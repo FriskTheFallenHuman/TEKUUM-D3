@@ -4,7 +4,7 @@
 Doom 3 GPL Source Code
 Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company. 
 
-This file is part of the Doom 3 GPL Source Code (?Doom 3 Source Code?).  
+This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").  
 
 Doom 3 Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -83,7 +83,7 @@ int	vkeyToDoom3Key_French[256] = {
 	/*0x08*/	'c',	'v',		'?',	'b',		'a',		'z',		'e',		'r',
 	/*0x10*/	'y',	't',		'1',	'2',		'3',		'4',		'6',		'5',
 	/*0x18*/	'-',	'9',		'7',	')',		'8',		'0',		'$',		'o',
-	/*0x20*/	'u',	'^',		'i',	'p',		K_ENTER,	'l',		'j',		'ù',
+	/*0x20*/	'u',	'^',		'i',	'p',		K_ENTER,	'l',		'j',		'ï¿½',
 	/*0x28*/	'k',	'm',		0x60,	';',			'=',	'n',		',',			':',
 	/*0x30*/	K_TAB, K_SPACE, '<', K_BACKSPACE, '?', K_ESCAPE, '?', K_COMMAND,
 	/*0x38*/	K_SHIFT, K_CAPSLOCK, K_ALT, K_CTRL, '?', '?', '?', '?',
@@ -101,7 +101,7 @@ int	vkeyToDoom3Key_German[256] = {
 	/*0x00*/	'a',	's',		'd',	'f',		'h',		'g',		'y',		'x',
 	/*0x08*/	'c',	'v',		'?',	'b',		'q',		'w',		'e',		'r',
 	/*0x10*/	'z',	't',		'1',	'2',		'3',		'4',		'6',		'5',
-	/*0x18*/	'«',	'9',		'7',	'-',		'8',		'0',		'+',		'o',
+	/*0x18*/	'ï¿½',	'9',		'7',	'-',		'8',		'0',		'+',		'o',
 	/*0x20*/	'u',	'[',		'i',	'p',		K_ENTER,	'l',		'j',		'\'',
 	/*0x28*/	'k',	';',		'#',	',',		'-',		'n',		'm',		'.',
 	/*0x30*/	K_TAB, K_SPACE, '`', K_BACKSPACE, '?', K_ESCAPE, '?', K_COMMAND,

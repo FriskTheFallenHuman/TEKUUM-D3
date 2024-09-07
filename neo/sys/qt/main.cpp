@@ -30,7 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "GameMainWindow.h"
 
-#include "../../idlib/precompiled.h"
+#include "precompiled.h"
 #pragma hdrstop
 
 #include "../../framework/Common.h"

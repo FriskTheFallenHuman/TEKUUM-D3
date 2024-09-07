@@ -4,7 +4,7 @@
 Doom 3 GPL Source Code
 Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
 
-This file is part of the Doom 3 GPL Source Code (?Doom 3 Source Code?).
+This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
 
 Doom 3 Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
-#include "../../idlib/precompiled.h"
+#include "precompiled.h"
 #include <Carbon/Carbon.h>
 #include "PreferencesDialog.h"
 #include "PickMonitor.h"
@@ -43,7 +43,7 @@ static idCVar r_stretched( "r_stretched", "0", CVAR_ARCHIVE | CVAR_BOOL, "Used s
 #endif
 
 const UInt32 kRes_Stretched 				= ( 1 << 0 );		// set if the resolution is a stretched mode (kCGDisplayModeIsStretched)
-const UInt32 kRes_Safe		 				= ( 1 << 1 );		// ¥¥¥Ê(currently unused) set if the resolution is safe (kCGDisplayModeIsSafeForHardware)
+const UInt32 kRes_Safe		 				= ( 1 << 1 );		// ï¿½ï¿½ï¿½ï¿½(currently unused) set if the resolution is safe (kCGDisplayModeIsSafeForHardware)
 
 // Data to be presented and edited in the prefs dialog
 struct PrefInfo
@@ -916,7 +916,7 @@ OSStatus CreateGameDisplayPreferencesDialog( const GameDisplayInfo* inGDInfo,
 
 
 //------------------------------------------------------------------------------------
-// ¥ RunGameDisplayPreferencesDialog
+// ï¿½ RunGameDisplayPreferencesDialog
 //------------------------------------------------------------------------------------
 // Runs the Mac-specific preferences dialog.
 

@@ -4,7 +4,7 @@
 Doom 3 GPL Source Code
 Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
 
-This file is part of the Doom 3 GPL Source Code (?Doom 3 Source Code?).
+This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
 
 Doom 3 Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -648,7 +648,7 @@ BOOL CALLBACK AboutDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
 		case WM_INITDIALOG:
 		{
 			char buffer[1024];
-			idStr::snPrintf( buffer, 1024, "DOOM Radiant Build %d\nCopyright ©1999-2004 Id Software, Inc.\n", BUILD_NUMBER );
+			idStr::snPrintf( buffer, 1024, "DOOM Radiant Build %d\nCopyright ï¿½1999-2004 Id Software, Inc.\n", BUILD_NUMBER );
 //			SetDlgItemText( hwndDlg, IDC_ABOUT_INFO, buffer);
 			idStr::snPrintf( buffer, 1024, "Renderer:\t%s", glGetString( GL_RENDERER ) );
 			SetDlgItemText( hwndDlg, IDC_ABOUT_GLRENDERER, buffer );

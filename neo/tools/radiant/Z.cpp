@@ -4,7 +4,7 @@
 Doom 3 GPL Source Code
 Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
 
-This file is part of the Doom 3 GPL Source Code (?Doom 3 Source Code?).
+This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
 
 Doom 3 Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -232,7 +232,7 @@ void Z_MouseMoved( int x, int y, int buttons )
 
 /*
  =======================================================================================================================
-    DRAWING £
+    DRAWING ï¿½
     Z_DrawGrid
  =======================================================================================================================
  */
@@ -395,10 +395,10 @@ void Z_Draw()
 	);
 
 	/*
-	 * GL Bug £
+	 * GL Bug ï¿½
 	 * When not using hw acceleration, gl will fault if we clear the depth buffer bit
 	 * on the first pass. The hack fix is to set the GL_DEPTH_BUFFER_BIT only after
-	 * Z_Draw() has been called once. Yeah, right. £
+	 * Z_Draw() has been called once. Yeah, right. ï¿½
 	 * glClear(glbitClear);
 	 */
 	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );

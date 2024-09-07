@@ -31,7 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "GameGLWidget.h"
 
-#include "../../idlib/precompiled.h"
+#include "precompiled.h"
 #include "../../renderer/tr_local.h"
 #pragma hdrstop
 

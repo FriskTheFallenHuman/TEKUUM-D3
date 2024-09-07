@@ -27,8 +27,8 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
-#pragma hdrstop
 #include "precompiled.h"
+#pragma hdrstop
 
 
 #include "tr_local.h"
@@ -2280,7 +2280,7 @@ void idMaterial::ParseMaterial( idTokenParser& src )
 		// noshadow
 		else if( !token.Icmp( "noShadows" ) )
 		{
-			SetMaterialFlag( MF_NOSHADOWS );
+			//SetMaterialFlag( MF_NOSHADOWS );
 			continue;
 		}
 		else if( !token.Icmp( "suppressInSubview" ) )
@@ -2361,7 +2361,7 @@ void idMaterial::ParseMaterial( idTokenParser& src )
 			// volume would be coplanar with the surface, giving depth fighting
 			// we could make this no-self-shadows, but it may be more important
 			// to receive shadows from no-self-shadow monsters
-			SetMaterialFlag( MF_NOSHADOWS );
+			//SetMaterialFlag( MF_NOSHADOWS );
 		}
 		// backSided
 		else if( !token.Icmp( "backSided" ) )
@@ -2369,7 +2369,7 @@ void idMaterial::ParseMaterial( idTokenParser& src )
 			cullType = CT_BACK_SIDED;
 			// the shadow code doesn't handle this, so just disable shadows.
 			// We could fix this in the future if there was a need.
-			SetMaterialFlag( MF_NOSHADOWS );
+			//SetMaterialFlag( MF_NOSHADOWS );
 		}
 		// foglight
 		else if( !token.Icmp( "fogLight" ) )
@@ -2770,7 +2770,7 @@ bool idMaterial::Parse( const char* text, const int textLength, bool allowBinary
 	// translucent automatically implies noshadows
 	if( coverage == MC_TRANSLUCENT )
 	{
-		SetMaterialFlag( MF_NOSHADOWS );
+		//SetMaterialFlag( MF_NOSHADOWS );
 	}
 	else
 	{

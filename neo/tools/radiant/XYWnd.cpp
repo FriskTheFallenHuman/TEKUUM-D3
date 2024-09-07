@@ -4,7 +4,7 @@
 Doom 3 GPL Source Code
 Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
 
-This file is part of the Doom 3 GPL Source Code (?Doom 3 Source Code?).
+This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
 
 Doom 3 Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -3091,7 +3091,7 @@ bool CXYWnd::XY_MouseMoved( int x, int y, int buttons )
 
 /*
  =======================================================================================================================
-    DRAWING £
+    DRAWING ï¿½
     XY_DrawGrid
  =======================================================================================================================
  */
@@ -3764,7 +3764,7 @@ bool FilterBrush( brush_t* pb )
 
 /*
  =======================================================================================================================
-    PATH LINES £
+    PATH LINES ï¿½
     DrawPathLines Draws connections between entities. Needs to consider all entities, not just ones on screen, because
     the lines can be visible when neither end is. Called for both camera view and xy view.
  =======================================================================================================================

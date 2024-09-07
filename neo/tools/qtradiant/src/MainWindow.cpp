@@ -12,7 +12,7 @@
 
 #include "../../sys/qt/GameMainWindow.h"
 
-//#include "../../idlib/precompiled.h"
+//#include "precompiled.h"
 //#pragma hdrstop
 
 //#include "../../game/game.h"
