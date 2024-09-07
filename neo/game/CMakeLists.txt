@@ -1,0 +1,171 @@
+project( game CXX )
+add_definitions(-DGAME_DLL)
+
+set( GAME_INCLUDES
+    AF.h
+    AFEntity.h
+    Actor.h
+    BrittleFracture.h
+    Camera.h
+	#EndLevel.h
+    Entity.h
+    Fx.h
+    Game.def
+    Game.h
+    GameEdit.h
+    Game_local.h
+    Grabber.h
+    IK.h
+    Item.h
+    Light.h
+    Misc.h
+    Moveable.h
+    Mover.h
+    MultiplayerGame.h
+    Player.h
+    PlayerIcon.h
+    PlayerView.h
+    Portal.h
+    Projectile.h
+    Pvs.h
+    SecurityCamera.h
+    SmokeParticles.h
+    Sound.h
+    Target.h
+    Trigger.h
+    Weapon.h
+    WorldSpawn.h )
+set( GAME_SOURCES
+    AF.cpp
+    AFEntity.cpp
+    Actor.cpp
+    BrittleFracture.cpp
+    Camera.cpp
+	#EndLevel.cpp
+    Entity.cpp
+    Fx.cpp
+    GameEdit.cpp
+    Game_local.cpp
+    Game_network.cpp
+    Grabber.cpp
+    IK.cpp
+    Item.cpp
+    Light.cpp
+    Misc.cpp
+    Moveable.cpp
+    Mover.cpp
+    MultiplayerGame.cpp
+    Player.cpp
+    PlayerIcon.cpp
+    PlayerView.cpp
+    Portal.cpp
+    Projectile.cpp
+    Pvs.cpp
+    SecurityCamera.cpp
+    SmokeParticles.cpp
+    Sound.cpp
+    Target.cpp
+    Trigger.cpp
+    Weapon.cpp
+    WorldSpawn.cpp )
+file( GLOB GAME_AI_INCLUDES ai/*.h )
+file( GLOB GAME_AI_SOURCES ai/*.cpp )
+file( GLOB GAME_ANIM_INCLUDES anim/*.h )
+file( GLOB GAME_ANIM_SOURCES anim/*.cpp)
+file( GLOB GAME_GAMESYS_INCLUDES gamesys/*.h )
+set( GAME_GAMESYS_SOURCES
+	#gamesys/Callbacks.cpp
+    gamesys/Class.cpp
+    gamesys/Event.cpp
+    gamesys/SaveGame.cpp
+    gamesys/SysCmds.cpp
+    gamesys/SysCvar.cpp )
+file( GLOB GAME_PHYSICS_INCLUDES physics/*.h )
+file( GLOB GAME_PHYSICS_SOURCES physics/*.cpp )
+file( GLOB GAME_SCRIPT_INCLUDES script/*.h )
+file( GLOB GAME_SCRIPT_SOURCES script/*.cpp )
+
+set( GAME_INCLUDES_ALL
+    ${GAME_INCLUDES}
+    ${GAME_AI_INCLUDES}
+    ${GAME_ANIM_INCLUDES}
+    ${GAME_GAMESYS_INCLUDES}
+    ${GAME_PHYSICS_INCLUDES}
+    ${GAME_SCRIPT_INCLUDES} )
+			
+set( GAME_SOURCES_ALL
+    ${GAME_SOURCES}
+    ${GAME_AI_SOURCES}
+    ${GAME_ANIM_SOURCES}
+    ${GAME_GAMESYS_SOURCES}
+    ${GAME_PHYSICS_SOURCES}
+    ${GAME_SCRIPT_SOURCES} )
+
+source_group( "" FILES ${GAME_INCLUDES} )
+source_group( "" FILES ${GAME_SOURCES} )
+source_group( "AI" FILES ${GAME_AI_INCLUDES} )
+source_group( "AI" FILES ${GAME_AI_SOURCES} )
+source_group( "Anim" FILES ${GAME_ANIM_INCLUDES} )
+source_group( "Anim" FILES ${GAME_ANIM_SOURCES} )
+source_group( "GameSys" FILES ${GAME_GAMESYS_INCLUDES} )
+source_group( "GameSys" FILES ${GAME_GAMESYS_SOURCES} )
+source_group( "Physics" FILES ${GAME_PHYSICS_INCLUDES} )
+source_group( "Physics" FILES ${GAME_PHYSICS_SOURCES} )
+source_group( "Script" FILES ${GAME_SCRIPT_INCLUDES} )
+source_group( "Script" FILES ${GAME_SCRIPT_SOURCES} )
+
+if( MSVC )
+    add_library( ${PROJECT_NAME} SHARED ${GAME_SOURCES_ALL} ${GAME_INCLUDES_ALL} )
+    target_link_options( ${PROJECT_NAME} PRIVATE /DEF:${CMAKE_CURRENT_SOURCE_DIR}/Game.def )
+	target_include_directories( ${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/idlib )
+	add_dependencies( ${PROJECT_NAME} idlib )
+	target_link_libraries( ${PROJECT_NAME} idlib )
+else()
+	add_compile_options( -fPIC )
+	add_compile_options( -ldl )
+	if( USE_PRECOMPILED_HEADERS ) 	
+		set( GAME_PRECOMPILED_SOURCES ${GAME_SOURCES_ALL} )
+
+		foreach( src_file ${GAME_PRECOMPILED_SOURCES} )
+            set_source_files_properties(
+				${src_file}
+				PROPERTIES
+				COMPILE_FLAGS "-include ${CMAKE_CURRENT_SOURCE_DIR}/../idlib/precompiled.h" )
+		endforeach()
+
+		# precompiled magic for GCC/clang, adapted from https://gist.github.com/573926
+		STRING( TOUPPER "CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE}" _flags_var_name )
+		SET( _compiler_FLAGS ${${_flags_var_name}} )
+		GET_DIRECTORY_PROPERTY( _directory_flags INCLUDE_DIRECTORIES )
+		FOREACH( item ${_directory_flags} )
+			LIST( APPEND _compiler_FLAGS " -I${item}" )
+		ENDFOREACH( item )
+	endif()
+
+	#GK: fix for mingw and recent versions of cmake
+    cmake_policy( SET CMP0059 NEW )
+
+	GET_DIRECTORY_PROPERTY( _directory_flags DEFINITIONS )
+	LIST( APPEND _compiler_FLAGS ${_directory_flags} )
+	SEPARATE_ARGUMENTS( _compiler_FLAGS )
+	
+	if( USE_PRECOMPILED_HEADERS )
+		# we need to recreate the precompiled header for RBDoom3BFG 
+		# (i.e. can't use the one created for idlib before)
+		# because some definitions (e.g. -D__IDLIB__ -D__DOOM_DLL__) differ
+		add_custom_target( precomp_header_game ALL
+				COMMAND ${CMAKE_CXX_COMPILER} ${_compiler_FLAGS} -x c++-header ../idlib/precompiled.h -o ../idlib/precompiled.h.gch
+				WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+				COMMENT "Creating ../idlib/precompiled.h.gch for game" )
+	endif()
+
+    target_include_directories( ${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/idlib )
+
+	add_library( ${PROJECT_NAME} SHARED ${GAME_SOURCES_ALL} ${GAME_INCLUDES_ALL} )
+
+	if ( USE_PRECOMPILED_HEADERS )
+		# make sure precompiled header is created before executable is compiled
+		add_dependencies( ${PROJECT_NAME} precomp_header_game )
+	endif()
+	target_link_libraries( ${PROJECT_NAME} idlib )
+endif()
