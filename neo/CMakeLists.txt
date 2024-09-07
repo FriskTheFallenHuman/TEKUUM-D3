@@ -1020,15 +1020,15 @@ if(MSVC)
 		)
 	endif()
 
-	if(USE_QT_WINDOWING)
-		add_executable(Tekuum ${TEKUUM_INCLUDES} ${TEKUUM_SOURCES} ${QTTEKUUM_INCLUDES} ${QTTEKUUM_SOURCES} ${QTTEKUUM_RESOURCES})
+	if( USE_QT_WINDOWING )
+		add_executable( ${PROJECT_NAME} ${TEKUUM_INCLUDES} ${TEKUUM_SOURCES} ${QTTEKUUM_INCLUDES} ${QTTEKUUM_SOURCES} ${QTTEKUUM_RESOURCES} )
 	else()
-		add_executable(Tekuum WIN32 ${TEKUUM_INCLUDES} ${TEKUUM_SOURCES} ${WIN32_RESOURCES})
+		add_executable( ${PROJECT_NAME} WIN32 ${TEKUUM_INCLUDES} ${TEKUUM_SOURCES} ${WIN32_RESOURCES} )
 	endif()
 
 	if(ANGLE)
-		add_dependencies(Tekuum idlib external libANGLE)
-		target_link_libraries(Tekuum
+		add_dependencies( ${PROJECT_NAME} idlib external libANGLE )
+		target_link_libraries( ${PROJECT_NAME}
 			idlib
 			external
 			libANGLE
@@ -1044,8 +1044,8 @@ if(MSVC)
 			winmm
 			ws2_32.lib)
 	else()
-		add_dependencies(Tekuum idlib external)
-			target_link_libraries(Tekuum
+		add_dependencies(${PROJECT_NAME} idlib external)
+		target_link_libraries(${PROJECT_NAME}
 			idlib
 			external
 			${DirectX_LIBRARIES}
@@ -1063,29 +1063,32 @@ if(MSVC)
 
 	# set MSVC default debug directory on executable
 	if( CMAKE_MAJOR_VERSION EQUAL 3 AND CMAKE_MINOR_VERSION GREATER_EQUAL 8 )
-		set_target_properties( Tekuum PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/.." )
+		set_target_properties( ${PROJECT_NAME} PROPERTIES VS_STARTUP_PROJECT ${PROJECT_NAME} )
+		set_target_properties( ${PROJECT_NAME} PROPERTIES VS_DEBUGGER_COMMAND "${CMAKE_SOURCE_DIR}/../${PROJECT_NAME}.exe" )
+		set_target_properties( ${PROJECT_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/.." )
+		set_target_properties( ${PROJECT_NAME} PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "+set developer 1" )
 	endif()
 
-elseif(UNIX)
+elseif( UNIX )
 
-    if(SDL2)
-        find_package(SDL2 REQUIRED)
-        include_directories(${SDL2_INCLUDE_DIR})
-        set(SDLx_LIBRARY ${SDL2_LIBRARY})
+    if( SDL2 )
+        find_package( SDL2 REQUIRED )
+        include_directories( ${SDL2_INCLUDE_DIR} )
+        set( SDLx_LIBRARY ${SDL2_LIBRARY})
     else()
-        find_package(SDL REQUIRED)
-        include_directories(${SDL_INCLUDE_DIR})
-        set(SDLx_LIBRARY ${SDL_LIBRARY})
+        find_package( SDL REQUIRED )
+        include_directories( ${SDL_INCLUDE_DIR} )
+        set( SDLx_LIBRARY ${SDL_LIBRARY} )
     endif()
 
-    add_definitions(-DUSE_SDL)
-    add_definitions(-DUSE_SDL_ASYNC)
-    add_definitions(-DUSE_SOUND_PULSE)
-	add_definitions(-DUSE_EXCEPTIONS)
+    add_definitions( -DUSE_SDL )
+    add_definitions( -DUSE_SDL_ASYNC )
+    add_definitions( -DUSE_SOUND_PULSE )
+	add_definitions( -DUSE_EXCEPTIONS )
 
 	if(MESA)
-		add_definitions(-DUSE_GLES3)
-		add_definitions(-DUSE_MESA)
+		add_definitions( -DUSE_GLES3 )
+		add_definitions( -DUSE_MESA )
 	endif()
 
     #find_package(PulseAudio REQUIRED)
@@ -1144,11 +1147,11 @@ elseif(UNIX)
 		add_dependencies( precomp_header_tekuum idlib )
 	endif()
 
-	add_executable( tekuum ${TEKUUM_INCLUDES} ${TEKUUM_SOURCES} )
+	add_executable( ${PROJECT_NAME} ${TEKUUM_INCLUDES} ${TEKUUM_SOURCES} )
 
 	if ( USE_PRECOMPILED_HEADERS )
 		# make sure precompiled header is created before executable is compiled
-		add_dependencies( tekuum precomp_header_tekuum )
+		add_dependencies( ${PROJECT_NAME} precomp_header_tekuum )
 
 		if( WIN32 )
 			set( remove_command "del" )
@@ -1162,11 +1165,11 @@ elseif(UNIX)
 					COMMAND ${remove_command} "idlib/precompiled.h.gch"
 					WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 					COMMENT "remove idlib/precompiled.h.gch" )
-			add_dependencies( rm_precomp_header tekuum )
+			add_dependencies( rm_precomp_header ${PROJECT_NAME} )
 
 		# delete precompiled header file after executable is compiled: IDE build case (e.g. Xcode)
 		else()
-			add_custom_command( TARGET tekuum POST_BUILD
+			add_custom_command( TARGET ${PROJECT_NAME} POST_BUILD
 					# SRS - added wildcards to remove tmp files from cmake ZERO_CHECK regeneration
 					COMMAND ${remove_command} "idlib/precompiled.h*.gch*"
 					WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -1174,7 +1177,7 @@ elseif(UNIX)
 		endif()
 	endif()
 
-	target_link_libraries(tekuum
+	target_link_libraries(${PROJECT_NAME}
         idlib
 		external
         GL
@@ -1185,3 +1188,5 @@ elseif(UNIX)
         pulse-simple
         ${SDLx_LIBRARY})
 endif()
+
+set_target_properties( ${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:>${CMAKE_SOURCE_DIR}/.. LIBRARY_OUTPUT_DIRECTORY $<1:>${CMAKE_SOURCE_DIR}/.. )

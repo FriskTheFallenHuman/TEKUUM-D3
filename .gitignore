@@ -1043,3 +1043,53 @@ dkms.conf
 *.uf2
 # Raspberry Pi Pico disassembler file
 *.dis
+
+# Do not include MayaSDK please
+neo/libs/MayaSDKDevKit/*
+
+# Doxygen docs
+docs/html/*
+
+# Doom 3: Build directory & log directory
+buildlog/
+build*/
+
+# Doom 3: Ignore PK4 & Keys
+config.spec
+DoomConfig.cfg
+game00.pk4
+game01.pk4
+game02.pk4
+game03.pk4
+game*.dll
+pak000.pk4
+pak001.pk4
+pak002.pk4
+pak003.pk4
+pak004.pk4
+pak005.pk4
+pak006.pk4
+pak007.pk4
+pak008.pk4
+doomkey
+xpkey
+STEAM_doomkey
+STEAM_xpkey
+
+# Doom 3 RoE: Ignore PK4 & Keys
+D3ROE.ico
+description.txt
+game00.pk4
+game01.pk4
+game02.pk4
+game03.pk4
+game*.dll
+install.log
+pak000
+pak000.pk4
+pak001.pk4
+
+# General engine files
+*/generated/*
+consoleHistory.txt
+TekuumConfig.cfg
