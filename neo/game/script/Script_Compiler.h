@@ -32,10 +32,8 @@ const char* const RESULT_STRING = "<RESULT>";
 
 typedef struct opcode_s
 {
-	// RB begin
 	const char*	name;
 	const char*	opname;
-	// RB end
 	int			priority;
 	bool		rightAssociative;
 	idVarDef*	type_a;
@@ -202,9 +200,7 @@ class idCompiler
 {
 private:
 	static bool		punctuationValid[ 256 ];
-	// RB begin
 	static const char*		punctuation[];
-	// RB end
 
 	idParser		parser;
 	idParser*		parserPtr;
@@ -226,8 +222,8 @@ private:
 	const idVarDef*	basetype;			// for accessing fields
 
 	float			Divide( float numerator, float denominator );
-	void			Error( VERIFY_FORMAT_STRING const char* error, ... ) const;
-	void			Warning( VERIFY_FORMAT_STRING const char* message, ... ) const;
+	void			Error( const char* error, ... ) const id_attribute( ( format( printf, 2, 3 ) ) );
+	void			Warning( const char* message, ... ) const id_attribute( ( format( printf, 2, 3 ) ) );
 	idVarDef*		OptimizeOpcode( const opcode_t* op, idVarDef* var_a, idVarDef* var_b );
 	idVarDef*		EmitOpcode( const opcode_t* op, idVarDef* var_a, idVarDef* var_b );
 	idVarDef*		EmitOpcode( int op, idVarDef* var_a, idVarDef* var_b );
@@ -276,9 +272,7 @@ private:
 	void			ParseNamespace( idVarDef* newScope );
 
 public :
-	// RB: added const
 	static const opcode_t	opcodes[];
-	// RB end
 
 	idCompiler();
 	void			CompileFile( const char* text, const char* filename, bool console );

@@ -25,12 +25,6 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
-/*
-game_worldspawn.cpp
-
-Worldspawn class.  Each map has one worldspawn which handles global spawnargs.
-
-*/
 
 #include "precompiled.h"
 #pragma hdrstop
@@ -41,6 +35,7 @@ Worldspawn class.  Each map has one worldspawn which handles global spawnargs.
 ================
 idWorldspawn
 
+Worldspawn class.  Each map has one worldspawn which handles global spawnargs.
 Every map should have exactly one worldspawn.
 ================
 */
@@ -64,13 +59,7 @@ void idWorldspawn::Spawn()
 	assert( gameLocal.world == NULL );
 	gameLocal.world = this;
 
-	// RB: changed gravity sign
-#if defined(STANDALONE)
-	g_gravityZ.SetFloat( -spawnArgs.GetFloat( "gravity", va( "-%f", DEFAULT_GRAVITY ) ) );
-#else
 	g_gravity.SetFloat( spawnArgs.GetFloat( "gravity", va( "%f", DEFAULT_GRAVITY ) ) );
-#endif
-	// RB end
 
 	// disable stamina on hell levels
 	if( spawnArgs.GetBool( "no_stamina" ) )
@@ -80,14 +69,7 @@ void idWorldspawn::Spawn()
 
 	// load script
 	scriptname = gameLocal.GetMapName();
-
-	// RB begin
-#if defined(USE_DOOMSHARP)
-	scriptname.SetFileExtension( ".cs" );
-#else
 	scriptname.SetFileExtension( ".script" );
-#endif
-	// RB end
 	if( fileSystem->ReadFile( scriptname, NULL, NULL ) > 0 )
 	{
 		gameLocal.program.CompileFile( scriptname );
@@ -135,15 +117,7 @@ void idWorldspawn::Restore( idRestoreGame* savefile )
 {
 	assert( gameLocal.world == this );
 
-	// RB: changed g_gravity to 3d vector
-#if defined(STANDALONE)
-	g_gravityY.SetFloat( 0.0f );
-	g_gravityY.SetFloat( 0.0f );
-	g_gravityZ.SetFloat( -spawnArgs.GetFloat( "gravity", va( "%f", DEFAULT_GRAVITY ) ) );
-#else
 	g_gravity.SetFloat( spawnArgs.GetFloat( "gravity", va( "%f", DEFAULT_GRAVITY ) ) );
-#endif
-	// RB end
 
 	// disable stamina on hell levels
 	if( spawnArgs.GetBool( "no_stamina" ) )

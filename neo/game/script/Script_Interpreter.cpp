@@ -192,7 +192,7 @@ void idInterpreter::Reset()
 	currentFunction = 0;
 	NextInstruction( 0 );
 
-	threadDying 	= false;
+	threadDying	=	false;
 	doneProcessing	= true;
 }
 
@@ -203,7 +203,6 @@ idInterpreter::GetRegisterValue
 Returns a string representation of the value of the register.  This is
 used primarily for the debugger and debugging
 
-//FIXME:  This is pretty much wrong.  won't access data in most situations.
 ================
 */
 bool idInterpreter::GetRegisterValue( const char* name, idStr& out, int scopeDepth )
@@ -212,9 +211,9 @@ bool idInterpreter::GetRegisterValue( const char* name, idStr& out, int scopeDep
 	idVarDef*		d;
 	char			funcObject[ 1024 ];
 	char*			funcName;
-	const idVarDef*	scope;
+	const idVarDef*	scope = NULL;
+	const idVarDef*	scopeObj;
 	const idTypeDef*	field;
-	const idScriptObject* obj;
 	const function_t* func;
 
 	out.Empty();
@@ -242,40 +241,44 @@ bool idInterpreter::GetRegisterValue( const char* name, idStr& out, int scopeDep
 	if( funcName )
 	{
 		*funcName = '\0';
-		scope = gameLocal.program.GetDef( NULL, funcObject, &def_namespace );
+		scopeObj = gameLocal.program.GetDef( NULL, funcObject, &def_namespace );
 		funcName += 2;
+		if( scopeObj )
+		{
+			scope = gameLocal.program.GetDef( NULL, funcName, scopeObj );
+		}
 	}
 	else
 	{
 		funcName = funcObject;
-		scope = &def_namespace;
+		scope = gameLocal.program.GetDef( NULL, func->Name(), &def_namespace );
+		scopeObj = NULL;
 	}
 
-	// Get the function from the object
-	d = gameLocal.program.GetDef( NULL, funcName, scope );
-	if( !d )
+	if( !scope )
 	{
 		return false;
 	}
 
-	// Get the variable itself and check various namespaces
-	d = gameLocal.program.GetDef( NULL, name, d );
+	d = gameLocal.program.GetDef( NULL, name, scope );
+
+	// Check the objects for it if it wasnt local to the function
 	if( !d )
 	{
-		if( scope == &def_namespace )
+		for( ; scopeObj && scopeObj->TypeDef()->SuperClass(); scopeObj = scopeObj->TypeDef()->SuperClass()->def )
 		{
-			return false;
-		}
-
-		d = gameLocal.program.GetDef( NULL, name, scope );
-		if( !d )
-		{
-			d = gameLocal.program.GetDef( NULL, name, &def_namespace );
-			if( !d )
+			d = gameLocal.program.GetDef( NULL, name, scopeObj );
+			if( d )
 			{
-				return false;
+				break;
 			}
 		}
+	}
+
+	if( !d )
+	{
+		out = "???";
+		return false;
 	}
 
 	reg = GetVariable( d );
@@ -318,15 +321,25 @@ bool idInterpreter::GetRegisterValue( const char* name, idStr& out, int scopeDep
 			break;
 
 		case ev_field:
+		{
+			idEntity*		entity;
+			idScriptObject*	obj;
+
 			if( scope == &def_namespace )
 			{
 				// should never happen, but handle it safely anyway
 				return false;
 			}
 
-			field = scope->TypeDef()->GetParmType( reg.ptrOffset )->FieldType();
-			obj   = *reinterpret_cast<const idScriptObject**>( &localstack[ callStack[ callStackDepth ].stackbase ] );
-			if( !field || !obj )
+			field  = d->TypeDef()->FieldType();
+			entity = GetEntity( *( ( int* )&localstack[ localstackBase ] ) );
+			if( !entity || !field )
+			{
+				return false;
+			}
+
+			obj = &entity->scriptObject;
+			if( !obj )
 			{
 				return false;
 			}
@@ -341,10 +354,29 @@ bool idInterpreter::GetRegisterValue( const char* name, idStr& out, int scopeDep
 					out = va( "%g", *( reinterpret_cast<float*>( &obj->data[ reg.ptrOffset ] ) ) );
 					return true;
 
+				case ev_string:
+				{
+					const char* str;
+					str = reinterpret_cast<const char*>( &obj->data[ reg.ptrOffset ] );
+					if( !str )
+					{
+						out = "\"\"";
+					}
+					else
+					{
+						out  = "\"";
+						out += str;
+						out += "\"";
+					}
+					return true;
+				}
+
 				default:
 					return false;
 			}
+
 			break;
+		}
 
 		case ev_string:
 			if( reg.stringPtr )
@@ -451,7 +483,7 @@ idInterpreter::StackTrace
 void idInterpreter::StackTrace() const
 {
 	const function_t*	f;
-	int 				i;
+	int					i;
 	int					top;
 
 	if( callStackDepth == 0 )
@@ -601,10 +633,6 @@ void idInterpreter::ThreadCall( idInterpreter* source, const function_t* func, i
 {
 	Reset();
 
-	if( args > LOCALSTACK_SIZE )
-	{
-		args = LOCALSTACK_SIZE;
-	}
 	memcpy( localstack, &source->localstack[ source->localstackUsed - args ], args );
 
 	localstackUsed = args;
@@ -651,7 +679,7 @@ NOTE: If this is called from within a event called by this interpreter, the func
 */
 void idInterpreter::EnterFunction( const function_t* func, bool clearStack )
 {
-	int 		c;
+	int			c;
 	prstack_t*	stack;
 
 	if( clearStack )
@@ -802,14 +830,12 @@ idInterpreter::CallEvent
 */
 void idInterpreter::CallEvent( const function_t* func, int argsize )
 {
-	int 				i;
+	int					i;
 	int					j;
 	varEval_t			var;
-	int 				pos;
-	int 				start;
-	// RB: 64 bit fixes, changed int to intptr_t
+	int					pos;
+	int					start;
 	intptr_t			data[ D_EVENT_MAXARGS ];
-	// RB end
 	const idEventDef*	evdef;
 	const char*			format;
 
@@ -875,10 +901,7 @@ void idInterpreter::CallEvent( const function_t* func, int argsize )
 		{
 			case D_EVENT_INTEGER :
 				var.intPtr = ( int* )&localstack[ start + pos ];
-				// RB: fixed data alignment
-				//data[ i ] = int( *var.floatPtr );
 				( *( int* )&data[ i ] ) = int( *var.floatPtr );
-				// RB end
 				break;
 
 			case D_EVENT_FLOAT :
@@ -900,7 +923,7 @@ void idInterpreter::CallEvent( const function_t* func, int argsize )
 				( *( idEntity** )&data[ i ] ) = GetEntity( *var.entityNumberPtr );
 				if( !( *( idEntity** )&data[ i ] ) )
 				{
-					Warning( "Entity %i not found for event '%s'. Terminating thread.", *var.entityNumberPtr, evdef->GetName() );
+					Warning( "Entity not found for event '%s'. Terminating thread.", evdef->GetName() );
 					threadDying = true;
 					PopParms( argsize );
 					return;
@@ -998,14 +1021,12 @@ idInterpreter::CallSysEvent
 */
 void idInterpreter::CallSysEvent( const function_t* func, int argsize )
 {
-	int 				i;
+	int					i;
 	int					j;
 	varEval_t			source;
-	int 				pos;
-	int 				start;
-	// RB: 64 bit fixes, changed int to intptr_t
+	int					pos;
+	int					start;
 	intptr_t			data[ D_EVENT_MAXARGS ];
-	// RB end
 	const idEventDef*	evdef;
 	const char*			format;
 
@@ -1049,7 +1070,7 @@ void idInterpreter::CallSysEvent( const function_t* func, int argsize )
 				*( idEntity** )&data[ i ] = GetEntity( *source.entityNumberPtr );
 				if( !*( idEntity** )&data[ i ] )
 				{
-					Warning( "Entity %i not found for event '%s'. Terminating thread.", *source.entityNumberPtr, evdef->GetName() );
+					Warning( "Entity not found for event '%s'. Terminating thread.", evdef->GetName() );
 					threadDying = true;
 					PopParms( argsize );
 					return;
@@ -1094,7 +1115,7 @@ bool idInterpreter::Execute()
 	varEval_t	var_c;
 	varEval_t	var;
 	statement_t*	st;
-	int 		runaway;
+	int			runaway;
 	idThread*	newThread;
 	float		floatVal;
 	idScriptObject* obj;
@@ -1272,28 +1293,28 @@ bool idInterpreter::Execute()
 				var_a = GetVariable( st->a );
 				var_b = GetVariable( st->b );
 				var_c = GetVariable( st->c );
-				*var_c.floatPtr = *var_a.floatPtr** var_b.floatPtr;
+				*var_c.floatPtr = *var_a.floatPtr * *var_b.floatPtr;
 				break;
 
 			case OP_MUL_V:
 				var_a = GetVariable( st->a );
 				var_b = GetVariable( st->b );
 				var_c = GetVariable( st->c );
-				*var_c.floatPtr = *var_a.vectorPtr** var_b.vectorPtr;
+				*var_c.floatPtr = *var_a.vectorPtr * *var_b.vectorPtr;
 				break;
 
 			case OP_MUL_FV:
 				var_a = GetVariable( st->a );
 				var_b = GetVariable( st->b );
 				var_c = GetVariable( st->c );
-				*var_c.vectorPtr = *var_a.floatPtr** var_b.vectorPtr;
+				*var_c.vectorPtr = *var_a.floatPtr * *var_b.vectorPtr;
 				break;
 
 			case OP_MUL_VF:
 				var_a = GetVariable( st->a );
 				var_b = GetVariable( st->b );
 				var_c = GetVariable( st->c );
-				*var_c.vectorPtr = *var_a.vectorPtr** var_b.floatPtr;
+				*var_c.vectorPtr = *var_a.vectorPtr * *var_b.floatPtr;
 				break;
 
 			case OP_DIV_F:
@@ -2049,14 +2070,7 @@ bool idInterpreter::Execute()
 
 			case OP_PUSH_V:
 				var_a = GetVariable( st->a );
-				// RB: 64 bit fix, changed individual pushes with PushVector
-				/*
-				Push( *reinterpret_cast<int *>( &var_a.vectorPtr->x ) );
-				Push( *reinterpret_cast<int *>( &var_a.vectorPtr->y ) );
-				Push( *reinterpret_cast<int *>( &var_a.vectorPtr->z ) );
-				*/
 				PushVector( *var_a.vectorPtr );
-				// RB end
 				break;
 
 			case OP_PUSH_OBJ:
@@ -2079,41 +2093,3 @@ bool idInterpreter::Execute()
 
 	return threadDying;
 }
-
-// RB: moved from Script_Interpreter.h to avoid include problems with the script debugger
-/*
-================
-idInterpreter::GetEntity
-================
-*/
-idEntity* idInterpreter::GetEntity( int entnum ) const
-{
-	assert( entnum <= MAX_GENTITIES );
-	if( ( entnum > 0 ) && ( entnum <= MAX_GENTITIES ) )
-	{
-		return gameLocal.entities[ entnum - 1 ];
-	}
-	return NULL;
-}
-
-/*
-================
-idInterpreter::GetScriptObject
-================
-*/
-idScriptObject* idInterpreter::GetScriptObject( int entnum ) const
-{
-	idEntity* ent;
-
-	assert( entnum <= MAX_GENTITIES );
-	if( ( entnum > 0 ) && ( entnum <= MAX_GENTITIES ) )
-	{
-		ent = gameLocal.entities[ entnum - 1 ];
-		if( ent && ent->scriptObject.data )
-		{
-			return &ent->scriptObject;
-		}
-	}
-	return NULL;
-}
-// RB end

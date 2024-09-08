@@ -38,20 +38,16 @@ If you have questions concerning this license or the applicable additional terms
 #define TOP_PRIORITY		7
 
 bool idCompiler::punctuationValid[ 256 ];
-// RB begin
 const char* idCompiler::punctuation[] =
 {
-// RB end
 	"+=", "-=", "*=", "/=", "%=", "&=", "|=", "++", "--",
 	"&&", "||", "<=", ">=", "==", "!=", "::", ";",  ",",
 	"~",  "!",  "*",  "/",  "%",  "(",   ")",  "-", "+",
 	"=",  "[",  "]",  ".",  "<",  ">" ,  "&",  "|", ":",  NULL
 };
 
-// RB: added const
 const opcode_t idCompiler::opcodes[] =
 {
-// RB end
 	{ "<RETURN>", "RETURN", -1, false, &def_void, &def_void, &def_void },
 
 	{ "++", "UINC_F", 1, true, &def_float, &def_void, &def_void },
@@ -214,9 +210,7 @@ idCompiler::idCompiler()
 */
 idCompiler::idCompiler()
 {
-	// RB begin
 	const char**	ptr;
-	// RB end
 	int		id;
 
 	// make sure we have the right # of opcodes in the table
@@ -265,11 +259,7 @@ void idCompiler::Error( const char* message, ... ) const
 	vsprintf( string, message, argptr );
 	va_end( argptr );
 
-#if defined(USE_EXCEPTIONS)
 	throw idCompileError( string );
-#else
-	parserPtr->Error( "%s", string );
-#endif
 }
 
 /*
@@ -564,19 +554,19 @@ idVarDef* idCompiler::OptimizeOpcode( const opcode_t* op, idVarDef* var_a, idVar
 			type = &type_vector;
 			break;
 		case OP_MUL_F:
-			c._float = *var_a->value.floatPtr** var_b->value.floatPtr;
+			c._float = *var_a->value.floatPtr * *var_b->value.floatPtr;
 			type = &type_float;
 			break;
 		case OP_MUL_V:
-			c._float = *var_a->value.vectorPtr** var_b->value.vectorPtr;
+			c._float = *var_a->value.vectorPtr * *var_b->value.vectorPtr;
 			type = &type_float;
 			break;
 		case OP_MUL_FV:
-			vec_c = *var_b->value.vectorPtr** var_a->value.floatPtr;
+			vec_c = *var_b->value.vectorPtr * *var_a->value.floatPtr;
 			type = &type_vector;
 			break;
 		case OP_MUL_VF:
-			vec_c = *var_a->value.vectorPtr** var_b->value.floatPtr;
+			vec_c = *var_a->value.vectorPtr * *var_b->value.floatPtr;
 			type = &type_vector;
 			break;
 		case OP_DIV_F:
@@ -676,7 +666,7 @@ idVarDef* idCompiler::OptimizeOpcode( const opcode_t* op, idVarDef* var_a, idVar
 			type = &type_float;
 			break;
 		case OP_UMUL_F:
-			c._float = *var_b->value.floatPtr** var_a->value.floatPtr;
+			c._float = *var_b->value.floatPtr * *var_a->value.floatPtr;
 			type = &type_float;
 			break;
 		case OP_UDIV_F:
@@ -766,7 +756,7 @@ idVarDef* idCompiler::EmitOpcode( const opcode_t* op, idVarDef* var_a, idVarDef*
 
 	statement = gameLocal.program.AllocStatement();
 	statement->linenumber	= currentLineNumber;
-	statement->file 		= currentFileNumber;
+	statement->file			= currentFileNumber;
 
 	if( ( op->type_c == &def_void ) || op->rightAssociative )
 	{
@@ -816,10 +806,8 @@ Emits an opcode to push the variable onto the stack.
 */
 bool idCompiler::EmitPush( idVarDef* expression, const idTypeDef* funcArg )
 {
-	// RB: added const
 	const opcode_t* op;
 	const opcode_t* out;
-	// RB end
 
 	out = NULL;
 	for( op = &opcodes[ OP_PUSH_F ]; op->name && !strcmp( op->name, "<PUSH>" ); op++ )
@@ -899,61 +887,8 @@ void idCompiler::NextToken()
 	switch( token.type )
 	{
 		case TT_STRING:
-			// RB: added support for "vector( x y z )" instead of 'x y z' so the C# compiler does not bail about a multi character literal
-#if defined(USE_DOOMSHARP)
-			if( token.CmpPrefix( "vector" ) == 0 )
-			{
-				// handle quoted vectors as a unit
-				immediateType = &type_vector;
-				idLexer lex( token, token.Length(), parserPtr->GetFileName(), LEXFL_NOERRORS );
-				idToken token2;
-
-				if( !lex.ExpectTokenString( "vector" ) )
-				{
-					Error( "vector '%s' is not in the form of vector( x y z ).  expected vector", token.c_str() );
-				}
-
-				if( !lex.ExpectTokenString( "(" ) )
-				{
-					Error( "vector '%s' is not in the form of vector( x y z ).  expected ( after vector", token.c_str() );
-				}
-
-				for( i = 0; i < 3; i++ )
-				{
-					if( !lex.ReadToken( &token2 ) )
-					{
-						Error( "Couldn't read vector. '%s' is not in the form of vector( x y z )", token.c_str() );
-					}
-					if( token2.type == TT_PUNCTUATION && token2 == "-" )
-					{
-						if( !lex.CheckTokenType( TT_NUMBER, 0, &token2 ) )
-						{
-							Error( "expected a number following '-' but found '%s' in vector '%s'", token2.c_str(), token.c_str() );
-						}
-						immediate.vector[ i ] = -token2.GetFloatValue();
-					}
-					else if( token2.type == TT_NUMBER )
-					{
-						immediate.vector[ i ] = token2.GetFloatValue();
-					}
-					else
-					{
-						Error( "vector '%s' is not in the form of vector( x y z ).  expected float value, found '%s'", token.c_str(), token2.c_str() );
-					}
-				}
-
-				if( !lex.ExpectTokenString( ")" ) )
-				{
-					Error( "vector '%s' is not in the form of vector( x y z ).  expected final )", token.c_str() );
-				}
-			}
-			else
-#endif
-			{
-				// handle quoted strings as a unit
-				immediateType = &type_string;
-			}
-			// RB end
+			// handle quoted strings as a unit
+			immediateType = &type_string;
 			return;
 
 		case TT_LITERAL:
@@ -1155,17 +1090,6 @@ idTypeDef* idCompiler::CheckType()
 	{
 		type = &type_void;
 	}
-	// RB begin
-#if defined(USE_DOOMSHARP)
-	else if( token == "class" )
-	{
-		type = &type_object;
-	}
-	else if( token == "bool" )
-	{
-		type = &type_boolean;
-	}
-#else
 	else if( token == "object" )
 	{
 		type = &type_object;
@@ -1174,8 +1098,6 @@ idTypeDef* idCompiler::CheckType()
 	{
 		type = &type_boolean;
 	}
-#endif
-	// RB end
 	else if( token == "namespace" )
 	{
 		type = &type_namespace;
@@ -1257,8 +1179,8 @@ idVarDef* idCompiler::EmitFunctionParms( int op, idVarDef* func, int startarg, i
 	const idTypeDef*	funcArg;
 	idVarDef*		returnDef;
 	idTypeDef*		returnType;
-	int 			arg;
-	int 			size;
+	int				arg;
+	int				size;
 	int				resultOp;
 
 	type = func->TypeDef();
@@ -1319,6 +1241,26 @@ idVarDef* idCompiler::EmitFunctionParms( int op, idVarDef* func, int startarg, i
 		// need arg size seperate since script object may be NULL
 		statement_t& statement = gameLocal.program.GetStatement( gameLocal.program.NumStatements() - 1 );
 		statement.c = SizeConstant( func->value.functionPtr->parmTotal );
+		// DG: before changes I did to ParseFunctionDef(), func->value.functionPtr->parmTotal was 0
+		//     if the function declaration/prototype has been parsed already, but the
+		//     definition/implementation hadn't been parsed yet. That was wrong and sometimes
+		//     (with debug game DLLs) lead to assertions in custom scripts, because the
+		//     stack space reserved for function parameters was wrong.
+		//     Now func->value.functionPtr->parmTotal is calculated when parsing the prototype,
+		//     but func->value.functionPtr->parmSize[i] is still only calculated when parsing
+		//     the implementation (as it's not needed before and so we can tell the cases apart here).
+		//     However, savegames from before the change have script checksums
+		//     (by idProgram::CalculateChecksum()) from statements with the wrong size, so
+		//     loading them would fail as the checksum doesn't match.
+		//     Setting this flag allows using the parmTotal argSize 0 when calculating the checksum
+		//     so it matches the one from old savegames (unless something else has also changed in
+		//     the script state so they really are incompatible). That's only done when actually
+		//     loading old savegames (detected via BUILD_NUMBER/savegame.GetBuildNumber())
+		if( op == OP_OBJECTCALL && func->value.functionPtr->parmTotal > 0
+				&& func->value.functionPtr->parmSize.Num() == 0 )
+		{
+			statement.flags = statement_t::FLAG_OBJECTCALL_IMPL_NOT_PARSED_YET;
+		}
 	}
 	else
 	{
@@ -1537,9 +1479,7 @@ idVarDef* idCompiler::LookupDef( const char* name, const idVarDef* baseobj )
 	idVarDef*	field;
 	etype_t		type_b;
 	etype_t		type_c;
-	// RB: added const
 	const opcode_t*	op;
-	// RB end
 
 	// check if we're accessing a field
 	if( baseobj && ( baseobj->Type() == ev_object ) )
@@ -1720,7 +1660,7 @@ idCompiler::GetTerm
 idVarDef* idCompiler::GetTerm()
 {
 	idVarDef*	e;
-	int 		op;
+	int			op;
 
 	if( !immediateType && CheckToken( "~" ) )
 	{
@@ -1732,9 +1672,11 @@ idVarDef* idCompiler::GetTerm()
 				break;
 
 			default :
+				Error( "type mismatch for ~" );
+
 				// shut up compiler
 				op = OP_COMP_F;
-				Error( "type mismatch for ~" );
+				break;
 		}
 
 		return EmitOpcode( op, e, 0 );
@@ -1766,18 +1708,22 @@ idVarDef* idCompiler::GetTerm()
 				break;
 
 			case ev_function :
+				Error( "Invalid type for !" );
+
 				// shut up compiler
 				op = OP_NOT_F;
-				Error( "Invalid type for !" );
 				break;
+
 			case ev_object :
 				op = OP_NOT_ENT;
 				break;
 
 			default :
+				Error( "type mismatch for !" );
+
 				// shut up compiler
 				op = OP_NOT_F;
-				Error( "type mismatch for !" );
+				break;
 		}
 
 		return EmitOpcode( op, e, 0 );
@@ -1812,9 +1758,11 @@ idVarDef* idCompiler::GetTerm()
 					op = OP_NEG_V;
 					break;
 				default :
+					Error( "type mismatch for -" );
+
 					// shut up compiler
 					op = OP_NEG_F;
-					Error( "type mismatch for -" );
+					break;
 			}
 			return EmitOpcode( &opcodes[ op ], e, 0 );
 		}
@@ -1891,16 +1839,14 @@ idCompiler::GetExpression
 */
 idVarDef* idCompiler::GetExpression( int priority )
 {
-	// RB: added const
 	const opcode_t*	op;
 	const opcode_t*	oldop;
-	// RB end
 	idVarDef*		e;
 	idVarDef*		e2;
 	const idVarDef*	oldtype;
-	etype_t 		type_a;
-	etype_t 		type_b;
-	etype_t 		type_c;
+	etype_t			type_a;
+	etype_t			type_b;
+	etype_t			type_c;
 
 	if( priority == 0 )
 	{
@@ -2164,11 +2110,9 @@ idCompiler::ParseReturnStatement
 void idCompiler::ParseReturnStatement()
 {
 	idVarDef*	e;
-	etype_t 	type_a;
-	etype_t 	type_b;
-	// RB: added const
+	etype_t		type_a;
+	etype_t		type_b;
 	const opcode_t*	op;
-	// RB end
 
 	if( CheckToken( ";" ) )
 	{
@@ -2542,7 +2486,6 @@ void idCompiler::ParseObjectDef( const char* objname )
 	const char*  fieldname;
 	idTypeDef	newtype( ev_field, NULL, "", 0, NULL );
 	idVarDef*	oldscope;
-	int			num;
 	int			i;
 
 	oldscope = scope;
@@ -2576,7 +2519,6 @@ void idCompiler::ParseObjectDef( const char* objname )
 	scope = objtype->def;
 
 	// inherit all the functions
-	num = parentType->NumFunctions();
 	for( i = 0; i < parentType->NumFunctions(); i++ )
 	{
 		const function_t* func = parentType->GetFunction( i );
@@ -2666,10 +2608,9 @@ void idCompiler::ParseFunctionDef( idTypeDef* returnType, const char* name )
 {
 	idTypeDef*		type;
 	idVarDef*		def;
-	const idVarDef*	parm;
 	idVarDef*		oldscope;
-	int 			i;
-	int 			numParms;
+	int				i;
+	int				numParms;
 	const idTypeDef*	parmType;
 	function_t*		func;
 	statement_t*		pos;
@@ -2702,16 +2643,38 @@ void idCompiler::ParseFunctionDef( idTypeDef* returnType, const char* name )
 		}
 	}
 
-	// check if this is a prototype or declaration
+	// DG: make sure parmTotal gets calculated when parsing prototype (not just when parsing
+	//     implementation) so calling this function/method before the implementation has been parsed
+	//     works without getting Assertions in IdInterpreter::Execute() and ::LeaveFunction()
+	//     ("st->c->value.argSize == func->parmTotal", "localstackUsed == localstackBase", see #303 and #344)
+
+	// calculate stack space used by parms
+	numParms = type->NumParameters();
 	if( !CheckToken( "{" ) )
 	{
 		// it's just a prototype, so get the ; and move on
 		ExpectToken( ";" );
+		// DG: BUT only after calculating the stack space for the arguments because this
+		// function might be called before the implementation is parsed (see #303 and #344)
+		// which otherwise causes Assertions in IdInterpreter::Execute() and ::LeaveFunction()
+		// ("st->c->value.argSize == func->parmTotal", "localstackUsed == localstackBase")
+		func->parmTotal = 0;
+		for( i = 0; i < numParms; i++ )
+		{
+			parmType = type->GetParmType( i );
+			int size = parmType->Inherits( &type_object ) ? type_object.Size() : parmType->Size();
+			func->parmTotal += size;
+			// NOTE: Don't set func->parmSize[] yet, the workaround to keep compatibility
+			//       with old savegames checks for func->parmSize.Num() == 0
+			//       (see EmitFunctionParms() for more explanation of that workaround)
+			// Also not defining the parms yet, otherwise they're defined in a different order
+			// than before, so their .num is different which breaks compat with old savegames
+		}
 		return;
 	}
 
-	// calculate stack space used by parms
-	numParms = type->NumParameters();
+
+	int totalSize = 0; // DG: totalsize might already have been calculated for the prototype, see a few lines above
 	func->parmSize.SetNum( numParms );
 	for( i = 0; i < numParms; i++ )
 	{
@@ -2724,8 +2687,11 @@ void idCompiler::ParseFunctionDef( idTypeDef* returnType, const char* name )
 		{
 			func->parmSize[ i ] = parmType->Size();
 		}
-		func->parmTotal += func->parmSize[ i ];
+		totalSize += func->parmSize[ i ];
 	}
+	// DG: if parmTotal has been calculated before, it shouldn't have changed
+	assert( ( func->parmTotal == 0 || totalSize == func->parmTotal ) && "function parameter sizes differ between protype vs implementation?!" );
+	func->parmTotal = totalSize;
 
 	// define the parms
 	for( i = 0; i < numParms; i++ )
@@ -2734,7 +2700,7 @@ void idCompiler::ParseFunctionDef( idTypeDef* returnType, const char* name )
 		{
 			Error( "'%s' defined more than once in function parameters", type->GetParmName( i ) );
 		}
-		parm = gameLocal.program.AllocDef( type->GetParmType( i ), type->GetParmName( i ), def, false );
+		gameLocal.program.AllocDef( type->GetParmType( i ), type->GetParmName( i ), def, false );
 	}
 
 	oldscope = scope;
@@ -3024,7 +2990,7 @@ void idCompiler::ParseEventDef( idTypeDef* returnType, const char* name )
 	const idTypeDef*	expectedType;
 	idTypeDef*		argType;
 	idTypeDef*		type;
-	int 			i;
+	int				i;
 	int				num;
 	const char*		format;
 	const idEventDef* ev;
@@ -3126,7 +3092,7 @@ Called at the outer layer and when a local statement is hit
 */
 void idCompiler::ParseDefs()
 {
-	idStr 		name;
+	idStr		name;
 	idTypeDef*	type;
 	idVarDef*	def;
 	idVarDef*	oldscope;
@@ -3239,6 +3205,8 @@ void idCompiler::CompileFile( const char* text, const char* filename, bool toCon
 
 	compile_time.Start();
 
+	idStr origFileName = filename; // DG: filename pointer might become invalid when calling NextToken() below
+
 	scope				= &def_namespace;
 	basetype			= NULL;
 	callthread			= false;
@@ -3253,13 +3221,6 @@ void idCompiler::CompileFile( const char* text, const char* filename, bool toCon
 
 	parser.SetFlags( LEXFL_ALLOWMULTICHARLITERALS );
 	parser.LoadMemory( text, strlen( text ), filename );
-
-	// RB begin
-#if defined(USE_DOOMSHARP)
-	parser.AddDefine( "CSHARP 0" );
-#endif
-	// RB end
-
 	parserPtr = &parser;
 
 	// unread tokens to include script defines
@@ -3285,9 +3246,7 @@ void idCompiler::CompileFile( const char* text, const char* filename, bool toCon
 	token.line = 1;
 
 	error = false;
-#if defined(USE_EXCEPTIONS)
 	try
-#endif
 	{
 		// read first token
 		NextToken();
@@ -3297,7 +3256,7 @@ void idCompiler::CompileFile( const char* text, const char* filename, bool toCon
 			ParseNamespace( &def_namespace );
 		}
 	}
-#if defined(USE_EXCEPTIONS)
+
 	catch( idCompileError& err )
 	{
 		idStr error;
@@ -3316,19 +3275,17 @@ void idCompiler::CompileFile( const char* text, const char* filename, bool toCon
 
 		throw idCompileError( error );
 	}
-#else
-	// FIXME check for errors
-	if( error )
-	{
-		common->Printf( "Error: idCompiler::CompileFile: file %s, line %d: unknown error\n", gameLocal.program.GetFilename( currentFileNumber ), currentLineNumber );
-	}
-#endif
 
 	parser.FreeSource();
 
 	compile_time.Stop();
 	if( !toConsole )
 	{
-		gameLocal.Printf( "Compiled '%s': %.1f ms\n", filename, compile_time.Milliseconds() );
+		// DG: filename can be overwritten by NextToken() (via gameLocal.program.GetFilenum()), so
+		//     use a copy, origFileName, that's still valid here. Furthermore, the path is nonsense,
+		//     as idProgram::CompileText() called fileSystem->RelativePathToOSPath() on it
+		//     which does not return the *actual* full path of that file but invents one,
+		//     so revert that to the relative filename which at least isn't misleading
+		gameLocal.Printf( "Compiled '%s': %u ms\n", fileSystem->OSPathToRelativePath( origFileName ), compile_time.Milliseconds() );
 	}
 }

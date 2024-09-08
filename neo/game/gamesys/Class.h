@@ -25,18 +25,19 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
-/*
-
-Base class for all game objects.  Provides fast run-time type checking and run-time
-instancing of objects.
-
-*/
 
 #ifndef __SYS_CLASS_H__
 #define __SYS_CLASS_H__
 
 class idClass;
 class idTypeInfo;
+
+/*
+
+Base class for all game objects.  Provides fast run-time type checking and run-time
+instancing of objects.
+
+*/
 
 extern const idEventDef EV_Remove;
 extern const idEventDef EV_SafeRemove;
@@ -59,9 +60,7 @@ class idEventArg
 {
 public:
 	int			type;
-	// RB: 64 bit fix, changed int to intptr_t
 	intptr_t	value;
-	// RB end
 
 	idEventArg()
 	{
@@ -78,7 +77,6 @@ public:
 		type = D_EVENT_FLOAT;
 		value = *reinterpret_cast<int*>( &data );
 	};
-	// RB: 64 bit fixes, changed int to intptr_t
 	idEventArg( idVec3& data )
 	{
 		type = D_EVENT_VECTOR;
@@ -104,7 +102,6 @@ public:
 		type = D_EVENT_TRACE;
 		value = reinterpret_cast<intptr_t>( data );
 	};
-	// RB end
 };
 
 class idAllocError : public idException
@@ -146,8 +143,6 @@ proper superclass is indicated or the run-time type information will be
 incorrect.  Use this on concrete classes only.
 ================
 */
-// RB: made exceptions optional
-#if defined(USE_EXCEPTIONS)
 #define CLASS_DECLARATION( nameofsuperclass, nameofclass )											\
 	idTypeInfo nameofclass::Type( #nameofclass, #nameofsuperclass,									\
 		( idEventFunc<idClass> * )nameofclass::eventCallbacks,	nameofclass::CreateInstance, ( void ( idClass::* )() )&nameofclass::Spawn,	\
@@ -166,22 +161,6 @@ incorrect.  Use this on concrete classes only.
 		return &( nameofclass::Type );																\
 	}																								\
 idEventFunc<nameofclass> nameofclass::eventCallbacks[] = {
-#else
-#define CLASS_DECLARATION( nameofsuperclass, nameofclass )											\
-	idTypeInfo nameofclass::Type( #nameofclass, #nameofsuperclass,									\
-		( idEventFunc<idClass> * )nameofclass::eventCallbacks,	nameofclass::CreateInstance, ( void ( idClass::* )() )&nameofclass::Spawn,	\
-		( void ( idClass::* )( idSaveGame * ) const )&nameofclass::Save, ( void ( idClass::* )( idRestoreGame * ) )&nameofclass::Restore );	\
-	idClass *nameofclass::CreateInstance() {													\
-			nameofclass *ptr = new nameofclass;														\
-			ptr->FindUninitializedMemory();															\
-			return ptr;																				\
-	}																								\
-	idTypeInfo *nameofclass::GetType() const {												\
-		return &( nameofclass::Type );																\
-	}																								\
-idEventFunc<nameofclass> nameofclass::eventCallbacks[] = {
-#endif
-// RB end
 
 /*
 ================
@@ -215,7 +194,7 @@ on abstract classes only.
 		( idEventFunc<idClass> * )nameofclass::eventCallbacks, nameofclass::CreateInstance, ( void ( idClass::* )() )&nameofclass::Spawn,	\
 		( void ( idClass::* )( idSaveGame * ) const )&nameofclass::Save, ( void ( idClass::* )( idRestoreGame * ) )&nameofclass::Restore );	\
 	idClass *nameofclass::CreateInstance() {													\
-		gameLocal.Error( "Cannot instanciate abstract class %s.", #nameofclass );					\
+		gameLocal.Error( "Cannot instantiate abstract class %s.", #nameofclass );					\
 		return NULL;																				\
 	}																								\
 	idTypeInfo *nameofclass::GetType() const {												\
@@ -233,8 +212,16 @@ class idClass
 public:
 	ABSTRACT_PROTOTYPE( idClass );
 
+#ifdef ID_REDIRECT_NEWDELETE
+#undef new
+#endif
 	void* 						operator new( size_t );
+	void* 						operator new( size_t s, int, int, char*, int );
 	void						operator delete( void* );
+	void						operator delete( void*, int, int, char*, int );
+#ifdef ID_REDIRECT_NEWDELETE
+#define new ID_DEBUG_NEW
+#endif
 
 	virtual						~idClass();
 
@@ -280,9 +267,7 @@ public:
 	bool						ProcessEvent( const idEventDef* ev, idEventArg arg1, idEventArg arg2, idEventArg arg3, idEventArg arg4, idEventArg arg5, idEventArg arg6, idEventArg arg7 );
 	bool						ProcessEvent( const idEventDef* ev, idEventArg arg1, idEventArg arg2, idEventArg arg3, idEventArg arg4, idEventArg arg5, idEventArg arg6, idEventArg arg7, idEventArg arg8 );
 
-	// RB: 64 bit fix, changed int to intptr_t
-	bool						ProcessEventArgPtr( const idEventDef* ev, intptr_t* data );
-	// RB end
+	bool						ProcessEventArgPtr( const idEventDef* ev, int* data );
 	void						CancelEvents( const idEventDef* ev );
 
 	void						Event_Remove();
@@ -293,9 +278,6 @@ public:
 	static idTypeInfo* 			GetClass( const char* name );
 	static void					DisplayInfo_f( const idCmdArgs& args );
 	static void					ListClasses_f( const idCmdArgs& args );
-	// RB begin
-	static void					ExportScriptEvents_f( const idCmdArgs& args );
-	// RB end
 	static idClass* 			CreateInstance( const char* name );
 	static int					GetNumTypes()
 	{

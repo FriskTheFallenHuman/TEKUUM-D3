@@ -43,7 +43,7 @@ const idEventDef EV_Fx_KillFx( "_killfx" );
 const idEventDef EV_Fx_Action( "_fxAction", "e" );		// implemented by subclasses
 
 CLASS_DECLARATION( idEntity, idEntityFx )
-EVENT( EV_Activate,	   	idEntityFx::Event_Trigger )
+EVENT( EV_Activate,		idEntityFx::Event_Trigger )
 EVENT( EV_Fx_KillFx,	idEntityFx::Event_ClearFx )
 END_CLASS
 
@@ -602,11 +602,6 @@ void idEntityFx::Run( int time )
 				{
 					useAction->renderEntity.origin = GetPhysics()->GetOrigin() + fxaction.offset;
 					useAction->renderEntity.axis = fxaction.explicitAxis ? fxaction.axis : GetPhysics()->GetAxis();
-// RB begin
-#if defined(STANDALONE)
-					gameRenderWorld->UpdateEntityDef( useAction->modelDefHandle, &useAction->renderEntity );
-#endif
-// RB end
 				}
 				ApplyFade( fxaction, *useAction, time, actualStart );
 				break;
@@ -642,42 +637,6 @@ void idEntityFx::Run( int time )
 				}
 				break;
 			}
-// RB begin
-#if defined(STANDALONE)
-			case FX_SHOCKWAVE:
-			{
-				if( gameLocal.isClient )
-				{
-					useAction->shakeStarted = true;
-					break;
-				}
-				if( !useAction->shakeStarted )
-				{
-					idStr	shockDefName;
-					useAction->shakeStarted = true;
-
-					shockDefName = fxaction.data;
-					if( !shockDefName.Length() )
-					{
-						shockDefName = "func_shockwave";
-					}
-
-					projectileDef = gameLocal.FindEntityDefDict( shockDefName, false );
-					if( !projectileDef )
-					{
-						gameLocal.Warning( "shockwave \'%s\' not found", shockDefName.c_str() );
-					}
-					else
-					{
-						gameLocal.SpawnEntityDef( *projectileDef, &ent );
-						ent->SetOrigin( GetPhysics()->GetOrigin() + fxaction.offset );
-						ent->PostEventMS( &EV_Remove, ent->spawnArgs.GetInt( "duration" ) );
-					}
-				}
-				break;
-			}
-#endif
-// RB end
 		}
 	}
 }
@@ -892,8 +851,8 @@ void idEntityFx::WriteToSnapshot( idBitMsgDelta& msg ) const
 {
 	GetPhysics()->WriteToSnapshot( msg );
 	WriteBindToSnapshot( msg );
-	msg.WriteLong( ( fxEffect != NULL ) ? gameLocal.ServerRemapDecl( -1, DECL_FX, fxEffect->Index() ) : -1 );
-	msg.WriteLong( started );
+	msg.WriteInt( ( fxEffect != NULL ) ? gameLocal.ServerRemapDecl( -1, DECL_FX, fxEffect->Index() ) : -1 );
+	msg.WriteInt( started );
 }
 
 /*
@@ -907,8 +866,8 @@ void idEntityFx::ReadFromSnapshot( const idBitMsgDelta& msg )
 
 	GetPhysics()->ReadFromSnapshot( msg );
 	ReadBindFromSnapshot( msg );
-	fx_index = gameLocal.ClientRemapDecl( DECL_FX, msg.ReadLong() );
-	start_time = msg.ReadLong();
+	fx_index = gameLocal.ClientRemapDecl( DECL_FX, msg.ReadInt() );
+	start_time = msg.ReadInt();
 
 	if( fx_index != -1 && start_time > 0 && !fxEffect && started < 0 )
 	{
@@ -964,9 +923,6 @@ idTeleporter::Event_DoAction
 */
 void idTeleporter::Event_DoAction( idEntity* activator )
 {
-	float angle;
-
-	angle = spawnArgs.GetFloat( "angle" );
 	idAngles a( 0, spawnArgs.GetFloat( "angle" ), 0 );
 	activator->Teleport( GetPhysics()->GetOrigin(), a, NULL );
 }

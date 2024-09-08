@@ -160,14 +160,6 @@ typedef enum
 	FC_DISABLE_LEG_IK,
 	FC_RECORDDEMO,
 	FC_AVIGAME
-// RB begin
-#if defined(STANDALONE)
-	, FC_LAUNCH_PROJECTILE,
-	FC_TRIGGER_FX,
-	FC_START_EMITTER,
-	FC_STOP_EMITTER,
-#endif
-// RB end
 } frameCommandType_t;
 
 typedef struct
@@ -197,6 +189,44 @@ typedef struct
 	bool					ai_no_turn					: 1;
 	bool					anim_turn					: 1;
 } animFlags_t;
+
+
+/*
+==============================================================================================
+
+	idModelExport
+
+==============================================================================================
+*/
+
+class idModelExport
+{
+private:
+	void					Reset();
+	bool					ParseOptions( idLexer& lex );
+	int						ParseExportSection( idParser& parser );
+
+	static bool				CheckMayaInstall();
+	static void				LoadMayaDll();
+
+	bool					ConvertMayaToMD5();
+	static bool				initialized;
+
+public:
+	idStr					commandLine;
+	idStr					src;
+	idStr					dest;
+	bool					force;
+
+	idModelExport();
+
+	static void				Shutdown();
+
+	int						ExportDefFile( const char* filename );
+	bool					ExportModel( const char* model );
+	bool					ExportAnim( const char* anim );
+	int						ExportModels( const char* pathname, const char* extension );
+};
 
 /*
 ==============================================================================================
@@ -570,7 +600,7 @@ private:
 	idEntity* 					entity;
 
 	idAnimBlend					channels[ ANIM_NumAnimChannels ][ ANIM_MaxAnimsPerChannel ];
-	idList<jointMod_t*>			jointMods;
+	idList<jointMod_t*>		jointMods;
 	int							numJoints;
 	idJointMat* 				joints;
 

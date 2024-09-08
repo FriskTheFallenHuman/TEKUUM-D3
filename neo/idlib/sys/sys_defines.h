@@ -30,6 +30,35 @@ If you have questions concerning this license or the applicable additional terms
 #define SYS_DEFINES_H
 
 /*
+===============================================================================
+
+	CPU Arch detection.
+
+===============================================================================
+*/
+
+// Setting D3_ARCH for VisualC++ from CMake doesn't work when using VS integrated CMake
+// so set it in code instead
+#ifdef _MSC_VER
+	#ifdef CPUSTRING
+		#undef CPUSTRING
+	#endif // CPUSTRING
+
+	#ifdef _M_X64
+		// this matches AMD64 and ARM64EC (but not regular ARM64), but they're supposed to be binary-compatible somehow, so whatever
+		#define CPUSTRING "x86_64"
+	#elif defined( _M_ARM64 )
+		#define CPUSTRING "arm64"
+	#elif defined( _M_ARM )
+		#define CPUSTRING "arm"
+	#elif defined( _M_IX86 )
+		#define CPUSTRING "x86"
+	#else
+		#define CPUSTRING "UNKNOWN"
+	#endif // _M_X64 etc
+#endif // _MSC_VER
+
+/*
 ================================================================================================
 
 	Non-portable system services.
@@ -39,24 +68,28 @@ If you have questions concerning this license or the applicable additional terms
 
 // Win32
 #if defined(WIN32) || defined(_WIN32)
-
-	#define	CPUSTRING						"x86"
-	#define CPU_EASYARGS					1
-
-	#define	BUILD_STRING					"win-" CPUSTRING
-	#define BUILD_OS_ID						0
-
 	#ifdef _MSC_VER
 		#define ALIGN16( x )					__declspec(align(16)) x
 		#define ALIGNTYPE16						__declspec(align(16))
 		#define ALIGNTYPE128					__declspec(align(128))
+
+		#ifdef GAME_DLL
+			#define ID_GAME_API					__declspec(dllexport)
+		#else
+			#define ID_GAME_API
+		#endif
 	#else
 		// DG: mingw/GCC (and probably clang) support
 		#define ALIGN16( x )					x __attribute__ ((aligned (16)))
 		// FIXME: change ALIGNTYPE* ?
 		#define ALIGNTYPE16
 		#define ALIGNTYPE128
-		// DG end
+
+		#ifdef GAME_DLL
+			#define ID_GAME_API					__attribute__((visibility ("default")))
+		#else
+			#define ID_GAME_API
+		#endif
 	#endif
 
 	#define PACKED
@@ -109,31 +142,6 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #elif defined(__ANDROID__)
-
-	#if defined(__i386__)
-		#define	CPUSTRING						"x86"
-		#define CPU_EASYARGS					1
-	#elif defined(__x86_64__)
-		#define CPUSTRING						"x86_86"
-		#define CPU_EASYARGS					0
-	#elif defined(__ARMEL__)
-
-		#if defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_7A__)
-			#define CPUSTRING						"armv7a"
-		#elif defined(__MATH_NEON)
-			#define CPUSTRING						"neon"
-		#else//lif defined(__ARM_ARCH_5__)
-			#define CPUSTRING						"armv5"
-		#endif
-
-		// RB: Android is 32 bit only so far
-		//#define CPU_EASYARGS					1
-
-	#endif
-
-	#define	BUILD_STRING					"android-" CPUSTRING
-	#define BUILD_OS_ID						2
-
 	#define _alloca							alloca
 
 	#define ALIGN16( x )					x __attribute__ ((aligned (16)))
@@ -169,19 +177,13 @@ If you have questions concerning this license or the applicable additional terms
 	#define __cdecl
 
 #elif defined(__linux__)
-
-	#if defined(__i386__)
-		#define	CPUSTRING						"x86"
-		#define CPU_EASYARGS					1
-	#elif defined(__x86_64__)
-		#define CPUSTRING						"x86_86"
-		#define CPU_EASYARGS					0
-	#endif
-
-	#define	BUILD_STRING					"linux-" CPUSTRING
-	#define BUILD_OS_ID						1
-
 	#define _alloca							alloca
+
+	#ifdef GAME_DLL
+		#define ID_GAME_API					__attribute__((visibility ("default")))
+	#else
+		#define ID_GAME_API
+	#endif
 
 	#define ALIGN16( x )					x __attribute__ ((aligned (16)))
 	#define ALIGNTYPE8						__attribute__ ((aligned (8)))

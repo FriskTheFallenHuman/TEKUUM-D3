@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.20)
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
-project(Tekuum C CXX)
+project(RBDOOM3 C CXX)
 
 option(USE_CMDLINE_TOOLS "Compile the built-in command line based tools" OFF)
 option(USE_MFC_TOOLS "Compile the built-in MFC based tools" OFF)
@@ -26,19 +26,8 @@ option(RETAIL "Strip certain developer features and cheats from shipping builds"
 	# set(USE_CMDLINE_TOOLS FALSE)
 # endif()
 
-set( CPU_TYPE "" CACHE STRING "When set, passes this string as CPU-ID which will be embedded into the binary." )
-
-# SRS - Turn on optimization when cross-compiling from Apple arm64 to x86_64
-if ( CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)" OR CMAKE_OSX_ARCHITECTURES MATCHES "x86_64" )
-	set( CPU_OPTIMIZATION "-mmmx -msse -msse2" CACHE STRING "Which CPU specific optimitations should be used beside the compiler's default?" )
-endif()
-
-# SRS - Turn off MMX/SSE intrinsics when cross-compiling from Apple x86_64 to arm64
-if( CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)|(e2k)|(E2K)" AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "arm64" )
-	option( USE_INTRINSICS_SSE "Compile using SSE intrinsics (e.g mmx, sse, msse2)" ON )
-else()
-	option( USE_INTRINSICS_SSE "Compile using SSE intrinsics (e.g mmx, sse, msse2)" OFF )
-endif()
+# Define our cpu variable
+include( CPUDefine )
 
 if( UNIX )
     # SRS - Disable precompiled headers when cross-compiling on OSX, e.g. when creating universal binaries
@@ -90,12 +79,6 @@ if( CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang" )
 		message( FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++17 support. Please use a different C++ compiler." )
 	endif()
 
-	if( CPU_TYPE )
-		add_definitions( -DCPUSTRING="${CPU_TYPE}" )
-	endif()
-	if ( CPU_OPTIMIZATION )
-		add_definitions( ${CPU_OPTIMIZATION} )
-	endif()
 	if( WIN32 )
 		# require msvcr70.dll or newer for _aligned_malloc etc
 		# I think it is from Visual C++ .NET 2002, so it should be available on any remotely modern system.
@@ -187,6 +170,8 @@ elseif( MSVC )
 	set( CMAKE_EXE_LINKER_FLAGS_MINSIZEREL "${CMAKE_EXE_LINKER_FLAGS_MINSIZEREL} /SAFESEH:NO" )
 	set( CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /SAFESEH:NO" )
 	set( CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} /SAFESEH:NO" )
+	
+	add_definitions( -D_ALLOW_KEYWORD_MACROS ) # because of the "#define private public" and "#define protected public" in TypeInfo.cpp
 
 	add_definitions( -DWIN32
 					-DNOMINMAX
@@ -226,11 +211,6 @@ if( STANDALONE )
 	add_definitions( -DSTANDALONE )
 endif()
 
-if( DEBUG_MEMORY)
-	add_definitions( -DID_DEBUG_MEMORY )
-	add_definitions( -DID_REDIRECT_NEWDELETE )
-endif()
-
 if( RETAIL )
 	add_definitions( -DID_RETAIL )
 endif()
@@ -242,6 +222,7 @@ if( APPLE )
 endif()
 
 add_subdirectory(game)
+add_subdirectory(d3xp)
 add_subdirectory(idlib)
 add_subdirectory(libs)
 

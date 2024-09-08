@@ -95,11 +95,6 @@ enum
 	INVISIBILITY,
 	MEGAHEALTH,
 	ADRENALINE,
-// RB begin
-#if defined(STANDALONE)
-	HELLTIME,
-#endif
-// RB end
 	MAX_POWERUPS
 };
 
@@ -232,7 +227,7 @@ public:
 	class idPlayerView		playerView;			// handles damage kicks and effects
 
 	bool					noclip;
-	bool					nodamage;
+	bool					godmode;
 
 	bool					spawnAnglesSet;		// on first usercmd, we must set deltaAngles
 	idAngles				spawnAngles;
@@ -241,9 +236,7 @@ public:
 
 	int						buttonMask;
 	int						oldButtons;
-	// RB: BFG usercmd_t
 	int						oldImpulseSequence;
-	// RB end
 
 	int						lastHitTime;			// last time projectile fired by player hit target
 	int						lastSndHitTime;			// MP hit sound - != lastHitTime because we throttle
@@ -338,12 +331,6 @@ public:
 	idMat3					firstPersonViewAxis;
 
 	idDragEntity			dragEntity;
-
-// RB begin
-#if defined(STANDALONE)
-	idFuncMountedObject*	mountedObject;
-#endif
-// RB end
 
 public:
 	CLASS_PROTOTYPE( idPlayer );
@@ -568,13 +555,7 @@ private:
 	jointHandle_t			chestJoint;
 	jointHandle_t			headJoint;
 
-// RB begin
-#if defined(STANDALONE)
-	tyPhysics_Player		physicsObj;			// player physics
-#else
-	idPhysics_Player		physicsObj;
-#endif
-// RB end
+	idPhysics_Player		physicsObj;			// player physics
 
 	idList<aasLocation_t>	aasLocation;		// for AI tracking the player
 
@@ -783,4 +764,3 @@ ID_INLINE void idPlayer::SetSelfSmooth( bool b )
 }
 
 #endif /* !__GAME_PLAYER_H__ */
-

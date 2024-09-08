@@ -735,92 +735,6 @@ const char* idAnim::AddFrameCommand( const idDeclModelDef* modelDef, int framenu
 		fc.string = new idStr( token );
 		fc.index = jointInfo->num;
 	}
-// RB begin
-#if defined(STANDALONE)
-	else if( token == "launch_projectile" )
-	{
-		if( !src.ReadTokenOnLine( &token ) )
-		{
-			return "Unexpected end of line";
-		}
-		if( !declManager->FindDeclWithoutParsing( DECL_ENTITYDEF, token, false ) )
-		{
-			return "Unknown projectile def";
-		}
-		fc.type = FC_LAUNCH_PROJECTILE;
-		fc.string = new idStr( token );
-	}
-	else if( token == "trigger_fx" )
-	{
-
-		if( !src.ReadTokenOnLine( &token ) )
-		{
-			return "Unexpected end of line";
-		}
-		jointInfo = modelDef->FindJoint( token );
-		if( !jointInfo )
-		{
-			return va( "Joint '%s' not found", token.c_str() );
-		}
-		if( !src.ReadTokenOnLine( &token ) )
-		{
-			return "Unexpected end of line";
-		}
-		if( !declManager->FindType( DECL_FX, token, false ) )
-		{
-			return "Unknown FX def";
-		}
-
-		fc.type = FC_TRIGGER_FX;
-		fc.string = new idStr( token );
-		fc.index = jointInfo->num;
-
-	}
-	else if( token == "start_emitter" )
-	{
-
-		idStr str;
-		if( !src.ReadTokenOnLine( &token ) )
-		{
-			return "Unexpected end of line";
-		}
-		str = token + " ";
-
-		if( !src.ReadTokenOnLine( &token ) )
-		{
-			return "Unexpected end of line";
-		}
-		jointInfo = modelDef->FindJoint( token );
-		if( !jointInfo )
-		{
-			return va( "Joint '%s' not found", token.c_str() );
-		}
-		if( !src.ReadTokenOnLine( &token ) )
-		{
-			return "Unexpected end of line";
-		}
-		if( !declManager->FindType( DECL_PARTICLE, token.c_str() ) )
-		{
-			return va( "Particle '%s' not found", token.c_str() );
-		}
-		str += token;
-		fc.type = FC_START_EMITTER;
-		fc.string = new idStr( str );
-		fc.index = jointInfo->num;
-
-	}
-	else if( token == "stop_emitter" )
-	{
-
-		if( !src.ReadTokenOnLine( &token ) )
-		{
-			return "Unexpected end of line";
-		}
-		fc.type = FC_STOP_EMITTER;
-		fc.string = new idStr( token );
-	}
-#endif
-// RB end
 	else if( token == "footstep" )
 	{
 		fc.type = FC_FOOTSTEP;
@@ -1175,11 +1089,6 @@ void idAnim::CallFrameCommands( idEntity* ent, int from, int to ) const
 					target = gameLocal.FindEntity( command.string->c_str() );
 					if( target )
 					{
-// RB begin
-#if defined(STANDALONE)
-						SetTimeState ts( target->timeGroup );
-#endif
-// RB end
 						target->Signal( SIG_TRIGGER );
 						target->ProcessEvent( &EV_Activate, ent );
 						target->TriggerGuis();
@@ -1236,35 +1145,6 @@ void idAnim::CallFrameCommands( idEntity* ent, int from, int to ) const
 					ent->ProcessEvent( &AI_FireMissileAtTarget, modelDef->GetJointName( command.index ), command.string->c_str() );
 					break;
 				}
-// RB begin
-#if defined(STANDALONE)
-				case FC_LAUNCH_PROJECTILE:
-				{
-					ent->ProcessEvent( &AI_LaunchProjectile, command.string->c_str() );
-					break;
-				}
-				case FC_TRIGGER_FX:
-				{
-					ent->ProcessEvent( &AI_TriggerFX, modelDef->GetJointName( command.index ), command.string->c_str() );
-					break;
-				}
-				case FC_START_EMITTER:
-				{
-					int index = command.string->Find( " " );
-					if( index >= 0 )
-					{
-						idStr name = command.string->Left( index );
-						idStr particle = command.string->Right( command.string->Length() - index - 1 );
-						ent->ProcessEvent( &AI_StartEmitter, name.c_str(), modelDef->GetJointName( command.index ), particle.c_str() );
-					}
-				}
-
-				case FC_STOP_EMITTER:
-				{
-					ent->ProcessEvent( &AI_StopEmitter, command.string->c_str() );
-				}
-#endif
-// RB end
 				case FC_FOOTSTEP :
 				{
 					ent->ProcessEvent( &EV_Footstep );
@@ -2872,7 +2752,7 @@ void idDeclModelDef::GetJointList( const char* jointnames, idList<jointHandle_t>
 	while( *pos )
 	{
 		// skip over whitespace
-		while( ( *pos != 0 ) && isspace( ( unsigned char )*pos ) )
+		while( ( *pos != 0 ) && isspace( *pos ) )
 		{
 			pos++;
 		}
@@ -2906,7 +2786,7 @@ void idDeclModelDef::GetJointList( const char* jointnames, idList<jointHandle_t>
 			getChildren = false;
 		}
 
-		while( ( *pos != 0 ) && !isspace( ( unsigned char )*pos ) )
+		while( ( *pos != 0 ) && !isspace( *pos ) )
 		{
 			jointname += *pos;
 			pos++;
@@ -3108,7 +2988,7 @@ bool idDeclModelDef::ParseAnim( idLexer& src, int numDefaultAnims )
 	len = alias.Length();
 	for( i = len - 1; i > 0; i-- )
 	{
-		if( !isdigit( ( unsigned char )alias[ i ] ) )
+		if( !isdigit( alias[ i ] ) )
 		{
 			break;
 		}
@@ -3768,7 +3648,7 @@ int idDeclModelDef::NumJointsOnChannel( int channel ) const
 	if( ( channel < 0 ) || ( channel >= ANIM_NumAnimChannels ) )
 	{
 		gameLocal.Error( "idDeclModelDef::NumJointsOnChannel : channel out of range" );
-		return 0;
+		return 0; // unreachable, (Error() doesn't return) just to shut up compiler
 	}
 	return channelJoints[ channel ].Num();
 }
@@ -3783,7 +3663,7 @@ const int* idDeclModelDef::GetChannelJoints( int channel ) const
 	if( ( channel < 0 ) || ( channel >= ANIM_NumAnimChannels ) )
 	{
 		gameLocal.Error( "idDeclModelDef::GetChannelJoints : channel out of range" );
-		return NULL;
+		return NULL; // unreachable, (Error() doesn't return) just to shut up compiler
 	}
 	return channelJoints[ channel ].Ptr();
 }
@@ -5511,7 +5391,6 @@ bool idAnimator::GetJointLocalTransform( jointHandle_t jointHandle, int currentT
 	// FIXME: overkill
 	CreateFrame( currentTime, false );
 
-	// RB: long neck GCC compiler bug workaround from dhewm3 ...
 	if( jointHandle == 0 )
 	{
 		offset = joints[ jointHandle ].ToVec3();
@@ -5524,7 +5403,6 @@ bool idAnimator::GetJointLocalTransform( jointHandle_t jointHandle, int currentT
 	m /= joints[ modelJoints[ jointHandle ].parentNum ];
 	offset = m.ToVec3();
 	axis = m.ToMat3();
-	// RB end
 
 	return true;
 }
@@ -5630,8 +5508,8 @@ idAnimator::GetJoints
 */
 void idAnimator::GetJoints( int* numJoints, idJointMat** jointsPtr )
 {
-	*numJoints = this->numJoints;
-	*jointsPtr = this->joints;
+	*numJoints	= this->numJoints;
+	*jointsPtr	= this->joints;
 }
 
 /*
@@ -6090,7 +5968,7 @@ idRenderModel* idGameEdit::ANIM_CreateMeshForAnim( idRenderModel* model, const c
 	const idDict*			args;
 	const char*				temp;
 	idRenderModel*			newmodel;
-	const idMD5Anim*		 md5anim;
+	const idMD5Anim*			md5anim;
 	idStr					filename;
 	idStr					extension;
 	const idAnim*			anim;

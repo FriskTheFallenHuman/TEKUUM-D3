@@ -718,6 +718,7 @@ void idAFConstraint_BallAndSocketJoint::Evaluate( float invTimeStep )
 	}
 	else
 	{
+		a2.Zero();
 		c1.SubVec3( 0 ) = -( invTimeStep * ERROR_REDUCTION ) * ( anchor2 - ( a1 + body1->GetWorldOrigin() ) );
 	}
 
@@ -3478,7 +3479,7 @@ void idAFConstraint_Contact::ApplyFriction( float invTimeStep )
 		return;
 	}
 
-	// seperate friction per contact is silly but it's fast and often looks close enough
+	// separate friction per contact is silly but it's fast and often looks close enough
 	if( af_useImpulseFriction.GetBool() )
 	{
 
@@ -5011,7 +5012,7 @@ void idAFTree::Factor() const
 {
 	int i, j;
 	idAFBody* body;
-	idAFConstraint* child;
+	idAFConstraint* child = NULL;
 	idMatX childI;
 
 	childI.SetData( 6, 6, MATX_ALLOCA( 6 * 6 ) );
@@ -7212,7 +7213,7 @@ bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec )
 
 	if( af_showTimings.GetInteger() == 1 )
 	{
-		gameLocal.Printf( "%12s: t %1.4f pc %2d, %1.4f ac %2d %1.4f lcp %1.4f cd %1.4f\n",
+		gameLocal.Printf( "%12s: t %u pc %2d, %u ac %2d %u lcp %u cd %u\n",
 						  self->name.c_str(),
 						  timer_total.Milliseconds(),
 						  numPrimary, timer_pc.Milliseconds(),
@@ -7224,7 +7225,7 @@ bool idPhysics_AF::Evaluate( int timeStepMSec, int endTimeMSec )
 		numArticulatedFigures++;
 		if( endTimeMSec > lastTimerReset )
 		{
-			gameLocal.Printf( "af %d: t %1.4f pc %2d, %1.4f ac %2d %1.4f lcp %1.4f cd %1.4f\n",
+			gameLocal.Printf( "af %d: t %u pc %2d, %u ac %2d %u lcp %u cd %u\n",
 							  numArticulatedFigures,
 							  timer_total.Milliseconds(),
 							  numPrimary, timer_pc.Milliseconds(),
@@ -7868,7 +7869,7 @@ void idPhysics_AF::BuildTrees()
 
 		if( trees.Num() > 1 )
 		{
-			gameLocal.Warning( "Articulated figure has multiple seperate tree structures for entity '%s' type '%s'.",
+			gameLocal.Warning( "Articulated figure has multiple separate tree structures for entity '%s' type '%s'.",
 							   self->name.c_str(), self->GetType()->classname );
 		}
 
@@ -8968,10 +8969,10 @@ const float	AF_VELOCITY_MAX				= 16000;
 const int	AF_VELOCITY_TOTAL_BITS		= 16;
 const int	AF_VELOCITY_EXPONENT_BITS	= idMath::BitsForInteger( idMath::BitsForFloat( AF_VELOCITY_MAX ) ) + 1;
 const int	AF_VELOCITY_MANTISSA_BITS	= AF_VELOCITY_TOTAL_BITS - 1 - AF_VELOCITY_EXPONENT_BITS;
-const float	AF_FORCE_MAX				= 1e20f;
-const int	AF_FORCE_TOTAL_BITS			= 16;
-const int	AF_FORCE_EXPONENT_BITS		= idMath::BitsForInteger( idMath::BitsForFloat( AF_FORCE_MAX ) ) + 1;
-const int	AF_FORCE_MANTISSA_BITS		= AF_FORCE_TOTAL_BITS - 1 - AF_FORCE_EXPONENT_BITS;
+//const float	AF_FORCE_MAX				= 1e20f;
+//const int	AF_FORCE_TOTAL_BITS			= 16;
+//const int	AF_FORCE_EXPONENT_BITS		= idMath::BitsForInteger( idMath::BitsForFloat( AF_FORCE_MAX ) ) + 1;
+//const int	AF_FORCE_MANTISSA_BITS		= AF_FORCE_TOTAL_BITS - 1 - AF_FORCE_EXPONENT_BITS;
 
 /*
 ================
@@ -8983,7 +8984,7 @@ void idPhysics_AF::WriteToSnapshot( idBitMsgDelta& msg ) const
 	int i;
 	idCQuat quat;
 
-	msg.WriteLong( current.atRest );
+	msg.WriteInt( current.atRest );
 	msg.WriteFloat( current.noMoveTime );
 	msg.WriteFloat( current.activateTime );
 	msg.WriteDeltaFloat( 0.0f, current.pushVelocity[0], AF_VELOCITY_EXPONENT_BITS, AF_VELOCITY_MANTISSA_BITS );
@@ -9029,10 +9030,10 @@ idPhysics_AF::ReadFromSnapshot
 */
 void idPhysics_AF::ReadFromSnapshot( const idBitMsgDelta& msg )
 {
-	int i, num;
+	int i, num id_attribute( ( unused ) );
 	idCQuat quat;
 
-	current.atRest = msg.ReadLong();
+	current.atRest = msg.ReadInt();
 	current.noMoveTime = msg.ReadFloat();
 	current.activateTime = msg.ReadFloat();
 	current.pushVelocity[0] = msg.ReadDeltaFloat( 0.0f, AF_VELOCITY_EXPONENT_BITS, AF_VELOCITY_MANTISSA_BITS );

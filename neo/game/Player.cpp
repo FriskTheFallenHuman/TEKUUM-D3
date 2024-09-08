@@ -76,9 +76,7 @@ const idEventDef EV_Player_ExitTeleporter( "exitTeleporter" );
 const idEventDef EV_Player_StopAudioLog( "stopAudioLog" );
 const idEventDef EV_Player_HideTip( "hideTip" );
 const idEventDef EV_Player_LevelTrigger( "levelTrigger" );
-// RB: changed to internal event
-const idEventDef EV_SpectatorTouch( "<spectatorTouch>", "et" );
-// RB end
+const idEventDef EV_SpectatorTouch( "spectatorTouch", "et" );
 const idEventDef EV_Player_GetIdealWeapon( "getIdealWeapon", NULL, 's' );
 
 CLASS_DECLARATION( idActor, idPlayer )
@@ -1078,7 +1076,7 @@ idPlayer::idPlayer()
 	memset( &usercmd, 0, sizeof( usercmd ) );
 
 	noclip					= false;
-	nodamage				= false;
+	godmode					= false;
 
 	spawnAnglesSet			= false;
 	spawnAngles				= ang_zero;
@@ -1087,9 +1085,7 @@ idPlayer::idPlayer()
 
 	oldButtons				= 0;
 	buttonMask				= 0;
-	// RB: BFG usercmd_t
 	oldImpulseSequence		= 0;
-	// RB end
 
 	lastHitTime				= 0;
 	lastSndHitTime			= 0;
@@ -1100,12 +1096,6 @@ idPlayer::idPlayer()
 	hud						= NULL;
 	objectiveSystem			= NULL;
 	objectiveSystemOpen		= false;
-
-// RB begin
-#if defined(STANDALONE)
-	mountedObject			= NULL;
-#endif
-// RB end
 
 	heartRate				= BASE_HEARTRATE;
 	heartInfo.Init( 0, 0, 0, 0 );
@@ -1339,12 +1329,10 @@ void idPlayer::Init()
 	const idKeyValue*	kv;
 
 	noclip					= false;
-	nodamage				= false;
+	godmode					= false;
 
 	oldButtons				= 0;
-	// RB: BFG usercmd_t
-	oldImpulseSequence		= 0;
-	// RB end
+	oldImpulseSequence				= 0;
 
 	currentWeapon			= -1;
 	idealWeapon				= -1;
@@ -1377,12 +1365,6 @@ void idPlayer::Init()
 	influenceEntity			= NULL;
 	influenceMaterial		= NULL;
 	influenceSkin			= NULL;
-
-// RB begin
-#if defined(STANDALONE)
-	mountedObject			= NULL;
-#endif
-// RB end
 
 	currentLoggedAccel		= 0;
 
@@ -1474,11 +1456,6 @@ void idPlayer::Init()
 		cursor->SetStateString( "combatcursor", "1" );
 		cursor->SetStateString( "itemcursor", "0" );
 		cursor->SetStateString( "guicursor", "0" );
-// RB begin
-#if defined(STANDALONE)
-		cursor->SetStateString( "grabbercursor", "0" );
-#endif
-// RB end
 	}
 
 	if( ( gameLocal.isMultiplayer || g_testDeath.GetBool() ) && skin )
@@ -1820,7 +1797,7 @@ void idPlayer::Save( idSaveGame* savefile ) const
 	playerView.Save( savefile );
 
 	savefile->WriteBool( noclip );
-	savefile->WriteBool( nodamage );
+	savefile->WriteBool( godmode );
 
 	// don't save spawnAnglesSet, since we'll have to reset them after loading the savegame
 	savefile->WriteAngles( spawnAngles );
@@ -1829,9 +1806,7 @@ void idPlayer::Save( idSaveGame* savefile ) const
 
 	savefile->WriteInt( buttonMask );
 	savefile->WriteInt( oldButtons );
-	// RB: BFG usercmd_t
 	savefile->WriteInt( oldImpulseSequence );
-	// RB end
 
 	savefile->WriteInt( lastHitTime );
 	savefile->WriteInt( lastSndHitTime );
@@ -2023,12 +1998,6 @@ void idPlayer::Save( idSaveGame* savefile ) const
 		hud->SetStateString( "message", common->GetLanguageDict()->GetString( "#str_02916" ) );
 		hud->HandleNamedEvent( "Message" );
 	}
-
-// RB begin
-#if defined(STANDALONE)
-	savefile->WriteObject( mountedObject );
-#endif
-// RB end
 }
 
 /*
@@ -2046,7 +2015,7 @@ void idPlayer::Restore( idRestoreGame* savefile )
 	playerView.Restore( savefile );
 
 	savefile->ReadBool( noclip );
-	savefile->ReadBool( nodamage );
+	savefile->ReadBool( godmode );
 
 	savefile->ReadAngles( spawnAngles );
 	savefile->ReadAngles( viewAngles );
@@ -2058,12 +2027,10 @@ void idPlayer::Restore( idRestoreGame* savefile )
 
 	savefile->ReadInt( buttonMask );
 	savefile->ReadInt( oldButtons );
-	// RB: BFG usercmd_t
 	savefile->ReadInt( oldImpulseSequence );
 
 	usercmd.impulseSequence = 0;
 	oldImpulseSequence = 0;
-	// RB end
 
 	savefile->ReadInt( lastHitTime );
 	savefile->ReadInt( lastSndHitTime );
@@ -2286,11 +2253,13 @@ void idPlayer::Restore( idRestoreGame* savefile )
 	// create combat collision hull for exact collision detection
 	SetCombatModel();
 
-// RB begin
-#if defined(STANDALONE)
-	savefile->ReadObject( reinterpret_cast<idClass*&>( mountedObject ) );
-#endif
-// RB end
+	// DG: workaround for lingering messages that are shown forever after loading a savegame
+	//     (one way to get them is saving again, while the message from first save is still
+	//      shown, and then load)
+	if( hud )
+	{
+		hud->SetStateString( "message", "" );
+	}
 }
 
 /*
@@ -3037,13 +3006,11 @@ idPlayer::UpdateConditions
 void idPlayer::UpdateConditions()
 {
 	idVec3	velocity;
-	float	fallspeed;
 	float	forwardspeed;
 	float	sidespeed;
 
 	// minus the push velocity to avoid playing the walking animation and sounds when riding a mover
 	velocity = physicsObj.GetLinearVelocity() - physicsObj.GetPushedLinearVelocity();
-	fallspeed = velocity * physicsObj.GetGravityNormal();
 
 	if( influenceActive )
 	{
@@ -3758,7 +3725,7 @@ idPlayer::GiveVideo
 void idPlayer::GiveVideo( const char* videoName, idDict* item )
 {
 
-	if( videoName == NULL || *videoName == NULL )
+	if( videoName == NULL || *videoName == 0 )
 	{
 		return;
 	}
@@ -3801,7 +3768,7 @@ idPlayer::GiveEmail
 void idPlayer::GiveEmail( const char* emailName )
 {
 
-	if( emailName == NULL || *emailName == NULL )
+	if( emailName == NULL || *emailName == 0 )
 	{
 		return;
 	}
@@ -3832,7 +3799,7 @@ void idPlayer::GivePDA( const char* pdaName, idDict* item )
 		inventory.pdaSecurity.AddUnique( item->GetString( "inv_name" ) );
 	}
 
-	if( pdaName == NULL || *pdaName == NULL )
+	if( pdaName == NULL || *pdaName == 0 )
 	{
 		pdaName = "personal";
 	}
@@ -4679,7 +4646,7 @@ void idPlayer::UpdateWeapon()
 		// gui handling overrides weapon use
 		Weapon_GUI();
 	}
-	else 	if( focusCharacter && ( focusCharacter->health > 0 ) )
+	else	if( focusCharacter && ( focusCharacter->health > 0 ) )
 	{
 		Weapon_NPC();
 	}
@@ -4988,11 +4955,7 @@ void idPlayer::UpdateLocation()
 		}
 		else
 		{
-#if defined(STANDALONE)
-			hud->SetStateString( "location", common->GetLanguageDict()->GetString( "#str_idPlayer_UpdateLocation_Unidentified" ) );
-#else
 			hud->SetStateString( "location", common->GetLanguageDict()->GetString( "#str_02911" ) );
-#endif
 		}
 	}
 }
@@ -5031,7 +4994,6 @@ void idPlayer::UpdateFocus()
 	idUserInterface* oldUI;
 	idAI*		oldChar;
 	int			oldTalkCursor;
-	idAFEntity_Vehicle* oldVehicle;
 	int			i, j;
 	idVec3		start, end;
 	bool		allowFocus;
@@ -5062,7 +5024,6 @@ void idPlayer::UpdateFocus()
 	oldUI			= focusUI;
 	oldChar			= focusCharacter;
 	oldTalkCursor	= talkCursor;
-	oldVehicle		= focusVehicle;
 
 	if( focusTime <= gameLocal.time )
 	{
@@ -5272,6 +5233,12 @@ void idPlayer::UpdateFocus()
 	{
 		if( !oldFocus || oldFocus != focusGUIent )
 		{
+			// DG: tell the old UI it isn't focused anymore
+			if( oldFocus != NULL && oldUI != NULL )
+			{
+				command = oldUI->Activate( false, gameLocal.time );
+				// TODO: HandleGuiCommands( oldFocus, command ); ?
+			} // DG end
 			command = focusUI->Activate( true, gameLocal.time );
 			HandleGuiCommands( focusGUIent, command );
 			StartSound( "snd_guienter", SND_CHANNEL_ANY, 0, false, NULL );
@@ -5495,8 +5462,7 @@ void idPlayer::BobCycle( const idVec3& pushVelocity )
 		return;
 	}
 
-	// RB: don't bob when flying rapidly with noclip
-	if( !physicsObj.HasGroundContacts() || influenceActive == INFLUENCE_LEVEL2 || ( gameLocal.isMultiplayer && spectating ) || noclip )
+	if( !physicsObj.HasGroundContacts() || influenceActive == INFLUENCE_LEVEL2 || ( gameLocal.isMultiplayer && spectating ) )
 	{
 		// airborne
 		bobCycle = 0;
@@ -5711,33 +5677,6 @@ void idPlayer::UpdateViewAngles()
 			viewAngles.pitch = -89.0f;
 		}
 	}
-// RB begin
-#if defined(STANDALONE)
-	else if( mountedObject )
-	{
-		int yaw_min, yaw_max, varc;
-
-		mountedObject->GetAngleRestrictions( yaw_min, yaw_max, varc );
-
-		if( yaw_min < yaw_max )
-		{
-			viewAngles.yaw = idMath::ClampFloat( yaw_min, yaw_max, viewAngles.yaw );
-		}
-		else
-		{
-			if( viewAngles.yaw < 0 )
-			{
-				viewAngles.yaw = idMath::ClampFloat( -180.f, yaw_max, viewAngles.yaw );
-			}
-			else
-			{
-				viewAngles.yaw = idMath::ClampFloat( yaw_min, 180.f, viewAngles.yaw );
-			}
-		}
-		viewAngles.pitch = idMath::ClampFloat( -varc, varc, viewAngles.pitch );
-	}
-#endif
-// RB end
 	else
 	{
 		if( viewAngles.pitch > pm_maxviewpitch.GetFloat() )
@@ -6166,7 +6105,7 @@ void idPlayer::UpdatePDAInfo( bool updatePDASel )
 		const char* security = pda->GetSecurity();
 		if( j == currentPDA || ( currentPDA == 0 && security && *security ) )
 		{
-			if( *security == NULL )
+			if( *security == 0 )
 			{
 				security = common->GetLanguageDict()->GetString( "#str_00066" );
 			}
@@ -6659,14 +6598,12 @@ void idPlayer::EvaluateControls()
 		gameLocal.sessionCommand = "died";
 	}
 
-	// RB: BFG usercmd_t
 	if( usercmd.impulseSequence != oldImpulseSequence )
 	{
 		PerformImpulse( usercmd.impulse );
 	}
 
 	oldImpulseSequence = usercmd.impulseSequence;
-	// RB end
 
 	scoreBoardOpen = ( ( usercmd.buttons & BUTTON_SCORES ) != 0 || forceScoreBoard );
 
@@ -7012,15 +6949,6 @@ void idPlayer::Move()
 		physicsObj.SetContents( CONTENTS_BODY );
 		physicsObj.SetMovementType( PM_FREEZE );
 	}
-// RB begin
-#if defined(STANDALONE)
-	else if( mountedObject )
-	{
-		physicsObj.SetContents( 0 );
-		physicsObj.SetMovementType( PM_FREEZE );
-	}
-#endif
-// RB end
 	else
 	{
 		physicsObj.SetContents( CONTENTS_BODY );
@@ -7172,10 +7100,8 @@ void idPlayer::UpdateHud()
 				inventory.nextItemNum = 1;
 			}
 			int i;
-			// RB: fixed left operand of comma operator has no effect
 			for( i = 0; i < 5 && i < c; i++ )
 			{
-				// RB end
 				hud->SetStateString( va( "itemtext%i", inventory.nextItemNum ), inventory.pickupItemNames[0].name );
 				hud->SetStateString( va( "itemicon%i", inventory.nextItemNum ), inventory.pickupItemNames[0].icon );
 				hud->HandleNamedEvent( va( "itemPickup%i", inventory.nextItemNum++ ) );
@@ -7184,7 +7110,7 @@ void idPlayer::UpdateHud()
 				{
 					inventory.onePickupTime = gameLocal.time;
 				}
-				else 	if( inventory.nextItemNum > 5 )
+				else	if( inventory.nextItemNum > 5 )
 				{
 					inventory.nextItemNum = 1;
 					inventory.nextItemPickup = inventory.onePickupTime + 2000;
@@ -7356,17 +7282,6 @@ void idPlayer::Think()
 		oldImpulseSequence = usercmd.impulseSequence;
 	}
 
-// RB begin
-#if defined(STANDALONE)
-	if( mountedObject )
-	{
-		usercmd.forwardmove = 0;
-		usercmd.rightmove = 0;
-		usercmd.upmove = 0;
-	}
-#endif
-// RB end
-
 	if( objectiveSystemOpen || gameLocal.inCinematic || influenceActive )
 	{
 		if( objectiveSystemOpen && AI_PAIN )
@@ -7396,6 +7311,14 @@ void idPlayer::Think()
 		acc->dir[1] = usercmd.rightmove - oldCmd.rightmove;
 		acc->dir[0] = acc->dir[2] = 0;
 	}
+
+#if 0
+	// freelook centering
+	if( ( usercmd.buttons ^ oldCmd.buttons ) & BUTTON_MLOOK )
+	{
+		centerView.Init( gameLocal.time, 200, viewAngles.pitch, 0 );
+	}
+#endif
 
 	// zooming
 	if( ( usercmd.buttons ^ oldCmd.buttons ) & BUTTON_ZOOM )
@@ -7596,12 +7519,11 @@ idPlayer::RouteGuiMouse
 void idPlayer::RouteGuiMouse( idUserInterface* gui )
 {
 	sysEvent_t ev;
-	const char* command;
 
 	if( usercmd.mx != oldMouseX || usercmd.my != oldMouseY )
 	{
 		ev = sys->GenerateMouseMoveEvent( usercmd.mx - oldMouseX, usercmd.my - oldMouseY );
-		command = gui->HandleEvent( &ev, gameLocal.time );
+		gui->HandleEvent( &ev, gameLocal.time );
 		oldMouseX = usercmd.mx;
 		oldMouseY = usercmd.my;
 	}
@@ -7646,7 +7568,7 @@ void idPlayer::Kill( bool delayRespawn, bool nodamage )
 	}
 	else if( health > 0 )
 	{
-		this->nodamage = false;
+		godmode = false;
 		if( nodamage )
 		{
 			ServerSpectate( true );
@@ -7865,10 +7787,10 @@ void idPlayer::CalcDamagePoints( idEntity* inflictor, idEntity* attacker, const 
 	}
 
 	// check for completely getting out of the damage
-	if( !damageDef->GetBool( "noDamage" ) || !damageDef->GetBool( "noGod" ) )
+	if( !damageDef->GetBool( "noGod" ) )
 	{
 		// check for godmode
-		if( nodamage )
+		if( godmode )
 		{
 			damage = 0;
 		}
@@ -7950,12 +7872,6 @@ void idPlayer::Damage( idEntity* inflictor, idEntity* attacker, const idVec3& di
 	idVec3		damage_from;
 	idVec3		localDamageVector;
 	float		attackerPushScale;
-
-// RB begin
-#if defined(STANDALONE)
-	SetTimeState ts( timeGroup );
-#endif
-// RB end
 
 	// damage is only processed on server
 	if( gameLocal.isClient )
@@ -8098,7 +8014,6 @@ void idPlayer::Damage( idEntity* inflictor, idEntity* attacker, const idVec3& di
 			damage = 1;
 		}
 
-		int oldHealth = health;
 		health -= damage;
 
 		if( health <= 0 )
@@ -8674,17 +8589,16 @@ void idPlayer::CalculateRenderView()
 		renderView->shaderParms[ i ] = gameLocal.globalShaderParms[ i ];
 	}
 	renderView->globalMaterial = gameLocal.GetGlobalMaterial();
-
-// RB begin
-#if defined(STANDALONE)
-	renderView->time[0] = gameLocal.slow.time;
-	renderView->time[1] = gameLocal.fast.time;
-#else
 	renderView->time[0] = gameLocal.time;
 	renderView->time[1] = gameLocal.time;
-#endif
-// RB end
 
+#if 0
+	// calculate size of 3D view
+	renderView->x = 0;
+	renderView->y = 0;
+	renderView->width = SCREEN_WIDTH;
+	renderView->height = SCREEN_HEIGHT;
+#endif
 	renderView->viewID = 0;
 
 	// check if we should be drawing from a camera's POV
@@ -9255,17 +9169,6 @@ void idPlayer::ClientPredictionThink()
 	buttonMask &= usercmd.buttons;
 	usercmd.buttons &= ~buttonMask;
 
-// RB begin
-#if defined(STANDALONE)
-	if( mountedObject )
-	{
-		usercmd.forwardmove = 0;
-		usercmd.rightmove = 0;
-		usercmd.upmove = 0;
-	}
-#endif
-// RB end
-
 	if( objectiveSystemOpen )
 	{
 		usercmd.forwardmove = 0;
@@ -9415,15 +9318,6 @@ void idPlayer::ClientPredictionThink()
 	{
 		playerView.CalculateShake();
 	}
-
-// RB begin
-#if defined(STANDALONE)
-	// determine if portal sky is in pvs
-	pvsHandle_t	clientPVS = gameLocal.pvs.SetupCurrentPVS( GetPVSAreas(), GetNumPVSAreas() );
-	gameLocal.portalSkyActive = gameLocal.pvs.CheckAreasForPortalSky( clientPVS, GetPhysics()->GetOrigin() );
-	gameLocal.pvs.FreeCurrentPVS( clientPVS );
-#endif
-// RB end
 }
 
 /*
@@ -9709,7 +9603,7 @@ void idPlayer::WritePlayerStateToSnapshot( idBitMsgDelta& msg ) const
 	int i;
 
 	msg.WriteByte( bobCycle );
-	msg.WriteLong( stepUpTime );
+	msg.WriteInt( stepUpTime );
 	msg.WriteFloat( stepUpDelta );
 	msg.WriteShort( inventory.weapons );
 	msg.WriteByte( inventory.armor );
@@ -9734,7 +9628,7 @@ void idPlayer::ReadPlayerStateFromSnapshot( const idBitMsgDelta& msg )
 	int i, ammo;
 
 	bobCycle = msg.ReadByte();
-	stepUpTime = msg.ReadLong();
+	stepUpTime = msg.ReadInt();
 	stepUpDelta = msg.ReadFloat();
 	inventory.weapons = msg.ReadShort();
 	inventory.armor = msg.ReadByte();
@@ -9827,14 +9721,13 @@ bool idPlayer::ClientReceiveEvent( int event, int time, const idBitMsg& msg )
 				// happens if the event and the spectate change are written on the server during the same frame (fraglimit)
 				return true;
 			}
-			return idActor::ClientReceiveEvent( event, time, msg );
+			break;
 		}
 		default:
-		{
-			return idActor::ClientReceiveEvent( event, time, msg );
-		}
+			break;
 	}
-	return false;
+
+	return idActor::ClientReceiveEvent( event, time, msg );
 }
 
 /*

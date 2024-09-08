@@ -192,7 +192,7 @@ void idGameLocal::ServerSendDeclRemapToClient( int clientNum, declType_t type, i
 	outMsg.BeginWriting();
 	outMsg.WriteByte( GAME_RELIABLE_MESSAGE_REMAP_DECL );
 	outMsg.WriteByte( type );
-	outMsg.WriteLong( index );
+	outMsg.WriteInt( index );
 	outMsg.WriteString( decl->GetName() );
 	networkSystem->ServerSendReliableMessage( clientNum, outMsg );
 }
@@ -365,7 +365,7 @@ void idGameLocal::ServerClientBegin( int clientNum )
 	outMsg.BeginWriting();
 	outMsg.WriteByte( GAME_RELIABLE_MESSAGE_SPAWN_PLAYER );
 	outMsg.WriteByte( clientNum );
-	outMsg.WriteLong( spawnIds[ clientNum ] );
+	outMsg.WriteInt( spawnIds[ clientNum ] );
 	networkSystem->ServerSendReliableMessage( -1, outMsg );
 }
 
@@ -434,7 +434,7 @@ void idGameLocal::ServerWriteInitialReliableMessages( int clientNum )
 		outMsg.BeginWriting( );
 		outMsg.WriteByte( GAME_RELIABLE_MESSAGE_SPAWN_PLAYER );
 		outMsg.WriteByte( i );
-		outMsg.WriteLong( spawnIds[ i ] );
+		outMsg.WriteInt( spawnIds[ i ] );
 		networkSystem->ServerSendReliableMessage( clientNum, outMsg );
 	}
 
@@ -446,7 +446,7 @@ void idGameLocal::ServerWriteInitialReliableMessages( int clientNum )
 		outMsg.WriteByte( GAME_RELIABLE_MESSAGE_EVENT );
 		outMsg.WriteBits( event->spawnId, 32 );
 		outMsg.WriteByte( event->event );
-		outMsg.WriteLong( event->time );
+		outMsg.WriteInt( event->time );
 		outMsg.WriteBits( event->paramsSize, idMath::BitsForInteger( MAX_EVENT_PARAM_SIZE ) );
 		if( event->paramsSize )
 		{
@@ -461,7 +461,7 @@ void idGameLocal::ServerWriteInitialReliableMessages( int clientNum )
 	outMsg.Init( msgBuf, sizeof( msgBuf ) );
 	outMsg.BeginWriting();
 	outMsg.WriteByte( GAME_RELIABLE_MESSAGE_PORTALSTATES );
-	outMsg.WriteLong( numPortals );
+	outMsg.WriteInt( numPortals );
 	for( i = 0; i < numPortals; i++ )
 	{
 		outMsg.WriteBits( gameRenderWorld->GetPortalState( ( qhandle_t )( i + 1 ) ) , NUM_RENDER_PORTAL_BITS );
@@ -662,27 +662,10 @@ void idGameLocal::ServerWriteSnapshot( int clientNum, int sequence, idBitMsg& ms
 	numSourceAreas = gameRenderWorld->BoundsInAreas( spectated->GetPlayerPhysics()->GetAbsBounds(), sourceAreas, idEntity::MAX_PVS_AREAS );
 	pvsHandle = gameLocal.pvs.SetupCurrentPVS( sourceAreas, numSourceAreas, PVS_NORMAL );
 
-// RB begin
-#if defined(STANDALONE)
-	// Add portalSky areas to PVS
-	if( portalSkyEnt.GetEntity() )
-	{
-		pvsHandle_t	otherPVS, newPVS;
-		idEntity* skyEnt = portalSkyEnt.GetEntity();
-
-		otherPVS = gameLocal.pvs.SetupCurrentPVS( skyEnt->GetPVSAreas(), skyEnt->GetNumPVSAreas() );
-		newPVS = gameLocal.pvs.MergeCurrentPVS( pvsHandle, otherPVS );
-		pvs.FreeCurrentPVS( pvsHandle );
-		pvs.FreeCurrentPVS( otherPVS );
-		pvsHandle = newPVS;
-	}
-#endif
-// RB end
-
 #if ASYNC_WRITE_TAGS
 	idRandom tagRandom;
 	tagRandom.SetSeed( random.RandomInt() );
-	msg.WriteLong( tagRandom.GetSeed() );
+	msg.WriteInt( tagRandom.GetSeed() );
 #endif
 
 	// create the snapshot
@@ -740,7 +723,7 @@ void idGameLocal::ServerWriteSnapshot( int clientNum, int sequence, idBitMsg& ms
 			snapshot->firstEntityState = newBase;
 
 #if ASYNC_WRITE_TAGS
-			msg.WriteLong( tagRandom.RandomInt() );
+			msg.WriteInt( tagRandom.RandomInt() );
 #endif
 		}
 	}
@@ -753,18 +736,18 @@ void idGameLocal::ServerWriteSnapshot( int clientNum, int sequence, idBitMsg& ms
 	{
 		if( i < numSourceAreas )
 		{
-			msg.WriteLong( sourceAreas[ i ] );
+			msg.WriteInt( sourceAreas[ i ] );
 		}
 		else
 		{
-			msg.WriteLong( 0 );
+			msg.WriteInt( 0 );
 		}
 	}
 	gameLocal.pvs.WritePVS( pvsHandle, msg );
 #endif
 	for( i = 0; i < ENTITY_PVS_SIZE; i++ )
 	{
-		msg.WriteDeltaLong( clientPVS[clientNum][i], snapshot->pvs[i] );
+		msg.WriteDeltaInt( clientPVS[clientNum][i], snapshot->pvs[i] );
 	}
 
 	// free the PVS
@@ -828,7 +811,7 @@ void idGameLocal::NetworkEventWarning( const entityNetEvent_t* event, const char
 	va_end( argptr );
 	idStr::Append( buf, sizeof( buf ), "\n" );
 
-	common->DWarning( buf );
+	common->DWarning( "%s", buf );
 }
 
 /*
@@ -927,7 +910,7 @@ void idGameLocal::ServerProcessReliableMessage( int clientNum, const idBitMsg& m
 		}
 		case GAME_RELIABLE_MESSAGE_VCHAT:
 		{
-			int index = msg.ReadLong();
+			int index = msg.ReadInt();
 			bool team = msg.ReadBits( 1 ) != 0;
 			mpGame.ProcessVoiceChat( clientNum, team, index );
 			break;
@@ -971,7 +954,7 @@ void idGameLocal::ServerProcessReliableMessage( int clientNum, const idBitMsg& m
 
 			event->spawnId = msg.ReadBits( 32 );
 			event->event = msg.ReadByte();
-			event->time = msg.ReadLong();
+			event->time = msg.ReadInt();
 
 			event->paramsSize = msg.ReadBits( idMath::BitsForInteger( MAX_EVENT_PARAM_SIZE ) );
 			if( event->paramsSize )
@@ -1164,7 +1147,7 @@ void idGameLocal::ClientReadSnapshot( int clientNum, int sequence, const int gam
 
 #if ASYNC_WRITE_TAGS
 	idRandom tagRandom;
-	tagRandom.SetSeed( msg.ReadLong() );
+	tagRandom.SetSeed( msg.ReadInt() );
 #endif
 
 	// read all entities from the snapshot
@@ -1254,7 +1237,7 @@ void idGameLocal::ClientReadSnapshot( int clientNum, int sequence, const int gam
 		ent->snapshotBits = msg.GetNumBitsRead() - numBitsRead;
 
 #if ASYNC_WRITE_TAGS
-		if( msg.ReadLong() != tagRandom.RandomInt() )
+		if( msg.ReadInt() != tagRandom.RandomInt() )
 		{
 			cmdSystem->BufferCommandText( CMD_EXEC_NOW, "writeGameState" );
 			if( entityDefNumber >= 0 && entityDefNumber < declManager->GetNumDecls( DECL_ENTITYDEF ) )
@@ -1293,23 +1276,6 @@ void idGameLocal::ClientReadSnapshot( int clientNum, int sequence, const int gam
 	numSourceAreas = gameRenderWorld->BoundsInAreas( spectated->GetPlayerPhysics()->GetAbsBounds(), sourceAreas, idEntity::MAX_PVS_AREAS );
 	pvsHandle = gameLocal.pvs.SetupCurrentPVS( sourceAreas, numSourceAreas, PVS_NORMAL );
 
-// RB begin
-#if defined(STANDALONE)
-	// Add portalSky areas to PVS
-	if( portalSkyEnt.GetEntity() )
-	{
-		pvsHandle_t	otherPVS, newPVS;
-		idEntity* skyEnt = portalSkyEnt.GetEntity();
-
-		otherPVS = gameLocal.pvs.SetupCurrentPVS( skyEnt->GetPVSAreas(), skyEnt->GetNumPVSAreas() );
-		newPVS = gameLocal.pvs.MergeCurrentPVS( pvsHandle, otherPVS );
-		pvs.FreeCurrentPVS( pvsHandle );
-		pvs.FreeCurrentPVS( otherPVS );
-		pvsHandle = newPVS;
-	}
-#endif
-// RB end
-
 	// read the PVS from the snapshot
 #if ASYNC_WRITE_PVS
 	int serverPVS[idEntity::MAX_PVS_AREAS];
@@ -1320,7 +1286,7 @@ void idGameLocal::ClientReadSnapshot( int clientNum, int sequence, const int gam
 	}
 	for( i = 0; i < idEntity::MAX_PVS_AREAS; i++ )
 	{
-		serverPVS[ i ] = msg.ReadLong();
+		serverPVS[ i ] = msg.ReadInt();
 	}
 	if( memcmp( sourceAreas, serverPVS, idEntity::MAX_PVS_AREAS * sizeof( int ) ) )
 	{
@@ -1340,7 +1306,7 @@ void idGameLocal::ClientReadSnapshot( int clientNum, int sequence, const int gam
 #endif
 	for( i = 0; i < ENTITY_PVS_SIZE; i++ )
 	{
-		snapshot->pvs[i] = msg.ReadDeltaLong( clientPVS[clientNum][i] );
+		snapshot->pvs[i] = msg.ReadDeltaInt( clientPVS[clientNum][i] );
 	}
 
 	// add entities in the PVS that haven't changed since the last applied snapshot
@@ -1538,7 +1504,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg& m
 			char name[MAX_STRING_CHARS];
 
 			type = msg.ReadByte();
-			index = msg.ReadLong();
+			index = msg.ReadInt();
 			msg.ReadString( name, sizeof( name ) );
 
 			const idDecl* decl = declManager->FindType( ( declType_t )type, name, false );
@@ -1555,7 +1521,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg& m
 		case GAME_RELIABLE_MESSAGE_SPAWN_PLAYER:
 		{
 			int client = msg.ReadByte();
-			int spawnId = msg.ReadLong();
+			int spawnId = msg.ReadInt();
 			if( !entities[ client ] )
 			{
 				SpawnPlayer( client );
@@ -1595,7 +1561,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg& m
 		}
 		case GAME_RELIABLE_MESSAGE_SOUND_INDEX:
 		{
-			int index = gameLocal.ClientRemapDecl( DECL_SOUND, msg.ReadLong() );
+			int index = gameLocal.ClientRemapDecl( DECL_SOUND, msg.ReadInt() );
 			if( index >= 0 && index < declManager->GetNumDecls( DECL_SOUND ) )
 			{
 				const idSoundShader* shader = declManager->SoundByIndex( index );
@@ -1622,7 +1588,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg& m
 
 			event->spawnId = msg.ReadBits( 32 );
 			event->event = msg.ReadByte();
-			event->time = msg.ReadLong();
+			event->time = msg.ReadInt();
 
 			event->paramsSize = msg.ReadBits( idMath::BitsForInteger( MAX_EVENT_PARAM_SIZE ) );
 			if( event->paramsSize )
@@ -1678,7 +1644,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg& m
 		}
 		case GAME_RELIABLE_MESSAGE_PORTALSTATES:
 		{
-			int numPortals = msg.ReadLong();
+			int numPortals = msg.ReadInt();
 			assert( numPortals == gameRenderWorld->NumPortals() );
 			for( int i = 0; i < numPortals; i++ )
 			{
@@ -1688,7 +1654,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg& m
 		}
 		case GAME_RELIABLE_MESSAGE_PORTAL:
 		{
-			qhandle_t portal = msg.ReadLong();
+			qhandle_t portal = msg.ReadInt();
 			int blockingBits = msg.ReadBits( NUM_RENDER_PORTAL_BITS );
 			assert( portal > 0 && portal <= gameRenderWorld->NumPortals() );
 			gameRenderWorld->SetPortalState( portal, blockingBits );
@@ -1759,13 +1725,6 @@ gameReturn_t idGameLocal::ClientPrediction( int clientNum, const usercmd_t* clie
 		isNewFrame = false;
 	}
 
-// RB begin
-#if defined(STANDALONE)
-	slow.Set( time, previousTime, realClientTime );
-	fast.Set( time, previousTime, realClientTime );
-#endif
-// RB end
-
 	// set the user commands for this frame
 	memcpy( usercmds, clientCmds, numClients * sizeof( usercmds[ 0 ] ) );
 
@@ -1788,7 +1747,7 @@ gameReturn_t idGameLocal::ClientPrediction( int clientNum, const usercmd_t* clie
 
 	if( sessionCommand.Length() )
 	{
-		strncpy( ret.sessionCommand, sessionCommand, sizeof( ret.sessionCommand ) );
+		idStr::Copynz( ret.sessionCommand, sessionCommand, sizeof( ret.sessionCommand ) );
 	}
 	return ret;
 }
@@ -1848,61 +1807,58 @@ bool idGameLocal::DownloadRequest( const char* IP, const char* guid, const char*
 		idStr::snPrintf( urls, MAX_STRING_CHARS, "1;%s", cvarSystem->GetCVarString( "si_serverURL" ) );
 		return true;
 	}
-	else
+
+	// 2: table of pak URLs
+	// first token is the game pak if request, empty if not requested by the client
+	// there may be empty tokens for paks the server couldn't pinpoint - the order matters
+	idStr reply = "2;";
+	idStrList dlTable, pakList;
+	int i, j;
+
+	Tokenize( dlTable, cvarSystem->GetCVarString( "net_serverDlTable" ) );
+	Tokenize( pakList, paks );
+
+	for( i = 0; i < pakList.Num(); i++ )
 	{
-		// 2: table of pak URLs
-		// first token is the game pak if request, empty if not requested by the client
-		// there may be empty tokens for paks the server couldn't pinpoint - the order matters
-		idStr reply = "2;";
-		idStrList dlTable, pakList;
-		int i, j;
-
-		Tokenize( dlTable, cvarSystem->GetCVarString( "net_serverDlTable" ) );
-		Tokenize( pakList, paks );
-
-		for( i = 0; i < pakList.Num(); i++ )
+		if( i > 0 )
 		{
-			if( i > 0 )
+			reply += ";";
+		}
+		if( pakList[ i ][ 0 ] == '\0' )
+		{
+			if( i == 0 )
 			{
-				reply += ";";
-			}
-			if( pakList[ i ][ 0 ] == '\0' )
-			{
-				if( i == 0 )
-				{
-					// pak 0 will always miss when client doesn't ask for game bin
-					common->DPrintf( "no game pak request\n" );
-				}
-				else
-				{
-					common->DPrintf( "no pak %d\n", i );
-				}
-				continue;
-			}
-			for( j = 0; j < dlTable.Num(); j++ )
-			{
-				if( !fileSystem->FilenameCompare( pakList[ i ], dlTable[ j ] ) )
-				{
-					break;
-				}
-			}
-			if( j == dlTable.Num() )
-			{
-				common->Printf( "download for %s: pak not matched: %s\n", IP, pakList[ i ].c_str() );
+				// pak 0 will always miss when client doesn't ask for game bin
+				common->DPrintf( "no game pak request\n" );
 			}
 			else
 			{
-				idStr url = cvarSystem->GetCVarString( "net_serverDlBaseURL" );
-				url.AppendPath( dlTable[ j ] );
-				reply += url;
-				common->DPrintf( "download for %s: %s\n", IP, url.c_str() );
+				common->DPrintf( "no pak %d\n", i );
+			}
+			continue;
+		}
+		for( j = 0; j < dlTable.Num(); j++ )
+		{
+			if( !fileSystem->FilenameCompare( pakList[ i ], dlTable[ j ] ) )
+			{
+				break;
 			}
 		}
-
-		idStr::Copynz( urls, reply, MAX_STRING_CHARS );
-		return true;
+		if( j == dlTable.Num() )
+		{
+			common->Printf( "download for %s: pak not matched: %s\n", IP, pakList[ i ].c_str() );
+		}
+		else
+		{
+			idStr url = cvarSystem->GetCVarString( "net_serverDlBaseURL" );
+			url.AppendPath( dlTable[ j ] );
+			reply += url;
+			common->DPrintf( "download for %s: %s\n", IP, url.c_str() );
+		}
 	}
-	return false;
+
+	idStr::Copynz( urls, reply, MAX_STRING_CHARS );
+	return true;
 }
 
 /*

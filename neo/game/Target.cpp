@@ -25,11 +25,6 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
-/*
-
-Invisible entities that affect other entities or the world when activated.
-
-*/
 
 #include "precompiled.h"
 #pragma hdrstop
@@ -40,6 +35,8 @@ Invisible entities that affect other entities or the world when activated.
 ===============================================================================
 
 idTarget
+
+Invisible entities that affect other entities or the world when activated.
 
 ===============================================================================
 */
@@ -277,7 +274,7 @@ void idTarget_WaitForButton::Think()
 	if( thinkFlags & TH_THINK )
 	{
 		player = gameLocal.GetLocalPlayer();
-		if( player && ( !player->oldButtons & BUTTON_ATTACK ) && ( player->usercmd.buttons & BUTTON_ATTACK ) )
+		if( player && !( player->oldButtons & BUTTON_ATTACK ) && ( player->usercmd.buttons & BUTTON_ATTACK ) )
 		{
 			player->usercmd.buttons &= ~BUTTON_ATTACK;
 			BecomeInactive( TH_THINK );
@@ -1011,7 +1008,6 @@ void idTarget_SetInfluence::Event_GatherEntities()
 	int i, listedEntities;
 	idEntity* entityList[ MAX_GENTITIES ];
 
-	bool demonicOnly = spawnArgs.GetBool( "effect_demonic" );
 	bool lights = spawnArgs.GetBool( "effect_lights" );
 	bool sounds = spawnArgs.GetBool( "effect_sounds" );
 	bool guis = spawnArgs.GetBool( "effect_guis" );
@@ -2002,8 +1998,6 @@ void idTarget_FadeSoundClass::Event_RestoreVolume()
 {
 	float fadeTime = spawnArgs.GetFloat( "fadeTime" );
 	float fadeDB = spawnArgs.GetFloat( "fadeDB" );
-	int fadeClass = spawnArgs.GetInt( "fadeClass" );
 	// restore volume
 	gameSoundWorld->FadeSoundClasses( 0, fadeDB, fadeTime );
 }
-

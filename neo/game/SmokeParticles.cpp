@@ -139,22 +139,7 @@ void idSmokeParticles::FreeSmokes()
 		{
 			next = smoke->next;
 
-// RB begin
-#if defined(STANDALONE)
-			float frac;
-
-			if( smoke->timeGroup )
-			{
-				frac = ( float )( gameLocal.fast.time - smoke->privateStartTime ) / ( stage->particleLife * 1000 );
-			}
-			else
-			{
-				frac = ( float )( gameLocal.slow.time - smoke->privateStartTime ) / ( stage->particleLife * 1000 );
-			}
-#else
 			float frac = ( float )( gameLocal.time - smoke->privateStartTime ) / ( stage->particleLife * 1000 );
-#endif
-// RB end
 			if( frac >= 1.0f )
 			{
 				// remove the particle from the stage list
@@ -192,20 +177,9 @@ idSmokeParticles::EmitSmoke
 Called by game code to drop another particle into the list
 ================
 */
-// RB begin
-#if defined(STANDALONE)
-	bool idSmokeParticles::EmitSmoke( const idDeclParticle* smoke, const int systemStartTime, const float diversity, const idVec3& origin, const idMat3& axis, int timeGroup /*_D3XP*/ )
-#else
-	bool idSmokeParticles::EmitSmoke( const idDeclParticle* smoke, const int systemStartTime, const float diversity, const idVec3& origin, const idMat3& axis )
-#endif
+bool idSmokeParticles::EmitSmoke( const idDeclParticle* smoke, const int systemStartTime, const float diversity, const idVec3& origin, const idMat3& axis )
 {
 	bool	continues = false;
-
-// RB begin
-#if defined(STANDALONE)
-	SetTimeState ts( timeGroup );
-#endif
-// RB end
 
 	if( !smoke )
 	{
@@ -252,7 +226,7 @@ Called by game code to drop another particle into the list
 		}
 
 		// see how many particles we should emit this tic
-		// FIXME: 			smoke.privateStartTime += stage->timeOffset;
+		// FIXME:			smoke.privateStartTime += stage->timeOffset;
 		int		finalParticleTime = stage->cycleMsec * stage->spawnBunching;
 		int		deltaMsec = gameLocal.time - systemStartTime;
 
@@ -330,11 +304,6 @@ Called by game code to drop another particle into the list
 			freeSmokes = freeSmokes->next;
 			numActiveSmokes++;
 
-// RB begin
-#if defined(STANDALONE)
-			newSmoke->timeGroup = timeGroup;
-#endif
-// RB end
 			newSmoke->index = prevCount;
 			newSmoke->axis = axis;
 			newSmoke->origin = origin;
@@ -358,35 +327,22 @@ idSmokeParticles::UpdateRenderEntity
 bool idSmokeParticles::UpdateRenderEntity( renderEntity_s* renderEntity, const renderView_t* renderView )
 {
 
+	// FIXME: re-use model surfaces
+	renderEntity->hModel->InitEmpty( smokeParticle_SnapshotName );
+
 	// this may be triggered by a model trace or other non-view related source,
 	// to which we should look like an empty model
 	if( !renderView )
 	{
-		// FIXME: re-use model surfaces
-		renderEntity->hModel->InitEmpty( smokeParticle_SnapshotName );
 		return false;
 	}
 
 	// don't regenerate it if it is current
-// RB begin
-#if defined(STANDALONE)
-	if( renderView->time[renderEntity->timeGroup] == currentParticleTime && !renderView->forceUpdate )
-#else
 	if( renderView->time[0] == currentParticleTime && !renderView->forceUpdate )
-#endif
 	{
 		return false;
 	}
-
-#if defined(STANDALONE)
-	currentParticleTime = renderView->time[renderEntity->timeGroup];
-#else
 	currentParticleTime = renderView->time[0];
-#endif
-	// RB end
-
-	// FIXME: re-use model surfaces
-	renderEntity->hModel->InitEmpty( smokeParticle_SnapshotName );
 
 	particleGen_t g;
 
@@ -429,20 +385,7 @@ bool idSmokeParticles::UpdateRenderEntity( renderEntity_s* renderEntity, const r
 		{
 			next = smoke->next;
 
-// RB begin
-#if defined(STANDALONE)
-			if( smoke->timeGroup )
-			{
-				g.frac = ( float )( gameLocal.fast.time - smoke->privateStartTime ) / ( stage->particleLife * 1000 );
-			}
-			else
-			{
-				g.frac = ( float )( gameLocal.time - smoke->privateStartTime ) / ( stage->particleLife * 1000 );
-			}
-#else
 			g.frac = ( float )( gameLocal.time - smoke->privateStartTime ) / ( stage->particleLife * 1000 );
-#endif
-// RB end
 			if( g.frac >= 1.0f )
 			{
 				// remove the particle from the stage list

@@ -89,7 +89,7 @@ bool idMsgQueue::Add( const byte* data, const int size )
 	}
 	int sequence = last;
 	WriteShort( size );
-	WriteLong( sequence );
+	WriteInt( sequence );
 	WriteData( data, size );
 	last++;
 	return true;
@@ -109,7 +109,7 @@ bool idMsgQueue::Get( byte* data, int& size )
 	}
 	int sequence;
 	size = ReadShort();
-	sequence = ReadLong();
+	sequence = ReadInt();
 	ReadData( data, size );
 	assert( sequence == first );
 	first++;
@@ -214,10 +214,10 @@ int idMsgQueue::ReadShort()
 
 /*
 ===============
-idMsgQueue::WriteLong
+idMsgQueue::WriteInt
 ===============
 */
-void idMsgQueue::WriteLong( int l )
+void idMsgQueue::WriteInt( int l )
 {
 	WriteByte( ( l >>  0 ) & 255 );
 	WriteByte( ( l >>  8 ) & 255 );
@@ -227,10 +227,10 @@ void idMsgQueue::WriteLong( int l )
 
 /*
 ===============
-idMsgQueue::ReadLong
+idMsgQueue::ReadInt
 ===============
 */
-int idMsgQueue::ReadLong()
+int idMsgQueue::ReadInt()
 {
 	return ReadByte() | ( ReadByte() << 8 ) | ( ReadByte() << 16 ) | ( ReadByte() << 24 );
 }
@@ -377,7 +377,7 @@ void idMsgChannel::WriteMessageData( idBitMsg& out, const idBitMsg& msg )
 	tmp.Init( tmpBuf, sizeof( tmpBuf ) );
 
 	// write acknowledgement of last received reliable message
-	tmp.WriteLong( reliableReceive.GetLast() );
+	tmp.WriteInt( reliableReceive.GetLast() );
 
 	// write reliable messages
 	reliableSend.CopyToBuffer( tmp.GetData() + tmp.GetSize() );
@@ -418,7 +418,7 @@ bool idMsgChannel::ReadMessageData( idBitMsg& out, const idBitMsg& msg )
 	out.BeginReading();
 
 	// read acknowledgement of sent reliable messages
-	reliableAcknowledge = out.ReadLong();
+	reliableAcknowledge = out.ReadInt();
 
 	// remove acknowledged reliable messages
 	while( reliableSend.GetFirst() <= reliableAcknowledge )
@@ -438,7 +438,7 @@ bool idMsgChannel::ReadMessageData( idBitMsg& out, const idBitMsg& msg )
 			common->Printf( "%s: bad reliable message\n", Sys_NetAdrToString( remoteAddress ) );
 			return false;
 		}
-		reliableSequence = out.ReadLong();
+		reliableSequence = out.ReadInt();
 		if( reliableSequence == reliableReceive.GetLast() + 1 )
 		{
 			reliableReceive.Add( out.GetData() + out.GetReadCount(), reliableMessageSize );
@@ -476,7 +476,7 @@ void idMsgChannel::SendNextFragment( idPort& port, const int time )
 	// write the packet
 	msg.Init( msgBuf, sizeof( msgBuf ) );
 	msg.WriteShort( id );
-	msg.WriteLong( outgoingSequence | FRAGMENT_BIT );
+	msg.WriteInt( outgoingSequence | FRAGMENT_BIT );
 
 	fragLength = FRAGMENT_SIZE;
 	if( unsentFragmentStart + fragLength > unsentMsg.GetSize() )
@@ -563,7 +563,7 @@ int idMsgChannel::SendMessage( idPort& port, const int time, const idBitMsg& msg
 
 	// write the header
 	unsentMsg.WriteShort( id );
-	unsentMsg.WriteLong( outgoingSequence );
+	unsentMsg.WriteInt( outgoingSequence );
 
 	// write out the message data
 	WriteMessageData( unsentMsg, msg );
@@ -613,7 +613,7 @@ bool idMsgChannel::Process( const netadr_t from, int time, idBitMsg& msg, int& s
 	UpdateIncomingRate( time, msg.GetSize() );
 
 	// get sequence numbers
-	sequence = msg.ReadLong();
+	sequence = msg.ReadInt();
 
 	// check for fragment information
 	if( sequence & FRAGMENT_BIT )

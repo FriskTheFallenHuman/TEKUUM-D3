@@ -968,7 +968,7 @@ static drawSurf_t* R_ParticleDeform( drawSurf_t* surf, bool useArea )
 #if defined(STANDALONE)
 			int stageAge = g.renderView->time[renderEntity->timeGroup] + idMath::Ftoi( renderEntity->shaderParms[SHADERPARM_TIMEOFFSET] * 1000.0f - stage->timeOffset * 1000.0f );
 #else
-			int stageAge = g.renderView->time[TIME_GROUP1] + idMath::Ftoi( renderEntity->shaderParms[SHADERPARM_TIMEOFFSET] * 1000.0f - stage->timeOffset * 1000.0f );
+			int stageAge = g.renderView->time[0] + idMath::Ftoi( renderEntity->shaderParms[SHADERPARM_TIMEOFFSET] * 1000.0f - stage->timeOffset * 1000.0f );
 #endif
 // RB end
 			int stageCycle = stageAge / stage->cycleMsec;
@@ -1007,7 +1007,7 @@ static drawSurf_t* R_ParticleDeform( drawSurf_t* surf, bool useArea )
 #if defined(STANDALONE)
 				if( renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] != 0.0f && g.renderView->time[renderEntity->timeGroup] - inCycleTime >= renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] * 1000.0f )
 #else
-				if( renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] != 0.0f && g.renderView->time[TIME_GROUP1] - inCycleTime >= renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] * 1000.0f )
+				if( renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] != 0.0f && g.renderView->time[0] - inCycleTime >= renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] * 1000.0f )
 #endif
 // RB end
 				{

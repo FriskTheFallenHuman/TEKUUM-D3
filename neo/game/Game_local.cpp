@@ -64,71 +64,19 @@ idAnimManager				animationLib;
 idGameLocal					gameLocal;
 idGame* 					game = &gameLocal;	// statically pointed at an idGameLocal
 
-// RB: added wallwalk
 const char* idGameLocal::sufaceTypeNames[ MAX_SURFACE_TYPES ] =
 {
 	"none",	"metal", "stone", "flesh", "wood", "cardboard", "liquid", "glass", "plastic",
-	"ricochet", "wallwalk", "surftype11", "surftype12", "surftype13", "surftype14", "surftype15"
+	"ricochet", "surftype10", "surftype11", "surftype12", "surftype13", "surftype14", "surftype15"
 };
-// RB end
-
-// RB begin
-#if defined(STANDALONE)
-// List of all defs used by the player that will stay on the fast timeline
-static char* fastEntityList[] =
-{
-	"player_doommarine",
-	"weapon_chainsaw",
-	"weapon_fists",
-	"weapon_flashlight",
-	"weapon_rocketlauncher",
-	"projectile_rocket",
-	"weapon_machinegun",
-	"projectile_bullet_machinegun",
-	"weapon_pistol",
-	"projectile_bullet_pistol",
-	"weapon_handgrenade",
-	"projectile_grenade",
-	"weapon_bfg",
-	"projectile_bfg",
-	"weapon_chaingun",
-	"projectile_chaingunbullet",
-	"weapon_pda",
-	"weapon_plasmagun",
-	"projectile_plasmablast",
-	"weapon_shotgun",
-	"projectile_bullet_shotgun",
-	"weapon_soulcube",
-	"projectile_soulblast",
-	"weapon_shotgun_double",
-	"projectile_shotgunbullet_double",
-	"weapon_grabber",
-	"weapon_bloodstone_active1",
-	"weapon_bloodstone_active2",
-	"weapon_bloodstone_active3",
-	"weapon_bloodstone_passive",
-	NULL
-};
-#endif
-// RB end
 
 /*
 ===========
 GetGameAPI
 ============
 */
-#if __MWERKS__
-	#pragma export on
-#endif
-#if __GNUC__ >= 4
-	#pragma GCC visibility push(default)
-#endif
-extern "C" gameExport_t* GetGameAPI( gameImport_t* import )
+extern "C" ID_GAME_API gameExport_t* GetGameAPI( gameImport_t* import )
 {
-#if __MWERKS__
-#pragma export off
-#endif
-
 	if( import->version == GAME_API_VERSION )
 	{
 
@@ -161,9 +109,6 @@ extern "C" gameExport_t* GetGameAPI( gameImport_t* import )
 
 	return &gameExport;
 }
-#if __GNUC__ >= 4
-	#pragma GCC visibility pop
-#endif
 
 /*
 ===========
@@ -401,6 +346,9 @@ void idGameLocal::Shutdown()
 
 	idAI::FreeObstacleAvoidanceNodes();
 
+	// shutdown the model exporter
+	idModelExport::Shutdown();
+
 	idEvent::Shutdown();
 
 	delete[] locationEntities;
@@ -435,16 +383,11 @@ void idGameLocal::Shutdown()
 	Printf( "--------------------------------------\n" );
 
 #ifdef GAME_DLL
-
 	// remove auto-completion function pointers pointing into this DLL
 	cvarSystem->RemoveFlaggedAutoCompletion( CVAR_GAME );
 
-	// enable leak test
-	//Mem_EnableLeakTest( "game" );
-
 	// shutdown idLib
 	idLib::ShutDown();
-
 #endif
 }
 
@@ -578,12 +521,6 @@ void idGameLocal::SaveGame( idFile* f )
 	savegame.WriteInt( previousTime );
 	savegame.WriteInt( time );
 
-// RB begin
-#if defined(STANDALONE)
-	//savegame.WriteInt( msec );
-#endif
-// RB end
-
 	savegame.WriteInt( vacuumAreaNum );
 
 	savegame.WriteInt( entityDefBits );
@@ -597,20 +534,6 @@ void idGameLocal::SaveGame( idFile* f )
 	savegame.WriteInt( realClientTime );
 	savegame.WriteBool( isNewFrame );
 	savegame.WriteFloat( clientSmoothing );
-
-// RB begin
-#if defined(STANDALONE)
-	portalSkyEnt.Save( &savegame );
-	savegame.WriteBool( portalSkyActive );
-
-	fast.Save( &savegame );
-	slow.Save( &savegame );
-
-	savegame.WriteInt( slowmoState );
-	savegame.WriteFloat( slowmoScale );
-	savegame.WriteBool( quickSlowmoReset );
-#endif
-// RB end
 
 	savegame.WriteBool( mapCycleLoaded );
 	savegame.WriteInt( spawnCount );
@@ -961,14 +884,6 @@ void idGameLocal::LoadMap( const char* mapName, int randseed )
 	// clear the sound system
 	gameSoundWorld->ClearAllSoundEmitters();
 
-// RB begin
-#if defined(STANDALONE)
-	// clear envirosuit sound fx
-	gameSoundWorld->SetEnviroSuit( false );
-	gameSoundWorld->SetSlowmo( false );
-#endif
-// RB end
-
 	InitAsyncNetwork();
 
 	if( !sameMap || ( mapFile && mapFile->NeedsReload() ) )
@@ -1034,15 +949,6 @@ void idGameLocal::LoadMap( const char* mapName, int randseed )
 	sessionCommand = "";
 	nextGibTime		= 0;
 
-// RB begin
-#if defined(STANDALONE)
-	portalSkyEnt			= NULL;
-	portalSkyActive			= false;
-
-	ResetSlowTimeVars();
-#endif
-// RB end
-
 	vacuumAreaNum = -1;		// if an info_vacuum is spawned, it will set this
 
 	if( !editEntities )
@@ -1050,13 +956,7 @@ void idGameLocal::LoadMap( const char* mapName, int randseed )
 		editEntities = new idEditEntities;
 	}
 
-	// RB: changed g_gravity to 3d vector
-#if defined(STANDALONE)
-	gravity.Set( g_gravityX.GetFloat(), g_gravityY.GetFloat(), g_gravityZ.GetFloat() );
-#else
 	gravity.Set( 0, 0, -g_gravity.GetFloat() );
-#endif
-	// RB end
 
 	spawnArgs.Clear();
 
@@ -1115,8 +1015,6 @@ void idGameLocal::LocalMapRestart( )
 
 	MapClear( false );
 
-
-
 	// clear the smoke particle free list
 	smokeParticles->Init();
 
@@ -1124,14 +1022,6 @@ void idGameLocal::LocalMapRestart( )
 	if( gameSoundWorld )
 	{
 		gameSoundWorld->ClearAllSoundEmitters();
-
-// RB begin
-#if defined(STANDALONE)
-		// clear envirosuit sound fx
-		gameSoundWorld->SetEnviroSuit( false );
-		gameSoundWorld->SetSlowmo( false );
-#endif
-// RB end
 	}
 
 	// the spawnCount is reset to zero temporarily to spawn the map entities with the same spawnId
@@ -1448,8 +1338,8 @@ bool idGameLocal::InitFromSaveGame( const char* mapName, idRenderWorld* renderWo
 		if( !InhibitEntitySpawn( mapEnt->epairs ) )
 		{
 			CacheDictionaryMedia( &mapEnt->epairs );
-			const char* classname = mapEnt->epairs.GetString( "classname" );
-			if( classname != '\0' )
+			const char* classname;
+			if( mapEnt->epairs.GetString( "classname", "", &classname ) )
 			{
 				FindEntityDef( classname, false );
 			}
@@ -1547,12 +1437,6 @@ bool idGameLocal::InitFromSaveGame( const char* mapName, idRenderWorld* renderWo
 	savegame.ReadInt( previousTime );
 	savegame.ReadInt( time );
 
-// RB begin
-#if defined(STANDALONE)
-	//savegame.ReadInt( msec );
-#endif
-// RB end
-
 	savegame.ReadInt( vacuumAreaNum );
 
 	savegame.ReadInt( entityDefBits );
@@ -1566,42 +1450,6 @@ bool idGameLocal::InitFromSaveGame( const char* mapName, idRenderWorld* renderWo
 	savegame.ReadInt( realClientTime );
 	savegame.ReadBool( isNewFrame );
 	savegame.ReadFloat( clientSmoothing );
-
-// RB begin
-#if defined(STANDALONE)
-	portalSkyEnt.Restore( &savegame );
-	savegame.ReadBool( portalSkyActive );
-
-	fast.Restore( &savegame );
-	slow.Restore( &savegame );
-
-	int blah;
-	savegame.ReadInt( blah );
-	slowmoState = ( slowmoState_t )blah;
-
-	savegame.ReadFloat( slowmoScale );
-	savegame.ReadBool( quickSlowmoReset );
-
-	if( slowmoState == SLOWMO_STATE_OFF )
-	{
-		if( gameSoundWorld )
-		{
-			gameSoundWorld->SetSlowmo( false );
-		}
-	}
-	else
-	{
-		if( gameSoundWorld )
-		{
-			gameSoundWorld->SetSlowmo( true );
-		}
-	}
-	if( gameSoundWorld )
-	{
-		gameSoundWorld->SetSlowmoSpeed( slowmoScale );
-	}
-#endif
-// RB end
 
 	savegame.ReadBool( mapCycleLoaded );
 	savegame.ReadInt( spawnCount );
@@ -1896,8 +1744,8 @@ void idGameLocal::GetShakeSounds( const idDict* dict )
 	const char* soundShaderName;
 	idStr soundName;
 
-	soundShaderName = dict->GetString( "s_shader" );
-	if( soundShaderName != '\0' && dict->GetFloat( "s_shakes" ) != 0.0f )
+	if( dict->GetString( "s_shader", "", &soundShaderName )
+			&& dict->GetFloat( "s_shakes" ) != 0.0f )
 	{
 		soundShader = declManager->FindSound( soundShaderName );
 
@@ -2360,28 +2208,6 @@ void idGameLocal::SetupPlayerPVS()
 			pvs.FreeCurrentPVS( otherPVS );
 			playerConnectedAreas = newPVS;
 		}
-
-// RB begin
-#if defined(STANDALONE)
-		// if portalSky is preset, then merge into pvs so we get rotating brushes, etc
-		if( portalSkyEnt.GetEntity() )
-		{
-			idEntity* skyEnt = portalSkyEnt.GetEntity();
-
-			otherPVS = pvs.SetupCurrentPVS( skyEnt->GetPVSAreas(), skyEnt->GetNumPVSAreas() );
-			newPVS = pvs.MergeCurrentPVS( playerPVS, otherPVS );
-			pvs.FreeCurrentPVS( playerPVS );
-			pvs.FreeCurrentPVS( otherPVS );
-			playerPVS = newPVS;
-
-			otherPVS = pvs.SetupCurrentPVS( skyEnt->GetPVSAreas(), skyEnt->GetNumPVSAreas() );
-			newPVS = pvs.MergeCurrentPVS( playerConnectedAreas, otherPVS );
-			pvs.FreeCurrentPVS( playerConnectedAreas );
-			pvs.FreeCurrentPVS( otherPVS );
-			playerConnectedAreas = newPVS;
-		}
-#endif
-// RB end
 	}
 }
 
@@ -2445,47 +2271,17 @@ void idGameLocal::UpdateGravity()
 {
 	idEntity* ent;
 
-	// RB: changed gravity to 3 vectors
-#if defined(STANDALONE)
-	if( g_gravityX.IsModified() || g_gravityY.IsModified() || g_gravityZ.IsModified() )
-#else
 	if( g_gravity.IsModified() )
-#endif
 	{
-
-		/*
-		if ( g_gravityX.GetFloat() == 0.0f ) {
-			g_gravityX.SetFloat( 1.0f );
-		}
-
-		if ( g_gravityY.GetFloat() == 0.0f ) {
-			g_gravityY.SetFloat( 1.0f );
-		}
-		*/
-
-#if defined(STANDALONE)
-		gravity.Set( g_gravityX.GetFloat(), g_gravityY.GetFloat(), g_gravityZ.GetFloat() );
-#else
 		if( g_gravity.GetFloat() == 0.0f )
 		{
 			g_gravity.SetFloat( 1.0f );
 		}
-
 		gravity.Set( 0, 0, -g_gravity.GetFloat() );
-#endif
 
 		// update all physics objects
 		for( ent = spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() )
 		{
-#if defined(STANDALONE)
-			//if ( ent->IsType( idAFEntity_Generic::Type ) ) {
-			idPhysics* phys = ent->GetPhysics();
-			if( phys )
-			{
-				phys->SetGravity( gravity );
-			}
-			//}
-#else
 			if( ent->IsType( idAFEntity_Generic::Type ) )
 			{
 				idPhysics* phys = ent->GetPhysics();
@@ -2494,18 +2290,9 @@ void idGameLocal::UpdateGravity()
 					phys->SetGravity( gravity );
 				}
 			}
-#endif
 		}
-
-#if defined(STANDALONE)
-		g_gravityX.ClearModified();
-		g_gravityY.ClearModified();
-		g_gravityZ.ClearModified();
-#else
 		g_gravity.ClearModified();
-#endif
 	}
-	// RB end
 }
 
 /*
@@ -2600,36 +2387,6 @@ void idGameLocal::SortActiveEntityList()
 	sortPushers = false;
 }
 
-// RB begin
-#if defined(STANDALONE)
-/*
-================
-idGameLocal::RunTimeGroup2
-================
-*/
-void idGameLocal::RunTimeGroup2()
-{
-	idEntity* ent;
-	int num = 0;
-
-	SelectTimeGroup( true );
-
-	for( ent = activeEntities.Next(); ent != NULL; ent = ent->activeNode.Next() )
-	{
-		if( ent->timeGroup != TIME_GROUP2 )
-		{
-			continue;
-		}
-
-		ent->Think();
-		num++;
-	}
-
-	SelectTimeGroup( false );
-}
-#endif
-// RB end
-
 /*
 ================
 idGameLocal::RunFrame
@@ -2637,13 +2394,13 @@ idGameLocal::RunFrame
 */
 gameReturn_t idGameLocal::RunFrame( const usercmd_t* clientCmds )
 {
-	idEntity* 	ent;
-	int			num;
-	float		ms;
-	idTimer		timer_think, timer_events, timer_singlethink;
-	gameReturn_t ret;
-	idPlayer*	player;
-	const renderView_t* view;
+	idEntity* 			ent;
+	int					num;
+	float				ms;
+	idTimer				timer_think, timer_events, timer_singlethink;
+	gameReturn_t		ret;
+	idPlayer*			player;
+	const renderView_t*	view;
 
 #ifdef _DEBUG
 	if( isMultiplayer )
@@ -2667,32 +2424,13 @@ gameReturn_t idGameLocal::RunFrame( const usercmd_t* clientCmds )
 			player->Think();
 		}
 	}
-	else
-	{
-		do
+	else do
 		{
 			// update the game time
 			framenum++;
-
-// RB begin
-#if defined(STANDALONE)
-			fast.previousTime = FRAME_TO_MSEC( framenum - 1 );
-			fast.time = FRAME_TO_MSEC( framenum );
-			fast.realClientTime = time;
-
-			ComputeSlowScale();
-
-			slow.previousTime = slow.time;
-			slow.time += idMath::Ftoi( ( fast.time - fast.previousTime ) * slowmoScale );
-			slow.realClientTime = slow.time;
-
-			SelectTimeGroup( false );
-#else
 			previousTime = FRAME_TO_MSEC( framenum - 1 );
 			time = FRAME_TO_MSEC( framenum );
 			realClientTime = time;
-#endif
-// RB end
 
 #ifdef GAME_DLL
 			// allow changing SIMD usage on the fly
@@ -2787,25 +2525,11 @@ gameReturn_t idGameLocal::RunFrame( const usercmd_t* clientCmds )
 					num = 0;
 					for( ent = activeEntities.Next(); ent != NULL; ent = ent->activeNode.Next() )
 					{
-// RB begin
-#if defined(STANDALONE)
-						if( ent->timeGroup != TIME_GROUP1 )
-						{
-							continue;
-						}
-#endif
-// RB end
 						ent->Think();
 						num++;
 					}
 				}
 			}
-
-// RB begin
-#if defined(STANDALONE)
-			RunTimeGroup2();
-#endif
-// RB end
 
 			// remove any entities that have stopped thinking
 			if( numEntitiesToDeactivate )
@@ -2832,15 +2556,6 @@ gameReturn_t idGameLocal::RunFrame( const usercmd_t* clientCmds )
 			// service any pending events
 			idEvent::ServiceEvents();
 
-// RB begin
-#if defined(STANDALONE)
-			// service pending fast events
-			SelectTimeGroup( true );
-			idEvent::ServiceFastEvents();
-			SelectTimeGroup( false );
-#endif
-// RB end
-
 			timer_events.Stop();
 
 			// free the player pvs
@@ -2855,7 +2570,7 @@ gameReturn_t idGameLocal::RunFrame( const usercmd_t* clientCmds )
 			// display how long it took to calculate the current game frame
 			if( g_frametime.GetBool() )
 			{
-				Printf( "game %d: all:%.1f th:%.1f ev:%.1f %d ents \n",
+				Printf( "game %d: all:%u th:%u ev:%u %d ents \n",
 						time, timer_think.Milliseconds() + timer_events.Milliseconds(),
 						timer_think.Milliseconds(), timer_events.Milliseconds(), num );
 			}
@@ -2885,7 +2600,7 @@ gameReturn_t idGameLocal::RunFrame( const usercmd_t* clientCmds )
 			// see if a target_sessionCommand has forced a changelevel
 			if( sessionCommand.Length() )
 			{
-				strncpy( ret.sessionCommand, sessionCommand, sizeof( ret.sessionCommand ) );
+				idStr::Copynz( ret.sessionCommand, sessionCommand, sizeof( ret.sessionCommand ) );
 				break;
 			}
 
@@ -2898,7 +2613,6 @@ gameReturn_t idGameLocal::RunFrame( const usercmd_t* clientCmds )
 			}
 		}
 		while( ( inCinematic || ( time < cinematicStopTime ) ) && skipCinematic );
-	}
 
 	ret.syncNextGameFrame = skipCinematic;
 	if( skipCinematic )
@@ -2932,27 +2646,73 @@ Calculates the horizontal and vertical field of view based on a horizontal field
 */
 void idGameLocal::CalcFov( float base_fov, float& fov_x, float& fov_y ) const
 {
-	const int width = renderSystem->GetWidth();
-	const int height = renderSystem->GetHeight();
-	if( width == height )
+	float	x;
+	float	y;
+	float	ratio_x;
+	float	ratio_y;
+
+	// first, calculate the vertical fov based on a 640x480 view
+	x = 640.0f / tan( base_fov / 360.0f * idMath::PI );
+	y = atan2( 480.0f, x );
+	fov_y = y * 360.0f / idMath::PI;
+
+	// FIXME: somehow, this is happening occasionally
+	assert( fov_y > 0 );
+	if( fov_y <= 0 )
 	{
-		// this is the Rift, so don't mess with our aspect ratio corrections
-		fov_x = base_fov;
-		fov_y = base_fov;
-		return;
+		Error( "idGameLocal::CalcFov: bad result, fov_y == %f, base_fov == %f", fov_y, base_fov );
 	}
 
-	// Calculate the fov_y based on an ideal aspect ratio
-	const float ideal_ratio_x = 16.0f;
-	const float ideal_ratio_y = 9.0f;
-	const float tanHalfX = idMath::Tan( DEG2RAD( base_fov * 0.5f ) );
-	fov_y = 2.0f * RAD2DEG( idMath::ATan( ideal_ratio_y * tanHalfX, ideal_ratio_x ) );
+	switch( r_aspectRatio.GetInteger() )
+	{
+		default :
+		case -1 :
+			// auto mode => use aspect ratio from resolution, assuming screen's pixels are squares
+			ratio_x = renderSystem->GetWidth();
+			ratio_y = renderSystem->GetHeight();
+			if( ratio_x <= 0.0f || ratio_y <= 0.0f )
+			{
+				// for some reason (maybe this is a dedicated server?) GetScreenWidth()/Height()
+				// returned 0. Assume default 4:3 to avoid assert()/Error() below.
+				fov_x = base_fov;
+				return;
+			}
+			break;
+		case 0 :
+			// 4:3
+			fov_x = base_fov;
+			return;
+			break;
 
-	// Then calculate fov_x based on the true aspect ratio
-	const float ratio_x = width * renderSystem->GetPixelAspect();
-	const float ratio_y = height;
-	const float tanHalfY = idMath::Tan( DEG2RAD( fov_y * 0.5f ) );
-	fov_x = 2.0f * RAD2DEG( idMath::ATan( ratio_x * tanHalfY, ratio_y ) );
+		case 1 :
+			// 16:9
+			ratio_x = 16.0f;
+			ratio_y = 9.0f;
+			break;
+
+		case 2 :
+			// 16:10
+			ratio_x = 16.0f;
+			ratio_y = 10.0f;
+			break;
+	}
+
+	y = ratio_y / tan( fov_y / 360.0f * idMath::PI );
+	fov_x = atan2( ratio_x, y ) * 360.0f / idMath::PI;
+
+	if( fov_x < base_fov )
+	{
+		fov_x = base_fov;
+		x = ratio_x / tan( fov_x / 360.0f * idMath::PI );
+		fov_y = atan2( ratio_y, x ) * 360.0f / idMath::PI;
+	}
+
+	// FIXME: somehow, this is happening occasionally
+	assert( ( fov_x > 0 ) && ( fov_y > 0 ) );
+	if( ( fov_y <= 0 ) || ( fov_x <= 0 ) )
+	{
+		Error( "idGameLocal::CalcFov: bad result" );
+	}
 }
 
 /*
@@ -3610,9 +3370,7 @@ idEntity* idGameLocal::SpawnEntityType( const idTypeInfo& classdef, const idDict
 		Error( "Attempted to spawn non-entity class '%s'", classdef.classname );
 	}
 
-#if defined(USE_EXCEPTIONS)
 	try
-#endif
 	{
 		if( args )
 		{
@@ -3625,12 +3383,11 @@ idEntity* idGameLocal::SpawnEntityType( const idTypeInfo& classdef, const idDict
 		obj = classdef.CreateInstance();
 		obj->CallSpawn();
 	}
-#if defined(USE_EXCEPTIONS)
+
 	catch( idAllocError& )
 	{
 		obj = NULL;
 	}
-#endif
 	spawnArgs.Clear();
 
 	return static_cast<idEntity*>( obj );
@@ -3676,29 +3433,6 @@ bool idGameLocal::SpawnEntityDef( const idDict& args, idEntity** ent, bool setDe
 	}
 
 	spawnArgs.SetDefaults( &def->dict );
-
-// RB begin
-#if defined(STANDALONE)
-	if( !spawnArgs.FindKey( "slowmo" ) )
-	{
-		bool slowmo = true;
-
-		for( int i = 0; fastEntityList[i]; i++ )
-		{
-			if( !idStr::Cmp( classname, fastEntityList[i] ) )
-			{
-				slowmo = false;
-				break;
-			}
-		}
-
-		if( !slowmo )
-		{
-			spawnArgs.SetBool( "slowmo", slowmo );
-		}
-	}
-#endif
-// RB end
 
 	// check if we should spawn a class object
 	spawnArgs.GetString( "spawnclass", NULL, &spawn );
@@ -4280,17 +4014,6 @@ idGameLocal::GetAlertEntity
 */
 idActor* idGameLocal::GetAlertEntity()
 {
-// RB begin
-#if defined(STANDALONE)
-	int timeGroup = 0;
-	if( lastAIAlertTime && lastAIAlertEntity.GetEntity() )
-	{
-		timeGroup = lastAIAlertEntity.GetEntity()->timeGroup;
-	}
-	SetTimeState ts( timeGroup );
-#endif
-// RB end
-
 	if( lastAIAlertTime >= time )
 	{
 		return lastAIAlertEntity.GetEntity();
@@ -4311,7 +4034,7 @@ void idGameLocal::RadiusDamage( const idVec3& origin, idEntity* inflictor, idEnt
 	idEntity* 	entityList[ MAX_GENTITIES ];
 	int			numListedEntities;
 	idBounds	bounds;
-	idVec3 		v, damagePoint, dir;
+	idVec3		v, damagePoint, dir;
 	int			i, e, damage, radius, push;
 
 	const idDict* damageDef = FindEntityDefDict( damageDefName, false );
@@ -4629,13 +4352,7 @@ void idGameLocal::ProjectDecal( const idVec3& origin, const idVec3& dir, float d
 	winding += idVec5( windingOrigin + ( axis * decalWinding[1] ) * size, idVec2( 0, 1 ) );
 	winding += idVec5( windingOrigin + ( axis * decalWinding[2] ) * size, idVec2( 0, 0 ) );
 	winding += idVec5( windingOrigin + ( axis * decalWinding[3] ) * size, idVec2( 1, 0 ) );
-
-// RB begin
-#if defined(STANDALONE)
-	gameRenderWorld->ProjectDecalOntoWorld( winding, projectionOrigin, parallel, depth * 0.5f, declManager->FindMaterial( material ), gameLocal.slow.time /* _D3XP */ );
-#else
 	gameRenderWorld->ProjectDecalOntoWorld( winding, projectionOrigin, parallel, depth * 0.5f, declManager->FindMaterial( material ), time );
-#endif
 }
 
 /*
@@ -4925,7 +4642,7 @@ void idGameLocal::SetPortalState( qhandle_t portal, int blockingBits )
 	{
 		outMsg.Init( msgBuf, sizeof( msgBuf ) );
 		outMsg.WriteByte( GAME_RELIABLE_MESSAGE_PORTAL );
-		outMsg.WriteLong( portal );
+		outMsg.WriteInt( portal );
 		outMsg.WriteBits( blockingBits, NUM_RENDER_PORTAL_BITS );
 		networkSystem->ServerSendReliableMessage( -1, outMsg );
 	}
@@ -5179,50 +4896,12 @@ void idGameLocal::ThrottleUserInfo()
 	mpGame.ThrottleUserInfo();
 }
 
-// RB begin
-#if defined(STANDALONE)
-/*
-=================
-idPlayer::SetPortalSkyEnt
-=================
-*/
-void idGameLocal::SetPortalSkyEnt( idEntity* ent )
-{
-	portalSkyEnt = ent;
-}
-
-/*
-=================
-idPlayer::IsPortalSkyAcive
-=================
-*/
-bool idGameLocal::IsPortalSkyAcive()
-{
-	return portalSkyActive;
-}
-#endif
-// RB end
-
 /*
 ===========
 idGameLocal::SelectTimeGroup
 ============
 */
-void idGameLocal::SelectTimeGroup( int timeGroup )
-{
-// RB begin
-#if defined(STANDALONE)
-	if( timeGroup )
-	{
-		fast.Get( time, previousTime, realClientTime );
-	}
-	else
-	{
-		slow.Get( time, previousTime, realClientTime );
-	}
-#endif
-// RB end
-}
+void idGameLocal::SelectTimeGroup( int timeGroup ) { }
 
 /*
 ===========
@@ -5231,20 +4910,7 @@ idGameLocal::GetTimeGroupTime
 */
 int idGameLocal::GetTimeGroupTime( int timeGroup )
 {
-// RB begin
-#if defined(STANDALONE)
-	if( timeGroup )
-	{
-		return fast.time;
-	}
-	else
-	{
-		return slow.time;
-	}
-#else
 	return gameLocal.time;
-#endif
-// RB end
 }
 
 /*
@@ -5254,149 +4920,14 @@ idGameLocal::GetBestGameType
 */
 void idGameLocal::GetBestGameType( const char* map, const char* gametype, char buf[ MAX_STRING_CHARS ] )
 {
-	strncpy( buf, gametype, MAX_STRING_CHARS );
+	idStr::Copynz( buf, gametype, MAX_STRING_CHARS );
 	buf[ MAX_STRING_CHARS - 1 ] = '\0';
 }
 
-// RB begin
-#if defined(STANDALONE)
 /*
 ===========
-idGameLocal::ComputeSlowMsec
-============
-*/
-void idGameLocal::ComputeSlowScale()
-{
-	// check if we need to do a quick reset
-	if( quickSlowmoReset )
-	{
-		quickSlowmoReset = false;
-
-		// stop the sounds
-		if( gameSoundWorld )
-		{
-			gameSoundWorld->SetSlowmo( false );
-			gameSoundWorld->SetSlowmoSpeed( 1 );
-		}
-
-		// stop the state
-		slowmoState = SLOWMO_STATE_OFF;
-		slowmoScale = 1.0f;
-	}
-
-	// check the player state
-	idPlayer* player = GetLocalPlayer();
-	bool powerupOn = false;
-
-	if( player != NULL && player->PowerUpActive( HELLTIME ) )
-	{
-		powerupOn = true;
-	}
-	else if( g_enableSlowmo.GetBool() )
-	{
-		powerupOn = true;
-	}
-
-	// determine proper slowmo state
-	if( powerupOn && slowmoState == SLOWMO_STATE_OFF )
-	{
-		slowmoState = SLOWMO_STATE_RAMPUP;
-
-		if( gameSoundWorld )
-		{
-			gameSoundWorld->SetSlowmo( true );
-			gameSoundWorld->SetSlowmoSpeed( slowmoScale );
-		}
-	}
-	else if( !powerupOn && slowmoState == SLOWMO_STATE_ON )
-	{
-		slowmoState = SLOWMO_STATE_RAMPDOWN;
-
-		// play the stop sound
-		if( player != NULL )
-		{
-			//player->PlayHelltimeStopSound();
-		}
-	}
-
-	// do any necessary ramping
-	if( slowmoState == SLOWMO_STATE_RAMPUP )
-	{
-		float delta = ( 0.25f - slowmoScale );
-
-		if( fabs( delta ) < g_slowmoStepRate.GetFloat() )
-		{
-			slowmoScale = 0.25f;
-			slowmoState = SLOWMO_STATE_ON;
-		}
-		else
-		{
-			slowmoScale += delta * g_slowmoStepRate.GetFloat();
-		}
-
-		if( gameSoundWorld != NULL )
-		{
-			gameSoundWorld->SetSlowmoSpeed( slowmoScale );
-		}
-	}
-	else if( slowmoState == SLOWMO_STATE_RAMPDOWN )
-	{
-		float delta = ( 1.0f - slowmoScale );
-
-		if( fabs( delta ) < g_slowmoStepRate.GetFloat() )
-		{
-			slowmoScale = 1.0f;
-			slowmoState = SLOWMO_STATE_OFF;
-			if( gameSoundWorld )
-			{
-				gameSoundWorld->SetSlowmo( false );
-			}
-		}
-		else
-		{
-			slowmoScale += delta * g_slowmoStepRate.GetFloat();
-		}
-
-		if( gameSoundWorld != NULL )
-		{
-			gameSoundWorld->SetSlowmoSpeed( slowmoScale );
-		}
-	}
-}
-
-/*
-===========
-idGameLocal::ResetSlowTimeVars
-============
-*/
-void idGameLocal::ResetSlowTimeVars()
-{
-	slowmoScale			= 1.0f;
-	slowmoState			= SLOWMO_STATE_OFF;
-
-	fast.previousTime	= 0;
-	fast.time			= 0;
-
-	slow.previousTime	= 0;
-	slow.time			= 0;
-}
-
-/*
-===========
-idGameLocal::QuickSlowmoReset
-============
-*/
-void idGameLocal::QuickSlowmoReset()
-{
-	quickSlowmoReset = true;
-}
-#endif
-// RB end
-
-/*
-===============
 idGameLocal::NeedRestart
-===============
+============
 */
 bool idGameLocal::NeedRestart()
 {

@@ -2746,7 +2746,7 @@ idMover_Binary::SetMoverState
 */
 void idMover_Binary::SetMoverState( moverState_t newstate, int time )
 {
-	idVec3 	delta;
+	idVec3	delta;
 
 	moverState = newstate;
 	move_thread = 0;
@@ -5186,13 +5186,7 @@ void idPendulum::Spawn()
 			length = 8;
 		}
 
-		// RB: changed g_gravity to 3d vector, FIXME find down direction
-#if defined(STANDALONE)
-		freq = 1 / ( idMath::TWO_PI ) * idMath::Sqrt( idMath::Fabs( g_gravityZ.GetFloat() ) / ( 3 * length ) );
-#else
-		freq = 1 / ( idMath::TWO_PI ) * idMath::Sqrt( idMath::Fabs( g_gravity.GetFloat() ) / ( 3 * length ) );
-#endif
-		// RB end
+		freq = 1 / ( idMath::TWO_PI ) * idMath::Sqrt( g_gravity.GetFloat() / ( 3 * length ) );
 	}
 
 	physicsObj.SetSelf( this );

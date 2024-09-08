@@ -232,11 +232,7 @@ const int MAX_EXPRESSION_REGISTERS = 4096;
 #include "../aas/AASFileManager.h"
 
 // game
-#if defined(_D3XP)
-	#include "../d3xp/Game.h"
-#else
-	#include "../game/Game.h"
-#endif
+#include "../framework/Game.h"
 
 //-----------------------------------------------------
 

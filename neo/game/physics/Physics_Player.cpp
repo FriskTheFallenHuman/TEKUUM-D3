@@ -54,10 +54,6 @@ const float PM_NOCLIPFRICTION	= 12.0f;
 const float MIN_WALK_NORMAL		= 0.7f;		// can't walk on very steep slopes
 const float OVERCLIP			= 1.001f;
 
-// RB: added local gravity interpolation
-const int PM_TIME_GRAVITY_CHANGE = 700;
-// RB end
-
 // movementFlags
 const int PMF_DUCKED			= 1;		// set when ducking
 const int PMF_JUMPED			= 2;		// set when the player jumped this frame
@@ -133,7 +129,7 @@ Handles user intended acceleration
 */
 void idPhysics_Player::Accelerate( const idVec3& wishdir, const float wishspeed, const float accel )
 {
-#if 0
+#if 1
 	// q2 style
 	float addspeed, accelspeed, currentspeed;
 
@@ -569,7 +565,7 @@ void idPhysics_Player::WaterJumpMove()
 {
 
 	// waterjump has no control, but falls
-	SlideMove( true, true, false, false );
+	idPhysics_Player::SlideMove( true, true, false, false );
 
 	// add gravity
 	current.velocity += gravityNormal * frametime;
@@ -595,15 +591,15 @@ void idPhysics_Player::WaterMove()
 	float	scale;
 	float	vel;
 
-	if( CheckWaterJump() )
+	if( idPhysics_Player::CheckWaterJump() )
 	{
-		WaterJumpMove();
+		idPhysics_Player::WaterJumpMove();
 		return;
 	}
 
-	Friction();
+	idPhysics_Player::Friction();
 
-	scale = CmdScale( command );
+	scale = idPhysics_Player::CmdScale( command );
 
 	// user intentions
 	if( !scale )
@@ -624,7 +620,7 @@ void idPhysics_Player::WaterMove()
 		wishspeed = playerSpeed * PM_SWIMSCALE;
 	}
 
-	Accelerate( wishdir, wishspeed, PM_WATERACCELERATE );
+	idPhysics_Player::Accelerate( wishdir, wishspeed, PM_WATERACCELERATE );
 
 	// make sure we can go up slopes easily under water
 	if( groundPlane && ( current.velocity * groundTrace.c.normal ) < 0.0f )
@@ -637,7 +633,7 @@ void idPhysics_Player::WaterMove()
 		current.velocity *= vel;
 	}
 
-	SlideMove( false, true, false, false );
+	idPhysics_Player::SlideMove( false, true, false, false );
 }
 
 /*
@@ -653,9 +649,9 @@ void idPhysics_Player::FlyMove()
 	float	scale;
 
 	// normal slowdown
-	Friction();
+	idPhysics_Player::Friction();
 
-	scale = CmdScale( command );
+	scale = idPhysics_Player::CmdScale( command );
 
 	if( !scale )
 	{
@@ -670,9 +666,9 @@ void idPhysics_Player::FlyMove()
 	wishdir = wishvel;
 	wishspeed = wishdir.Normalize();
 
-	Accelerate( wishdir, wishspeed, PM_FLYACCELERATE );
+	idPhysics_Player::Accelerate( wishdir, wishspeed, PM_FLYACCELERATE );
 
-	SlideMove( false, false, false, false );
+	idPhysics_Player::SlideMove( false, false, false, false );
 }
 
 /*
@@ -687,9 +683,9 @@ void idPhysics_Player::AirMove()
 	float		wishspeed;
 	float		scale;
 
-	Friction();
+	idPhysics_Player::Friction();
 
-	scale = CmdScale( command );
+	scale = idPhysics_Player::CmdScale( command );
 
 	// project moves down to flat plane
 	viewForward -= ( viewForward * gravityNormal ) * gravityNormal;
@@ -704,7 +700,7 @@ void idPhysics_Player::AirMove()
 	wishspeed *= scale;
 
 	// not on ground, so little effect on velocity
-	Accelerate( wishdir, wishspeed, PM_AIRACCELERATE );
+	idPhysics_Player::Accelerate( wishdir, wishspeed, PM_AIRACCELERATE );
 
 	// we may have a ground plane that is very steep, even
 	// though we don't have a groundentity
@@ -714,7 +710,7 @@ void idPhysics_Player::AirMove()
 		current.velocity.ProjectOntoPlane( groundTrace.c.normal, OVERCLIP );
 	}
 
-	SlideMove( true, false, false, false );
+	idPhysics_Player::SlideMove( true, false, false, false );
 }
 
 /*
@@ -735,27 +731,27 @@ void idPhysics_Player::WalkMove()
 	if( waterLevel > WATERLEVEL_WAIST && ( viewForward * groundTrace.c.normal ) > 0.0f )
 	{
 		// begin swimming
-		WaterMove();
+		idPhysics_Player::WaterMove();
 		return;
 	}
 
-	if( CheckJump() )
+	if( idPhysics_Player::CheckJump() )
 	{
 		// jumped away
 		if( waterLevel > WATERLEVEL_FEET )
 		{
-			WaterMove();
+			idPhysics_Player::WaterMove();
 		}
 		else
 		{
-			AirMove();
+			idPhysics_Player::AirMove();
 		}
 		return;
 	}
 
-	Friction();
+	idPhysics_Player::Friction();
 
-	scale = CmdScale( command );
+	scale = idPhysics_Player::CmdScale( command );
 
 	// project moves down to flat plane
 	viewForward -= ( viewForward * gravityNormal ) * gravityNormal;
@@ -796,7 +792,7 @@ void idPhysics_Player::WalkMove()
 		accelerate = PM_ACCELERATE;
 	}
 
-	Accelerate( wishdir, wishspeed, accelerate );
+	idPhysics_Player::Accelerate( wishdir, wishspeed, accelerate );
 
 	if( ( groundMaterial && groundMaterial->GetSurfaceFlags() & SURF_SLICK ) || current.movementFlags & PMF_TIME_KNOCKBACK )
 	{
@@ -832,7 +828,7 @@ void idPhysics_Player::WalkMove()
 
 	gameLocal.push.InitSavingPushedEntityPositions();
 
-	SlideMove( false, true, true, true );
+	idPhysics_Player::SlideMove( false, true, true, true );
 }
 
 /*
@@ -901,14 +897,14 @@ void idPhysics_Player::NoclipMove()
 	}
 
 	// accelerate
-	scale = CmdScale( command );
+	scale = idPhysics_Player::CmdScale( command );
 
 	wishdir = scale * ( viewForward * command.forwardmove + viewRight * command.rightmove );
 	wishdir -= scale * gravityNormal * command.upmove;
 	wishspeed = wishdir.Normalize();
 	wishspeed *= scale;
 
-	Accelerate( wishdir, wishspeed, PM_ACCELERATE );
+	idPhysics_Player::Accelerate( wishdir, wishspeed, PM_ACCELERATE );
 
 	// move
 	current.origin += frametime * current.velocity;
@@ -926,14 +922,13 @@ void idPhysics_Player::SpectatorMove()
 	idVec3	wishdir;
 	float	scale;
 
-	trace_t	trace;
 	idVec3	end;
 
 	// fly movement
 
-	Friction();
+	idPhysics_Player::Friction();
 
-	scale = CmdScale( command );
+	scale = idPhysics_Player::CmdScale( command );
 
 	if( !scale )
 	{
@@ -947,9 +942,9 @@ void idPhysics_Player::SpectatorMove()
 	wishdir = wishvel;
 	wishspeed = wishdir.Normalize();
 
-	Accelerate( wishdir, wishspeed, PM_FLYACCELERATE );
+	idPhysics_Player::Accelerate( wishdir, wishspeed, PM_FLYACCELERATE );
 
-	SlideMove( false, false, false, false );
+	idPhysics_Player::SlideMove( false, false, false, false );
 }
 
 /*
@@ -977,7 +972,7 @@ void idPhysics_Player::LadderMove()
 		upscale = -1.0f;
 	}
 
-	scale = CmdScale( command );
+	scale = idPhysics_Player::CmdScale( command );
 	wishvel = -0.9f * gravityNormal * upscale * scale * ( float )command.forwardmove;
 
 	// strafe
@@ -1004,11 +999,11 @@ void idPhysics_Player::LadderMove()
 	}
 
 	// do strafe friction
-	Friction();
+	idPhysics_Player::Friction();
 
 	// accelerate
 	wishspeed = wishvel.Normalize();
-	Accelerate( wishvel, wishspeed, PM_ACCELERATE );
+	idPhysics_Player::Accelerate( wishvel, wishspeed, PM_ACCELERATE );
 
 	// cap the vertical velocity
 	upscale = current.velocity * -gravityNormal;
@@ -1041,7 +1036,7 @@ void idPhysics_Player::LadderMove()
 		}
 	}
 
-	SlideMove( false, ( command.forwardmove > 0 ), false, false );
+	idPhysics_Player::SlideMove( false, ( command.forwardmove > 0 ), false, false );
 }
 
 /*
@@ -1115,7 +1110,7 @@ void idPhysics_Player::CheckGround()
 	if( contents & MASK_SOLID )
 	{
 		// do something corrective if stuck in solid
-		CorrectAllSolid( groundTrace, contents );
+		idPhysics_Player::CorrectAllSolid( groundTrace, contents );
 	}
 
 	// if the trace didn't hit anything, we are in free fall
@@ -1545,15 +1540,15 @@ void idPhysics_Player::MovePlayer( int msec )
 	if( current.movementType == PM_SPECTATOR )
 	{
 		SpectatorMove();
-		DropTimers();
+		idPhysics_Player::DropTimers();
 		return;
 	}
 
 	// special no clip mode
 	if( current.movementType == PM_NOCLIP )
 	{
-		NoclipMove();
-		DropTimers();
+		idPhysics_Player::NoclipMove();
+		idPhysics_Player::DropTimers();
 		return;
 	}
 
@@ -1566,55 +1561,55 @@ void idPhysics_Player::MovePlayer( int msec )
 	}
 
 	// set watertype and waterlevel
-	SetWaterLevel();
+	idPhysics_Player::SetWaterLevel();
 
 	// check for ground
-	CheckGround();
+	idPhysics_Player::CheckGround();
 
 	// check if up against a ladder
-	CheckLadder();
+	idPhysics_Player::CheckLadder();
 
 	// set clip model size
-	CheckDuck();
+	idPhysics_Player::CheckDuck();
 
 	// handle timers
-	DropTimers();
+	idPhysics_Player::DropTimers();
 
 	// move
 	if( current.movementType == PM_DEAD )
 	{
 		// dead
-		DeadMove();
+		idPhysics_Player::DeadMove();
 	}
 	else if( ladder )
 	{
 		// going up or down a ladder
-		LadderMove();
+		idPhysics_Player::LadderMove();
 	}
 	else if( current.movementFlags & PMF_TIME_WATERJUMP )
 	{
 		// jumping out of water
-		WaterJumpMove();
+		idPhysics_Player::WaterJumpMove();
 	}
 	else if( waterLevel > 1 )
 	{
 		// swimming
-		WaterMove();
+		idPhysics_Player::WaterMove();
 	}
 	else if( walking )
 	{
 		// walking on ground
-		WalkMove();
+		idPhysics_Player::WalkMove();
 	}
 	else
 	{
 		// airborne
-		AirMove();
+		idPhysics_Player::AirMove();
 	}
 
 	// set watertype, waterlevel and groundentity
-	SetWaterLevel();
-	CheckGround();
+	idPhysics_Player::SetWaterLevel();
+	idPhysics_Player::CheckGround();
 
 	// move the player velocity back into the world frame
 	current.velocity += current.pushVelocity;
@@ -1832,6 +1827,21 @@ void idPhysics_Player::Restore( idRestoreGame* savefile )
 
 	savefile->ReadInt( ( int& )waterLevel );
 	savefile->ReadInt( waterType );
+
+	/* DG: It can apparently happen that the player saves while the clipModel's axis are
+	 *     modified by idPush::TryRotatePushEntity() -> idPhysics_Player::Rotate() -> idClipModel::Link()
+	 *     Normally idPush seems to reset them to the identity matrix in the next frame,
+	 *     but apparently not when coming from a savegame.
+	 *     Usually clipModel->axis is the identity matrix, and if it isn't there's clipping bugs
+	 *     like CheckGround() reporting that it's steep even though the player is only trying to
+	 *     walk up normal stairs.
+	 *     Resetting the axis to mat3_identity when restoring a savegame works around that issue
+	 *     and makes sure players can go on playing if their savegame was "corrupted" by saving
+	 *     while idPush was active. See https://github.com/dhewm/dhewm3/issues/328 for more details */
+	if( clipModel != NULL )
+	{
+		clipModel->SetPosition( clipModel->GetOrigin(), mat3_identity );
+	}
 }
 
 /*
@@ -1952,7 +1962,7 @@ bool idPhysics_Player::Evaluate( int timeStepMSec, int endTimeMSec )
 
 	ActivateContactEntities();
 
-	MovePlayer( timeStepMSec );
+	idPhysics_Player::MovePlayer( timeStepMSec );
 
 	clipModel->Link( gameLocal.clip, self, 0, current.origin, clipModel->GetAxis() );
 
@@ -2260,7 +2270,7 @@ void idPhysics_Player::WriteToSnapshot( idBitMsgDelta& msg ) const
 	msg.WriteDeltaFloat( 0.0f, current.stepUp );
 	msg.WriteBits( current.movementType, PLAYER_MOVEMENT_TYPE_BITS );
 	msg.WriteBits( current.movementFlags, PLAYER_MOVEMENT_FLAGS_BITS );
-	msg.WriteDeltaLong( 0, current.movementTime );
+	msg.WriteDeltaInt( 0, current.movementTime );
 }
 
 /*
@@ -2285,524 +2295,10 @@ void idPhysics_Player::ReadFromSnapshot( const idBitMsgDelta& msg )
 	current.stepUp = msg.ReadDeltaFloat( 0.0f );
 	current.movementType = msg.ReadBits( PLAYER_MOVEMENT_TYPE_BITS );
 	current.movementFlags = msg.ReadBits( PLAYER_MOVEMENT_FLAGS_BITS );
-	current.movementTime = msg.ReadDeltaLong( 0 );
+	current.movementTime = msg.ReadDeltaInt( 0 );
 
 	if( clipModel )
 	{
 		clipModel->Link( gameLocal.clip, self, 0, current.origin, clipModel->GetAxis() );
 	}
 }
-
-
-
-
-
-
-
-
-// RB begin
-CLASS_DECLARATION( idPhysics_Player, tyPhysics_Player )
-END_CLASS
-
-tyPhysics_Player::tyPhysics_Player()
-{
-	// HACK use different value than gameLocal.gravity so wen can set the wish gravity
-	SetGravity( vec3_origin );
-}
-
-void tyPhysics_Player::Save( idSaveGame* savefile ) const
-{
-	// gravity flipping
-	savefile->WriteVec3( oldGravityVector );
-	savefile->WriteVec3( oldGravityNormal );
-
-	savefile->WriteVec3( wishGravityVector );
-	savefile->WriteVec3( wishGravityNormal );
-	savefile->WriteInt( wishGravityTime );
-
-	// walk movement
-	savefile->WriteBool( wallwalking );
-	savefile->WriteVec3( wallwalkNormal );
-}
-
-void tyPhysics_Player::Restore( idRestoreGame* savefile )
-{
-	// gravity flipping
-	savefile->ReadVec3( oldGravityVector );
-	savefile->ReadVec3( oldGravityNormal );
-
-	savefile->ReadVec3( wishGravityVector );
-	savefile->ReadVec3( wishGravityNormal );
-	savefile->ReadInt( wishGravityTime );
-
-	// walk movement
-	savefile->ReadBool( wallwalking );
-	savefile->ReadVec3( wallwalkNormal );
-}
-
-bool tyPhysics_Player::Evaluate( int timeStepMSec, int endTimeMSec )
-{
-	idVec3 masterOrigin, oldOrigin;
-	idMat3 masterAxis;
-
-	waterLevel = WATERLEVEL_NONE;
-	waterType = 0;
-	oldOrigin = current.origin;
-
-	clipModel->Unlink();
-
-	// if bound to a master
-	if( masterEntity )
-	{
-		self->GetMasterPosition( masterOrigin, masterAxis );
-		current.origin = masterOrigin + current.localOrigin * masterAxis;
-		clipModel->Link( gameLocal.clip, self, 0, current.origin, clipModel->GetAxis() );
-		current.velocity = ( current.origin - oldOrigin ) / ( timeStepMSec * 0.001f );
-		masterDeltaYaw = masterYaw;
-		masterYaw = masterAxis[0].ToYaw();
-		masterDeltaYaw = masterYaw - masterDeltaYaw;
-		return true;
-	}
-
-	ActivateContactEntities();
-
-	MovePlayer( timeStepMSec );
-
-	clipModel->Link( gameLocal.clip, self, 0, current.origin, clipModel->GetAxis() );
-
-	if( pm_showPhysics.GetInteger() == 1 )
-	{
-		// show contact points
-		for( int i = 1; i < contacts.Num(); i++ )
-		{
-			const idVec3& start = contacts[i].point;
-			idVec3 end = start + contacts[i].normal * 5;
-
-			gameRenderWorld->DebugArrow( colorRed, start, end, 1 );
-		}
-
-		// show clip model orientation
-		//gameRenderWorld->DebugAxis( current.origin, clipModel->GetAxis() );
-	}
-
-	if( IsOutsideWorld() )
-	{
-		gameLocal.Warning( "clip model outside world bounds for entity '%s' at (%s)", self->name.c_str(), current.origin.ToString( 0 ) );
-	}
-
-	return true; //( current.origin != oldOrigin );
-}
-
-void tyPhysics_Player::SetGravity( const idVec3& newGravity )
-{
-#if 1
-	if( newGravity != gravityVector )
-	{
-		oldGravityVector = gravityVector;
-		oldGravityNormal = gravityNormal;
-
-		wishGravityVector = newGravity;
-		wishGravityNormal = newGravity;
-		wishGravityNormal.Normalize();
-
-		{
-			wishGravityTime = gameLocal.time;
-		}
-	}
-#else
-	idPhysics_Actor::SetGravity( newGravity );
-	SetClipModelAxis();
-#endif
-}
-
-bool tyPhysics_Player::IsGravityFlipping()
-{
-	if( wishGravityNormal.AngleTo( gravityNormal ) > 45 )
-	{
-		return true;
-	}
-
-	return false;
-}
-
-void tyPhysics_Player::UpdateGravity()
-{
-	if( wishGravityVector != gravityVector )
-	{
-		idVec3 lerpGravityVector;
-		idAngles lerpGravityAngles;
-
-		float lerp = ( float )( gameLocal.time - wishGravityTime ) / ( float )( ( wishGravityTime + PM_TIME_GRAVITY_CHANGE ) - wishGravityTime );
-
-		lerpGravityVector.Lerp( oldGravityVector, wishGravityVector, lerp );
-		idAngles oldGravityAngles = oldGravityVector.ToAngles();
-		idAngles wishGravityAngles = wishGravityVector.ToAngles();
-
-		//lerpGravityAngles.
-
-		/*
-		idVec3 forward;
-		viewAngles.ToVectors( &forward, NULL, NULL );
-		viewForward *= clipModelAxis;
-		viewRight = gravityNormal.Cross( forward );
-		viewRight.Normalize();
-		*/
-
-		idPhysics_Actor::SetGravity( lerpGravityVector );
-		SetClipModelAxis();
-	}
-}
-
-void tyPhysics_Player::CorrectAllSolid( trace_t& trace, int contents )
-{
-	if( debugLevel )
-	{
-		gameLocal.Printf( "%i:allsolid\n", c_pmove );
-	}
-
-	// jitter around to find a free spot
-#if 0
-	for( int i = -1; i <= 1; i++ )
-	{
-		for( int j = -1; j <= 1; j++ )
-		{
-			for( int k = -1; k <= 1; k++ )
-			{
-				idVec3 point = current.origin;
-				point.x += ( float ) i;
-				point.y += ( float ) j;
-				point.z += ( float ) k;
-
-				// set the clip model origin before getting the contacts
-				clipModel->SetPosition( point, clipModel->GetAxis() );
-
-				EvaluateContacts();
-
-				// setup a ground trace from the contacts
-				trace.endpos = point;
-				trace.endAxis = clipModel->GetAxis();
-				if( contacts.Num() )
-				{
-					trace.fraction = 0.0f;
-					trace.c = contacts[0];
-					for( i = 1; i < contacts.Num(); i++ )
-					{
-						trace.c.normal += contacts[i].normal;
-					}
-					trace.c.normal.Normalize();
-				}
-				else
-				{
-					trace.fraction = 1.0f;
-				}
-
-				contents = gameLocal.clip.Contents( point, clipModel, clipModel->GetAxis(), -1, self );
-				if( !( contents & MASK_SOLID ) )
-				{
-					current.origin = point;
-					return;
-				}
-			}
-		}
-	}
-#endif
-
-	if( trace.fraction >= 1.0f )
-	{
-		memset( &trace, 0, sizeof( trace ) );
-		trace.endpos = current.origin;
-		trace.endAxis = clipModelAxis;
-		trace.fraction = 0.0f;
-		trace.c.dist = current.origin.z;
-		trace.c.normal.Set( 0, 0, 1 );
-		trace.c.point = current.origin;
-		trace.c.entityNum = ENTITYNUM_WORLD;
-		trace.c.id = 0;
-		trace.c.type = CONTACT_TRMVERTEX;
-		trace.c.material = NULL;
-		trace.c.contents = contents;
-	}
-}
-
-void tyPhysics_Player::CheckGround()
-{
-	int i, contents;
-	idVec3 point;
-	bool hadGroundContacts;
-
-	hadGroundContacts = HasGroundContacts();
-
-	// set the clip model origin before getting the contacts
-	clipModel->SetPosition( current.origin, clipModel->GetAxis() );
-
-	EvaluateContacts();
-
-	// setup a ground trace from the contacts
-#if 1
-	gameLocal.clip.Translation( groundTrace, current.origin, current.origin + gravityNormal * CONTACT_EPSILON,
-								clipModel, clipModel->GetAxis(), -1, self );
-#else
-	groundTrace.endpos = current.origin;
-	groundTrace.endAxis = clipModel->GetAxis();
-	if( contacts.Num() )
-	{
-		groundTrace.fraction = 0.0f;
-		groundTrace.c = contacts[0];
-		for( i = 1; i < contacts.Num(); i++ )
-		{
-			groundTrace.c.normal += contacts[i].normal;
-		}
-		groundTrace.c.normal.Normalize();
-	}
-	else
-	{
-		groundTrace.fraction = 1.0f;
-	}
-#endif
-
-	contents = gameLocal.clip.Contents( current.origin, clipModel, clipModel->GetAxis(), -1, self );
-	if( contents & MASK_SOLID )
-	{
-		// do something corrective if stuck in solid
-		CorrectAllSolid( groundTrace, contents );
-	}
-
-	// if the trace didn't hit anything, we are in free fall
-	if( groundTrace.fraction == 1.0f )
-	{
-		groundPlane = false;
-		walking = false;
-		wallwalking = false;
-		groundEntityPtr = NULL;
-
-		SetGravity( gameLocal.GetGravity() );
-		return;
-	}
-
-	groundMaterial = groundTrace.c.material;
-	groundEntityPtr = gameLocal.entities[ groundTrace.c.entityNum ];
-
-	// check for wallwalking
-	if( groundMaterial && ( groundMaterial->GetSurfaceType() & SURFTYPE_WALLWALK ) != 0 )
-	{
-		//if ( debugLevel ) {
-		//	gameLocal.Printf( "%i:wallwalk\n", c_pmove );
-		//}
-
-		wallwalking = true;
-		wallwalkNormal = -groundTrace.c.normal;
-		wallwalkNormal.Normalize();
-
-		SetGravity( wallwalkNormal * gravityVector.Length() );
-	}
-	else
-	{
-		wallwalking = false;
-		SetGravity( gameLocal.GetGravity() );
-	}
-
-	// check if getting thrown off the ground
-	if( ( current.velocity * -gravityNormal ) > 0.0f && ( current.velocity * groundTrace.c.normal ) > 10.0f && !wallwalking )
-	{
-		if( debugLevel )
-		{
-			gameLocal.Printf( "%i:kickoff\n", c_pmove );
-		}
-
-		groundPlane = false;
-		walking = false;
-		wallwalking = false;
-		return;
-	}
-
-	// slopes that are too steep will not be considered onground
-	if( ( groundTrace.c.normal * -gravityNormal ) < MIN_WALK_NORMAL && !wallwalking )
-	{
-		if( debugLevel )
-		{
-			gameLocal.Printf( "%i:steep\n", c_pmove );
-		}
-
-		// FIXME: if they can't slide down the slope, let them walk (sharp crevices)
-
-		// make sure we don't die from sliding down a steep slope
-		if( current.velocity * gravityNormal > 150.0f )
-		{
-			current.velocity -= ( current.velocity * gravityNormal - 150.0f ) * gravityNormal;
-		}
-
-		groundPlane = true;
-		walking = false;
-		return;
-	}
-
-	groundPlane = true;
-	walking = true;
-
-	// hitting solid ground will end a waterjump
-	if( current.movementFlags & PMF_TIME_WATERJUMP )
-	{
-		current.movementFlags &= ~( PMF_TIME_WATERJUMP | PMF_TIME_LAND );
-		current.movementTime = 0;
-	}
-
-	// if the player didn't have ground contacts the previous frame
-	if( !hadGroundContacts )
-	{
-
-		// don't do landing time if we were just going down a slope
-		if( ( current.velocity * -gravityNormal ) < -200.0f )
-		{
-			// don't allow another jump for a little while
-			current.movementFlags |= PMF_TIME_LAND;
-			current.movementTime = 250;
-		}
-	}
-
-	// let the entity know about the collision
-	self->Collide( groundTrace, current.velocity );
-
-	if( groundEntityPtr.GetEntity() )
-	{
-		impactInfo_t info;
-		groundEntityPtr.GetEntity()->GetImpactInfo( self, groundTrace.c.id, groundTrace.c.point, &info );
-		if( info.invMass != 0.0f )
-		{
-			groundEntityPtr.GetEntity()->ApplyImpulse( self, groundTrace.c.id, groundTrace.c.point, current.velocity / ( info.invMass * 10.0f ) );
-		}
-	}
-}
-
-void tyPhysics_Player::WalkMove()
-{
-	idPhysics_Player::WalkMove();
-}
-
-void tyPhysics_Player::MovePlayer( int msec )
-{
-	// this counter lets us debug movement problems with a journal
-	// by setting a conditional breakpoint for the previous frame
-	c_pmove++;
-
-	walking = false;
-	wallwalking = false;
-	groundPlane = false;
-	ladder = false;
-
-	// determine the time
-	framemsec = msec;
-	frametime = framemsec * 0.001f;
-
-	// default speed
-	playerSpeed = walkSpeed;
-
-	// remove jumped and stepped up flag
-	current.movementFlags &= ~( PMF_JUMPED | PMF_STEPPED_UP | PMF_STEPPED_DOWN );
-	current.stepUp = 0.0f;
-
-	if( command.upmove < 10 )
-	{
-		// not holding jump
-		current.movementFlags &= ~PMF_JUMP_HELD;
-	}
-
-	// if no movement at all
-	if( current.movementType == PM_FREEZE )
-	{
-		return;
-	}
-
-	// move the player velocity into the frame of a pusher
-	current.velocity -= current.pushVelocity;
-
-	// view vectors
-	viewAngles.ToVectors( &viewForward, NULL, NULL );
-	viewForward *= clipModelAxis;
-	viewRight = gravityNormal.Cross( viewForward );
-	viewRight.Normalize();
-
-	// fly in spectator mode
-	if( current.movementType == PM_SPECTATOR )
-	{
-		SpectatorMove();
-		DropTimers();
-		return;
-	}
-
-	// special no clip mode
-	if( current.movementType == PM_NOCLIP )
-	{
-		NoclipMove();
-		DropTimers();
-		return;
-	}
-
-	// no control when dead
-	if( current.movementType == PM_DEAD )
-	{
-		command.forwardmove = 0;
-		command.rightmove = 0;
-		command.upmove = 0;
-	}
-
-	// set local gravity if changed
-	UpdateGravity();
-
-	// set watertype and waterlevel
-	SetWaterLevel();
-
-	// check for ground
-	CheckGround();
-
-	// check if up against a ladder
-	CheckLadder();
-
-	// set clip model size
-	CheckDuck();
-
-	// handle timers
-	DropTimers();
-
-	// move
-	if( current.movementType == PM_DEAD )
-	{
-		// dead
-		DeadMove();
-	}
-	else if( ladder )
-	{
-		// going up or down a ladder
-		LadderMove();
-	}
-	else if( current.movementFlags & PMF_TIME_WATERJUMP )
-	{
-		// jumping out of water
-		WaterJumpMove();
-	}
-	else if( waterLevel > 1 )
-	{
-		// swimming
-		WaterMove();
-	}
-	else if( walking ) // && !IsGravityFlipping() )
-	{
-		// walking on ground
-		WalkMove();
-	}
-	else
-	{
-		// airborne
-		AirMove();
-	}
-
-	// set watertype, waterlevel and groundentity
-	SetWaterLevel();
-	CheckGround();
-
-	// move the player velocity back into the world frame
-	current.velocity += current.pushVelocity;
-	current.pushVelocity.Zero();
-}
-
-
-// RB end

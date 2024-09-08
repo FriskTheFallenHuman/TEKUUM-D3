@@ -518,17 +518,10 @@ void idCameraAnim::Start()
 	BecomeActive( TH_THINK );
 
 	// if the player has already created the renderview for this frame, have him update it again so that the camera starts this frame
-
-	// RB begin
-#if defined(STANDALONE)
-	if( gameLocal.GetLocalPlayer()->GetRenderView()->time[TIME_GROUP2] == gameLocal.fast.time )
-#else
 	if( gameLocal.GetLocalPlayer()->GetRenderView()->time[0] == gameLocal.time )
-#endif
 	{
 		gameLocal.GetLocalPlayer()->CalculateRenderView();
 	}
-	// RB end
 }
 
 /*
@@ -580,18 +573,8 @@ void idCameraAnim::Think()
 			return;
 		}
 
-		/*
-		if( frameRate == USERCMD_HZ )
-		{
-			frameTime	= gameLocal.time - starttime;
-			frame		= frameTime / gameLocal.msec;
-		}
-		else
-		*/
-		{
-			frameTime	= ( gameLocal.time - starttime ) * frameRate;
-			frame		= frameTime / 1000;
-		}
+		frameTime	= ( gameLocal.time - starttime ) * frameRate;
+		frame		= frameTime / 1000;
 
 		if( frame > camera.Num() + cameraCuts.Num() - 2 )
 		{
@@ -642,12 +625,6 @@ void idCameraAnim::GetViewParms( renderView_t* view )
 		// FIXME: it would be better to fix it so this doesn't get called during a restore
 		return;
 	}
-
-// RB begin
-#if defined(STANDALONE)
-	SetTimeState ts( timeGroup );
-#endif
-// RB end
 
 	frameTime	= ( gameLocal.time - starttime ) * frameRate;
 	frame		= frameTime / 1000;

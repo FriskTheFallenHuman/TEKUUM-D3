@@ -62,4 +62,3 @@ public:
 
 
 #endif	/* !_PLAYERICON_H_ */
-

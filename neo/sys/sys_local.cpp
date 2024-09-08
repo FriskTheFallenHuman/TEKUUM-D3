@@ -124,15 +124,7 @@ void idSysLocal::DLL_Unload( intptr_t dllHandle )
 
 void idSysLocal::DLL_GetFileName( const char* baseName, char* dllName, int maxLength )
 {
-#ifdef _WIN32
-	idStr::snPrintf( dllName, maxLength, "%s" CPUSTRING ".dll", baseName );
-#elif defined( __linux__ )
-	idStr::snPrintf( dllName, maxLength, "%s" CPUSTRING ".so", baseName );
-#elif defined( MACOS_X )
-	idStr::snPrintf( dllName, maxLength, "%s" ".dylib", baseName );
-#else
-#error OS define is required
-#endif
+	idStr::snPrintf( dllName, maxLength, "%s" CPUSTRING LIBRARYSUFFIX, baseName );
 }
 
 sysEvent_t idSysLocal::GenerateMouseButtonEvent( int button, bool down )

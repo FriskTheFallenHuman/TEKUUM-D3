@@ -653,7 +653,7 @@ idIK_Walk::Evaluate
 */
 void idIK_Walk::Evaluate()
 {
-	int i, newPivotFoot = -1;
+	int i, newPivotFoot = 0;
 	float modelHeight, jointHeight, lowestHeight, floorHeights[MAX_LEGS];
 	float shift, smallestShift, newHeight, step, newPivotYaw, height, largestAnkleHeight;
 	idVec3 modelOrigin, normal, hipDir, kneeDir, start, end, jointOrigins[MAX_LEGS];

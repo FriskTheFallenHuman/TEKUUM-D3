@@ -73,11 +73,6 @@ typedef struct
 } classTypeInfo_t;
 
 
-static constantInfo_t constantInfo[] =
-{
-	{ NULL, NULL, NULL }
-};
-
 static enumTypeInfo_t enumTypeInfo[] =
 {
 	{ NULL, NULL }

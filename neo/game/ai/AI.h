@@ -50,14 +50,6 @@ const int	DEFAULT_FLY_OFFSET			= 68;
 #define ATTACK_ON_ACTIVATE		2
 #define ATTACK_ON_SIGHT			4
 
-typedef struct ballistics_s
-{
-	float				angle;		// angle in degrees in the range [-180, 180]
-	float				time;		// time it takes before the projectile arrives
-} ballistics_t;
-
-extern int Ballistics( const idVec3& start, const idVec3& end, float speed, float gravity, ballistics_t bal[2] );
-
 // defined in script/ai_base.script.  please keep them up to date.
 typedef enum
 {
@@ -159,14 +151,6 @@ extern const idEventDef AI_MuzzleFlash;
 extern const idEventDef AI_CreateMissile;
 extern const idEventDef AI_AttackMissile;
 extern const idEventDef AI_FireMissileAtTarget;
-// RB begin
-#if defined(STANDALONE)
-	extern const idEventDef AI_LaunchProjectile;
-	extern const idEventDef AI_TriggerFX;
-	extern const idEventDef AI_StartEmitter;
-	extern const idEventDef AI_StopEmitter;
-#endif
-// RB end
 extern const idEventDef AI_AttackMelee;
 extern const idEventDef AI_DirectDamage;
 extern const idEventDef AI_JumpFrame;
@@ -191,17 +175,6 @@ typedef struct particleEmitter_s
 	int					time;
 	jointHandle_t		joint;
 } particleEmitter_t;
-
-// RB begin
-#if defined(STANDALONE)
-typedef struct funcEmitter_s
-{
-	char				name[64];
-	idFuncEmitter*		particle;
-	jointHandle_t		joint;
-} funcEmitter_t;
-#endif
-// RB end
 
 class idMoveState
 {
@@ -310,12 +283,6 @@ public:
 	static bool				TestTrajectory( const idVec3& start, const idVec3& end, float zVel, float gravity, float time, float max_height, const idClipModel* clip, int clipmask, const idEntity* ignore, const idEntity* targetEntity, int drawtime );
 	// Finds the best collision free trajectory for a clip model.
 	static bool				PredictTrajectory( const idVec3& firePos, const idVec3& target, float projectileSpeed, const idVec3& projGravity, const idClipModel* clip, int clipmask, float max_height, const idEntity* ignore, const idEntity* targetEntity, int drawtime, idVec3& aimDir );
-
-// RB begin
-#if defined(STANDALONE)
-	virtual void			Gib( const idVec3& dir, const char* damageDefName );
-#endif
-// RB end
 
 protected:
 	// navigation
@@ -438,14 +405,6 @@ protected:
 	idVec3					lastVisibleReachableEnemyPos;
 	idVec3					lastReachableEnemyPos;
 	bool					wakeOnFlashlight;
-
-// RB begin
-#if defined(STANDALONE)
-	bool					spawnClearMoveables;
-
-	idHashTable<funcEmitter_t> funcEmitters;
-#endif
-// RB end
 
 	// script variables
 	idScriptBool			AI_TALK;
@@ -577,15 +536,6 @@ protected:
 	void					UpdateParticles();
 	void					TriggerParticles( const char* jointName );
 
-// RB begin
-#if defined(STANDALONE)
-	void					TriggerFX( const char* joint, const char* fx );
-	idEntity*				StartEmitter( const char* name, const char* joint, const char* particle );
-	idEntity*				GetEmitter( const char* name );
-	void					StopEmitter( const char* name );
-#endif
-// RB end
-
 	// AI script state management
 	void					LinkScriptVariables();
 	void					UpdateAIScript();
@@ -607,11 +557,6 @@ protected:
 	void					Event_AttackMissile( const char* jointname );
 	void					Event_FireMissileAtTarget( const char* jointname, const char* targetname );
 	void					Event_LaunchMissile( const idVec3& muzzle, const idAngles& ang );
-// RB begin
-#if defined(STANDALONE)
-	void					Event_LaunchProjectile( const char* entityDefName );
-#endif
-// RB end
 	void					Event_AttackMelee( const char* meleeDefName );
 	void					Event_DirectDamage( idEntity* damageTarget, const char* damageDefName );
 	void					Event_RadiusDamageFromJoint( const char* jointname, const char* damageDefName );
@@ -673,7 +618,6 @@ protected:
 	void					Event_TestMoveToPosition( const idVec3& position );
 	void					Event_TestMeleeAttack();
 	void					Event_TestAnimAttack( const char* animname );
-//	void					Event_Shrivel( float shirvel_time );
 	void					Event_Burn();
 	void					Event_PreBurn();
 	void					Event_ClearBurn();
@@ -722,21 +666,10 @@ protected:
 	void					Event_AllowHiddenMovement( int enable );
 	void					Event_TriggerParticles( const char* jointName );
 	void					Event_FindActorsInBounds( const idVec3& mins, const idVec3& maxs );
-	void 					Event_CanReachPosition( const idVec3& pos );
-	void 					Event_CanReachEntity( idEntity* ent );
+	void					Event_CanReachPosition( const idVec3& pos );
+	void					Event_CanReachEntity( idEntity* ent );
 	void					Event_CanReachEnemy();
 	void					Event_GetReachableEntityPosition( idEntity* ent );
-// RB begin
-#if defined(STANDALONE)
-	void					Event_MoveToPositionDirect( const idVec3& pos );
-	void					Event_AvoidObstacles( int ignore );
-	void					Event_TriggerFX( const char* joint, const char* fx );
-
-	void					Event_StartEmitter( const char* name, const char* joint, const char* particle );
-	void					Event_GetEmitter( const char* name );
-	void					Event_StopEmitter( const char* name );
-#endif
-// RB end
 };
 
 class idCombatNode : public idEntity

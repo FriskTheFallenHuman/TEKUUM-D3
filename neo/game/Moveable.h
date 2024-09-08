@@ -65,22 +65,10 @@ public:
 	virtual void			WriteToSnapshot( idBitMsgDelta& msg ) const;
 	virtual void			ReadFromSnapshot( const idBitMsgDelta& msg );
 
-// RB begin
-#if defined(STANDALONE)
-	void					SetAttacker( idEntity* ent );
-#endif
-// RB end
-
 protected:
 	idPhysics_RigidBody		physicsObj;				// physics object
 	idStr					brokenModel;			// model set when health drops down to or below zero
 	idStr					damage;					// if > 0 apply damage to hit entities
-// RB begin
-#if defined(STANDALONE)
-	idStr					monsterDamage;
-	idEntity*				attacker;
-#endif
-// RB end
 	idStr					fxCollide;				// fx system to start when collides with something
 	int						nextCollideFxTime;		// next time it is ok to spawn collision fx
 	float					minDamageVelocity;		// minimum velocity before moveable applies damage
@@ -166,15 +154,6 @@ public:
 	void					Save( idSaveGame* savefile ) const;
 	void					Restore( idRestoreGame* savefile );
 
-// RB begin
-#if defined(STANDALONE)
-	bool					IsStable();
-	void					SetStability( bool stability );
-	void					StartBurning();
-	void					StopBurning();
-#endif
-// RB end
-
 	virtual void			Think();
 	virtual void			Damage( idEntity* inflictor, idEntity* attacker, const idVec3& dir,
 									const char* damageDefName, const float damageScale, const int location );
@@ -209,11 +188,6 @@ private:
 	int						particleTime;
 	int						lightTime;
 	float					time;
-// RB begin
-#if defined(STANDALONE)
-	bool					isStable;
-#endif
-// RB end
 
 	void					AddParticles( const char* name, bool burn );
 	void					AddLight( const char* name , bool burn );

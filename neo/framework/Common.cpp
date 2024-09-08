@@ -50,16 +50,16 @@ typedef enum
 } errorParm_t;
 
 #if defined( _DEBUG )
-	#define BUILD_DEBUG "-debug private alpha"
+	#define BUILD_DEBUG "-debug"
 #else
-	#define BUILD_DEBUG " private alpha"
+	#define BUILD_DEBUG ""
 #endif
 
 struct version_s
 {
 	version_s()
 	{
-		sprintf( string, "%s.%d%s %s %s %s", ENGINE_VERSION, BUILD_NUMBER, BUILD_DEBUG, BUILD_STRING, __DATE__, __TIME__ );
+		sprintf( string, "%s.%d%s %s-%s %s %s", ENGINE_VERSION, BUILD_NUMBER, BUILD_DEBUG, OSTYPE, CPUSTRING, __DATE__, __TIME__ );
 	}
 	char	string[256];
 } version;

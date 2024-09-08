@@ -1290,13 +1290,7 @@ void idConsoleLocal::DrawSolidConsole( float frac )
 
 	renderSystem->SetColor( idStr::ColorForIndex( C_COLOR_CYAN ) );
 
-	// RB begin
-#if defined( _DEBUG )
-	idStr version = va( "%s.%i-debug private alpha %s", ENGINE_VERSION, BUILD_NUMBER, BUILD_STRING );
-#else
-	idStr version = va( "%s.%i %s private alpha", ENGINE_VERSION, BUILD_NUMBER, BUILD_STRING );
-#endif
-	// RB end
+	idStr version = va( "%s.%s-%s", ENGINE_VERSION, OSTYPE, CPUSTRING );
 
 	i = version.Length();
 

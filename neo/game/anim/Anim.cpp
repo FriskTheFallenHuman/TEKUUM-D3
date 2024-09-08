@@ -1175,7 +1175,7 @@ idMD5Anim* idAnimManager::GetAnim( const char* name )
 			return NULL;
 		}
 
-		anim = new( TAG_ANIM ) idMD5Anim();
+		anim = new idMD5Anim();
 		if( !anim->LoadAnim( filename ) )
 		{
 			gameLocal.Warning( "Couldn't load anim: '%s'", filename.c_str() );
@@ -1265,7 +1265,7 @@ void idAnimManager::ListAnims() const
 		{
 			anim = *animptr;
 			s = anim->Size();
-			gameLocal.Printf( "%8d bytes : %2d refs : %s\n", s, anim->NumRefs(), anim->Name() );
+			gameLocal.Printf( "%8zd bytes : %2d refs : %s\n", s, anim->NumRefs(), anim->Name() );
 			size += s;
 			num++;
 		}
@@ -1277,8 +1277,8 @@ void idAnimManager::ListAnims() const
 		namesize += jointnames[ i ].Size();
 	}
 
-	gameLocal.Printf( "\n%d memory used in %d anims\n", size, num );
-	gameLocal.Printf( "%d memory used in %d joint names\n", namesize, jointnames.Num() );
+	gameLocal.Printf( "\n%zd memory used in %d anims\n", size, num );
+	gameLocal.Printf( "%zd memory used in %d joint names\n", namesize, jointnames.Num() );
 }
 
 /*

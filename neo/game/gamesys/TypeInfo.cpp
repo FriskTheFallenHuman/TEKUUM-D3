@@ -30,10 +30,6 @@ If you have questions concerning this license or the applicable additional terms
 #define private		public
 #define protected	public
 
-// RB: required for Visual Studio 2012
-#define _ALLOW_KEYWORD_MACROS
-// RB end
-
 #include "precompiled.h"
 #pragma hdrstop
 
@@ -713,10 +709,19 @@ int idTypeInfoTools::WriteVariable_r( const void* varPtr, const char* varName, c
 	}
 
 	// if this is a pointer
+
+#if D3_SIZEOFPTR == 4
+	const uintptr_t uninitPtr = ( uintptr_t )0xcdcdcdcdUL;
+#elif D3_SIZEOFPTR == 8
+	const uintptr_t uninitPtr = ( uintptr_t )0xcdcdcdcdcdcdcdcdULL;
+#else
+#error "Unexpected pointer size"
+#endif
+
 	isPointer = 0;
 	for( i = typeString.Length(); i > 0 && typeString[i - 1] == '*'; i -= 2 )
 	{
-		if( varPtr == ( void* )0xcdcdcdcd || ( varPtr != NULL && *( ( unsigned long* )varPtr ) == 0xcdcdcdcd ) )
+		if( varPtr == ( void* )uninitPtr || ( varPtr != NULL && *( ( unsigned int* )varPtr ) == 0xcdcdcdcd ) )
 		{
 			common->Warning( "%s%s::%s%s references uninitialized memory", prefix, scope, varName, "" );
 			return typeSize;
@@ -1480,7 +1485,7 @@ int idTypeInfoTools::WriteVariable_r( const void* varPtr, const char* varName, c
 	i = 0;
 	do
 	{
-		if( *( ( unsigned long* )varPtr ) == 0xcdcdcdcd )
+		if( *( ( unsigned int* )varPtr ) == 0xcdcdcdcd )
 		{
 			common->Warning( "%s%s::%s%s uses uninitialized memory", prefix, scope, varName, "" );
 			break;
@@ -1735,9 +1740,7 @@ void TestSaveGame_f( const idCmdArgs& args )
 
 	name = args.Argv( 1 );
 
-#if defined(USE_EXCEPTIONS)
 	try
-#endif
 	{
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "map %s", name.c_str() ) );
 		name.Replace( "\\", "_" );
@@ -1745,12 +1748,10 @@ void TestSaveGame_f( const idCmdArgs& args )
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "saveGame test_%s", name.c_str() ) );
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "loadGame test_%s", name.c_str() ) );
 	}
-#if defined(USE_EXCEPTIONS)
 	catch( idException& )
 	{
 		// an ERR_DROP was thrown
 	}
-#endif
 	cmdSystem->BufferCommandText( CMD_EXEC_NOW, "quit" );
 }
 
@@ -1820,11 +1821,11 @@ void ListTypeInfo_f( const idCmdArgs& args )
 
 	if( args.Argc() > 1 && idStr::Icmp( args.Argv( 1 ), "size" ) == 0 )
 	{
-		index.Sort( SortTypeInfoBySize );
+		//index.Sort( SortTypeInfoBySize );
 	}
 	else
 	{
-		index.Sort( SortTypeInfoByName );
+		//index.Sort( SortTypeInfoByName );
 	}
 
 	for( i = 0; classTypeInfo[i].typeName != NULL; i++ )

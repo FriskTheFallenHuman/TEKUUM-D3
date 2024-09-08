@@ -509,6 +509,7 @@ void idTestModel::PrevAnim( const idCmdArgs& args )
 		return;
 	}
 
+	headAnim = 0;
 	anim--;
 	if( anim < 0 )
 	{
@@ -602,7 +603,6 @@ void idTestModel::TestAnim( const idCmdArgs& args )
 {
 	idStr			name;
 	int				animNum;
-	const idAnim*	newanim;
 
 	if( args.Argc() < 2 )
 	{
@@ -610,10 +610,30 @@ void idTestModel::TestAnim( const idCmdArgs& args )
 		return;
 	}
 
-	newanim = NULL;
-
 	name = args.Argv( 1 );
+#if 0
+	const idAnim*	newanim = NULL;
+
+	if( strstr( name, ".ma" ) || strstr( name, ".mb" ) )
+	{
+		const idMD5Anim*	md5anims[ ANIM_MaxSyncedAnims ];
+		idModelExport exporter;
+		exporter.ExportAnim( name );
+		name.SetFileExtension( MD5_ANIM_EXT );
+		md5anims[ 0 ] = animationLib.GetAnim( name );
+		if( md5anims[ 0 ] )
+		{
+			customAnim.SetAnim( animator.ModelDef(), name, name, 1, md5anims );
+			newanim = &customAnim;
+		}
+	}
+	else
+	{
+		animNum = animator.GetAnim( name );
+	}
+#else
 	animNum = animator.GetAnim( name );
+#endif
 
 	if( !animNum )
 	{
@@ -862,6 +882,14 @@ void idTestModel::TestModel_f( const idCmdArgs& args )
 			{
 				name.DefaultFileExtension( ".ase" );
 			}
+
+			if( strstr( name, ".ma" ) || strstr( name, ".mb" ) )
+			{
+				idModelExport exporter;
+				exporter.ExportModel( name );
+				name.SetFileExtension( MD5_MESH_EXT );
+			}
+
 			if( !renderModelManager->CheckModel( name ) )
 			{
 				gameLocal.Printf( "Can't register model\n" );

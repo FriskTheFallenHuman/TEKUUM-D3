@@ -173,6 +173,8 @@ void idForce_Field::Evaluate( int time )
 	bounds.FromTransformedBounds( clipModel->GetBounds(), clipModel->GetOrigin(), clipModel->GetAxis() );
 	numClipModels = gameLocal.clip.ClipModelsTouchingBounds( bounds, -1, clipModelList, MAX_GENTITIES );
 
+	torque.Zero();
+
 	for( i = 0; i < numClipModels; i++ )
 	{
 		cm = clipModelList[ i ];
@@ -193,10 +195,8 @@ void idForce_Field::Evaluate( int time )
 
 		if( playerOnly )
 		{
-			// RB: added check for tyPhysics_Player::Type
-			if( !physics->IsType( idPhysics_Player::Type ) && !physics->IsType( tyPhysics_Player::Type ) )
+			if( !physics->IsType( idPhysics_Player::Type ) )
 			{
-				// RB end
 				continue;
 			}
 		}
@@ -236,7 +236,7 @@ void idForce_Field::Evaluate( int time )
 			default:
 			{
 				gameLocal.Error( "idForce_Field: invalid type" );
-				break;
+				return;
 			}
 		}
 
@@ -290,7 +290,7 @@ void idForce_Field::Evaluate( int time )
 			default:
 			{
 				gameLocal.Error( "idForce_Field: invalid apply type" );
-				break;
+				return;
 			}
 		}
 	}

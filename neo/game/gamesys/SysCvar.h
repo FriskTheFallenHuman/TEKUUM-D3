@@ -34,24 +34,19 @@ extern idCVar	developer;
 extern idCVar	g_cinematic;
 extern idCVar	g_cinematicMaxSkipTime;
 
+extern idCVar	r_aspectRatio;
+
 extern idCVar	g_monsters;
 extern idCVar	g_decals;
 extern idCVar	g_knockback;
 extern idCVar	g_skill;
-// RB begin
-#if defined(STANDALONE)
-	extern idCVar	g_gravityX;
-	extern idCVar	g_gravityY;
-	extern idCVar	g_gravityZ;
-#else
-	extern idCVar	g_gravity;
-#endif
-// RB end
+extern idCVar	g_gravity;
 extern idCVar	g_skipFX;
 extern idCVar	g_skipParticles;
 extern idCVar	g_bloodEffects;
 extern idCVar	g_projectileLights;
 extern idCVar	g_doubleVision;
+extern idCVar	g_hitEffect;
 extern idCVar	g_muzzleFlash;
 
 extern idCVar	g_disasm;
@@ -98,11 +93,6 @@ extern idCVar	ai_showCombatNodes;
 extern idCVar	ai_showPaths;
 extern idCVar	ai_showObstacleAvoidance;
 extern idCVar	ai_blockedFailSafe;
-// RB begin
-#if defined(STANDALONE)
-	extern idCVar	ai_showHealth;
-#endif
-// RB end
 
 extern idCVar	g_dvTime;
 extern idCVar	g_dvAmplitude;
@@ -127,13 +117,6 @@ extern idCVar	g_vehicleSuspensionDown;
 extern idCVar	g_vehicleSuspensionKCompress;
 extern idCVar	g_vehicleSuspensionDamping;
 extern idCVar	g_vehicleTireFriction;
-// RB begin
-#if defined(STANDALONE)
-	extern idCVar	g_vehicleDebug;
-	extern idCVar	g_debugShockwave;
-	extern idCVar	g_enablePortalSky;
-#endif
-// RB end
 
 extern idCVar	ik_enable;
 extern idCVar	ik_debug;
@@ -214,9 +197,6 @@ extern idCVar	pm_thirdPerson;
 extern idCVar	pm_thirdPersonDeath;
 extern idCVar	pm_modelView;
 extern idCVar	pm_airTics;
-// RB begin
-extern idCVar	pm_showPhysics;
-// RB end
 
 extern idCVar	g_showPlayerShadow;
 extern idCVar	g_showHud;
@@ -242,21 +222,6 @@ extern idCVar	g_testModelAnimate;
 extern idCVar	g_testModelBlend;
 extern idCVar	g_exportMask;
 extern idCVar	g_flushSave;
-
-// RB begin
-#if defined(STANDALONE)
-	extern idCVar	g_enableSlowmo;
-	extern idCVar	g_slowmoStepRate;
-
-	extern idCVar	g_moveableDamageScale;
-
-	extern idCVar	g_grabberHoldSeconds;
-	extern idCVar	g_grabberEnableShake;
-	extern idCVar	g_grabberRandomMotion;
-	extern idCVar	g_grabberHardStop;
-	extern idCVar	g_grabberDamping;
-#endif
-// RB end
 
 extern idCVar	aas_test;
 extern idCVar	aas_showAreas;

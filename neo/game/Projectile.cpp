@@ -49,28 +49,12 @@ const idEventDef EV_Fizzle( "<fizzle>", NULL );
 const idEventDef EV_RadiusDamage( "<radiusdmg>", "e" );
 const idEventDef EV_GetProjectileState( "getProjectileState", NULL, 'd' );
 
-// RB begin
-#if defined(STANDALONE)
-	const idEventDef EV_CreateProjectile( "projectileCreateProjectile", "evv" );
-	const idEventDef EV_LaunchProjectile( "projectileLaunchProjectile", "vvv" );
-	const idEventDef EV_SetGravity( "setGravity", "f" );
-#endif
-// RB end
-
 CLASS_DECLARATION( idEntity, idProjectile )
 EVENT( EV_Explode,				idProjectile::Event_Explode )
 EVENT( EV_Fizzle,				idProjectile::Event_Fizzle )
 EVENT( EV_Touch,				idProjectile::Event_Touch )
 EVENT( EV_RadiusDamage,			idProjectile::Event_RadiusDamage )
 EVENT( EV_GetProjectileState,	idProjectile::Event_GetProjectileState )
-
-// RB begin
-#if defined(STANDALONE)
-	EVENT( EV_CreateProjectile,		idProjectile::Event_CreateProjectile )
-	EVENT( EV_LaunchProjectile,		idProjectile::Event_LaunchProjectile )
-	EVENT( EV_SetGravity,			idProjectile::Event_SetGravity )
-#endif
-// RB end
 END_CLASS
 
 /*
@@ -144,12 +128,6 @@ void idProjectile::Save( idSaveGame* savefile ) const
 	savefile->WriteParticle( smokeFly );
 	savefile->WriteInt( smokeFlyTime );
 
-// RB begin
-#if defined(STANDALONE)
-	savefile->WriteInt( originalTimeGroup );
-#endif
-// RB end
-
 	savefile->WriteInt( ( int )state );
 
 	savefile->WriteFloat( damagePower );
@@ -176,6 +154,12 @@ void idProjectile::Restore( idRestoreGame* savefile )
 
 	savefile->ReadRenderLight( renderLight );
 	savefile->ReadInt( ( int& )lightDefHandle );
+	// DG: enforce getting fresh handle, else this may be tied to an unrelated light!
+	if( lightDefHandle != -1 )
+	{
+		lightDefHandle = gameRenderWorld->AddLightDef( &renderLight );
+	}
+
 	savefile->ReadVec3( lightOffset );
 	savefile->ReadInt( lightStartTime );
 	savefile->ReadInt( lightEndTime );
@@ -183,12 +167,6 @@ void idProjectile::Restore( idRestoreGame* savefile )
 
 	savefile->ReadParticle( smokeFly );
 	savefile->ReadInt( smokeFlyTime );
-
-// RB begin
-#if defined(STANDALONE)
-	savefile->ReadInt( originalTimeGroup );
-#endif
-// RB end
 
 	savefile->ReadInt( ( int& )state );
 
@@ -205,23 +183,8 @@ void idProjectile::Restore( idRestoreGame* savefile )
 		idVec3 dir;
 		dir = physicsObj.GetLinearVelocity();
 		dir.NormalizeFast();
-// RB begin
-#if defined(STANDALONE)
-		gameLocal.smokeParticles->EmitSmoke( smokeFly, gameLocal.time, gameLocal.random.RandomFloat(), GetPhysics()->GetOrigin(), GetPhysics()->GetAxis(), timeGroup /*_D3XP*/ );
-#else
 		gameLocal.smokeParticles->EmitSmoke( smokeFly, gameLocal.time, gameLocal.random.RandomFloat(), GetPhysics()->GetOrigin(), GetPhysics()->GetAxis() );
-#endif
-// RB end
 	}
-
-// RB begin
-#if defined(STANDALONE)
-	if( lightDefHandle >= 0 )
-	{
-		lightDefHandle = gameRenderWorld->AddLightDef( &renderLight );
-	}
-#endif
-// RB end
 }
 
 /*
@@ -287,15 +250,6 @@ void idProjectile::Create( idEntity* owner, const idVec3& start, const idVec3& d
 
 	damagePower = 1.0f;
 
-// RB begin
-#if defined(STANDALONE)
-	if( spawnArgs.GetBool( "reset_time_offset", "0" ) )
-	{
-		renderEntity.shaderParms[ SHADERPARM_TIMEOFFSET ] = -MS2SEC( gameLocal.time );
-	}
-#endif
-// RB end
-
 	UpdateVisuals();
 
 	state = CREATED;
@@ -339,7 +293,6 @@ idProjectile::Launch
 void idProjectile::Launch( const idVec3& start, const idVec3& dir, const idVec3& pushVelocity, const float timeSinceFire, const float launchPower, const float dmgPower )
 {
 	float			fuse;
-	float			startthrust;
 	float			endthrust;
 	idVec3			velocity;
 	idAngles		angular_velocity;
@@ -353,7 +306,6 @@ void idProjectile::Launch( const idVec3& start, const idVec3& dir, const idVec3&
 	idVec3			gravVec;
 	idVec3			tmp;
 	idMat3			axis;
-	int				thrust_start;
 	int				contents;
 	int				clipMask;
 
@@ -368,7 +320,6 @@ void idProjectile::Launch( const idVec3& start, const idVec3& dir, const idVec3&
 	}
 
 	thrust				= spawnArgs.GetFloat( "thrust" );
-	startthrust			= spawnArgs.GetFloat( "thrust_start" );
 	endthrust			= spawnArgs.GetFloat( "thrust_end" );
 
 	spawnArgs.GetVector( "velocity", "0 0 0", velocity );
@@ -397,7 +348,6 @@ void idProjectile::Launch( const idVec3& start, const idVec3& dir, const idVec3&
 	}
 
 	thrust *= mass;
-	thrust_start = SEC2MS( startthrust ) + gameLocal.time;
 	thrust_end = SEC2MS( endthrust ) + gameLocal.time;
 
 	lightStartTime = 0;
@@ -500,12 +450,6 @@ void idProjectile::Launch( const idVec3& start, const idVec3& dir, const idVec3&
 		smokeFlyTime = gameLocal.time;
 	}
 
-// RB begin
-#if defined(STANDALONE)
-	originalTimeGroup = timeGroup;
-#endif
-// RB end
-
 	// used for the plasma bolts but may have other uses as well
 	if( projectileFlags.randomShaderSpin )
 	{
@@ -547,15 +491,7 @@ void idProjectile::Think()
 	{
 		idVec3 dir = -GetPhysics()->GetLinearVelocity();
 		dir.Normalize();
-
-// RB begin
-#if defined(STANDALONE)
-		SetTimeState ts( originalTimeGroup );
-
-		if( !gameLocal.smokeParticles->EmitSmoke( smokeFly, smokeFlyTime, gameLocal.random.RandomFloat(), GetPhysics()->GetOrigin(), dir.ToMat3(), timeGroup /*_D3XP*/ ) )
-#else
 		if( !gameLocal.smokeParticles->EmitSmoke( smokeFly, smokeFlyTime, gameLocal.random.RandomFloat(), GetPhysics()->GetOrigin(), dir.ToMat3() ) )
-#endif
 		{
 			smokeFlyTime = gameLocal.time;
 		}
@@ -822,7 +758,7 @@ void idProjectile::AddDefaultDamageEffect( const trace_t& collision, const idVec
 		msg.WriteFloat( collision.c.point[1] );
 		msg.WriteFloat( collision.c.point[2] );
 		msg.WriteDir( collision.c.normal, 24 );
-		msg.WriteLong( ( collision.c.material != NULL ) ? gameLocal.ServerRemapDecl( -1, DECL_MATERIAL, collision.c.material->Index() ) : -1 );
+		msg.WriteInt( ( collision.c.material != NULL ) ? gameLocal.ServerRemapDecl( -1, DECL_MATERIAL, collision.c.material->Index() ) : -1 );
 		msg.WriteFloat( velocity[0], 5, 10 );
 		msg.WriteFloat( velocity[1], 5, 10 );
 		msg.WriteFloat( velocity[2], 5, 10 );
@@ -1013,33 +949,6 @@ void idProjectile::Explode( const trace_t& collision, idEntity* ignore )
 			fxname = spawnArgs.GetString( "model_smoke" );
 		}
 	}
-
-// RB begin
-#if defined(STANDALONE)
-	// If the explosion is in liquid, spawn a particle splash
-	idVec3 testOrg = GetPhysics()->GetOrigin();
-	int testC = gameLocal.clip.Contents( testOrg, NULL, mat3_identity, CONTENTS_WATER, this );
-	if( testC & CONTENTS_WATER )
-	{
-		idFuncEmitter* splashEnt;
-		idDict splashArgs;
-
-		splashArgs.Set( "model", "sludgebulletimpact.prt" );
-		splashArgs.Set( "start_off", "1" );
-		splashEnt = static_cast<idFuncEmitter*>( gameLocal.SpawnEntityType( idFuncEmitter::Type, &splashArgs ) );
-
-		splashEnt->GetPhysics()->SetOrigin( testOrg );
-		splashEnt->PostEventMS( &EV_Activate, 0, this );
-		splashEnt->PostEventMS( &EV_Remove, 1500 );
-
-		// HACK - if this is a chaingun bullet, don't do the normal effect
-		if( !idStr::Cmp( spawnArgs.GetString( "def_damage" ), "damage_bullet_chaingun" ) )
-		{
-			fxname = NULL;
-		}
-	}
-#endif
-// RB end
 
 	if( fxname && *fxname )
 	{
@@ -1251,84 +1160,6 @@ void idProjectile::Event_Touch( idEntity* other, trace_t* trace )
 		Explode( collision, NULL );
 	}
 }
-
-// RB begin
-#if defined(STANDALONE)
-/*
-================
-idProjectile::CatchProjectile
-================
-*/
-void idProjectile::CatchProjectile( idEntity* o, const char* reflectName )
-{
-	idEntity* prevowner = owner.GetEntity();
-
-	owner = o;
-	physicsObj.GetClipModel()->SetOwner( o );
-
-	if( this->IsType( idGuidedProjectile::Type ) )
-	{
-		idGuidedProjectile* proj = static_cast<idGuidedProjectile*>( this );
-
-		proj->SetEnemy( prevowner );
-	}
-
-	idStr s = spawnArgs.GetString( "def_damage" );
-	s += reflectName;
-
-	const idDict* damageDef = gameLocal.FindEntityDefDict( s, false );
-	if( damageDef )
-	{
-		spawnArgs.Set( "def_damage", s );
-	}
-}
-
-/*
-================
-idProjectile::GetProjectileState
-================
-*/
-int idProjectile::GetProjectileState()
-{
-
-	return ( int )state;
-}
-
-/*
-================
-idProjectile::Event_CreateProjectile
-================
-*/
-void idProjectile::Event_CreateProjectile( idEntity* owner, const idVec3& start, const idVec3& dir )
-{
-	Create( owner, start, dir );
-}
-
-/*
-================
-idProjectile::Event_LaunchProjectile
-================
-*/
-void idProjectile::Event_LaunchProjectile( const idVec3& start, const idVec3& dir, const idVec3& pushVelocity )
-{
-	Launch( start, dir, pushVelocity );
-}
-
-/*
-================
-idProjectile::Event_SetGravity
-================
-*/
-void idProjectile::Event_SetGravity( float gravity )
-{
-	idVec3 gravVec;
-
-	gravVec = gameLocal.GetGravity();
-	gravVec.NormalizeFast();
-	physicsObj.SetGravity( gravVec * gravity );
-}
-#endif
-// RB end
 
 /*
 =================
@@ -1551,7 +1382,7 @@ bool idProjectile::ClientReceiveEvent( int event, int time, const idBitMsg& msg 
 			collision.c.point[1] = msg.ReadFloat();
 			collision.c.point[2] = msg.ReadFloat();
 			collision.c.normal = msg.ReadDir( 24 );
-			int index = gameLocal.ClientRemapDecl( DECL_MATERIAL, msg.ReadLong() );
+			int index = gameLocal.ClientRemapDecl( DECL_MATERIAL, msg.ReadInt() );
 			collision.c.material = ( index != -1 ) ? static_cast<const idMaterial*>( declManager->DeclByIndex( DECL_MATERIAL, index ) ) : NULL;
 			velocity[0] = msg.ReadFloat( 5, 10 );
 			velocity[1] = msg.ReadFloat( 5, 10 );
@@ -1560,11 +1391,10 @@ bool idProjectile::ClientReceiveEvent( int event, int time, const idBitMsg& msg 
 			return true;
 		}
 		default:
-		{
-			return idEntity::ClientReceiveEvent( event, time, msg );
-		}
+			break;
 	}
-	return false;
+
+	return idEntity::ClientReceiveEvent( event, time, msg );
 }
 
 /*
@@ -1575,18 +1405,7 @@ bool idProjectile::ClientReceiveEvent( int event, int time, const idBitMsg& msg 
 ===============================================================================
 */
 
-// RB begin
-#if defined(STANDALONE)
-	const idEventDef EV_SetEnemy( "setEnemy", "E" );
-#endif
-// RB end
-
 CLASS_DECLARATION( idProjectile, idGuidedProjectile )
-// RB begin
-#if defined(STANDALONE)
-	EVENT( EV_SetEnemy,		idGuidedProjectile::Event_SetEnemy )
-#endif
-// RB end
 END_CLASS
 
 /*
@@ -1819,7 +1638,7 @@ void idGuidedProjectile::Launch( const idVec3& start, const idVec3& dir, const i
 	angles = vel.ToAngles();
 	speed = vel.Length();
 	rndScale = spawnArgs.GetAngles( "random", "15 15 0" );
-	turn_max = spawnArgs.GetFloat( "turn_max", "180" ) / USERCMD_HZ;
+	turn_max = spawnArgs.GetFloat( "turn_max", "180" ) / ( float )USERCMD_HZ;
 	clamp_dist = spawnArgs.GetFloat( "clamp_dist", "256" );
 	burstMode = spawnArgs.GetBool( "burstMode" );
 	unGuided = false;
@@ -1828,18 +1647,6 @@ void idGuidedProjectile::Launch( const idVec3& start, const idVec3& dir, const i
 	UpdateVisuals();
 }
 
-// RB begin
-#if defined(STANDALONE)
-void idGuidedProjectile::SetEnemy( idEntity* ent )
-{
-	enemy = ent;
-}
-void idGuidedProjectile::Event_SetEnemy( idEntity* ent )
-{
-	SetEnemy( ent );
-}
-#endif
-// RB end
 
 /*
 ===============================================================================
@@ -1972,12 +1779,7 @@ void idSoulCubeMissile::Think()
 			// orbit the mob, cascading down
 			if( gameLocal.time < orbitTime + 1500 )
 			{
-// RB begin
-#if defined(STANDALONE)
-				if( !gameLocal.smokeParticles->EmitSmoke( smokeKill, smokeKillTime, gameLocal.random.CRandomFloat(), orbitOrg, mat3_identity, timeGroup /*_D3XP*/ ) )
-#else
 				if( !gameLocal.smokeParticles->EmitSmoke( smokeKill, smokeKillTime, gameLocal.random.CRandomFloat(), orbitOrg, mat3_identity ) )
-#endif
 				{
 					smokeKillTime = gameLocal.time;
 				}
@@ -2536,283 +2338,6 @@ void idBFGProjectile::Explode( const trace_t& collision, idEntity* ignore )
 /*
 ===============================================================================
 
-	tyPortalProjectile
-
-===============================================================================
-*/
-
-CLASS_DECLARATION( idProjectile, tyPortalProjectile )
-END_CLASS
-
-/*
-================
-tyPortalProjectile::tyPortalProjectile
-================
-*/
-tyPortalProjectile::tyPortalProjectile()
-{
-}
-
-/*
-=================
-tyPortalProjectile::~tyPortalProjectile
-=================
-*/
-tyPortalProjectile::~tyPortalProjectile()
-{
-}
-
-/*
-================
-tyPortalProjectile::Spawn
-================
-*/
-/*
-void tyPortalProjectile::Spawn() {
-}
-*/
-
-/*
-================
-tyPortalProjectile::Save
-================
-*/
-/*
-void tyPortalProjectile::Save( idSaveGame *savefile ) const {
-	// TODO
-}
-*/
-
-/*
-================
-tyPortalProjectile::Restore
-================
-*/
-/*
-void tyPortalProjectile::Restore( idRestoreGame *savefile ) {
-	// TODO
-}
-*/
-
-/*
-================
-tyPortalProjectile::Explode
-================
-*/
-void tyPortalProjectile::Explode( const trace_t& collision, idEntity* ignore )
-{
-	const char* fxname, *light_shader, *sndExplode;
-	float		light_fadetime;
-	idVec3		normal;
-	int			removeTime;
-
-	if( state == EXPLODED || state == FIZZLED )
-	{
-		return;
-	}
-
-	// stop sound
-	StopSound( SND_CHANNEL_BODY2, false );
-
-	// play explode sound
-	switch( ( int ) damagePower )
-	{
-		case 2:
-			sndExplode = "snd_explode2";
-			break;
-		case 3:
-			sndExplode = "snd_explode3";
-			break;
-		case 4:
-			sndExplode = "snd_explode4";
-			break;
-		default:
-			sndExplode = "snd_explode";
-			break;
-	}
-	StartSound( sndExplode, SND_CHANNEL_BODY, 0, true, NULL );
-
-	// we need to work out how long the effects last and then remove them at that time
-	// for example, bullets have no real effects
-	if( smokeFly && smokeFlyTime )
-	{
-		smokeFlyTime = 0;
-	}
-
-	Hide();
-	FreeLightDef();
-
-	if( spawnArgs.GetVector( "detonation_axis", "", normal ) )
-	{
-		GetPhysics()->SetAxis( normal.ToMat3() );
-	}
-	GetPhysics()->SetOrigin( collision.endpos + 2.0f * collision.c.normal );
-
-	// default remove time
-	removeTime = spawnArgs.GetInt( "remove_time", "1500" );
-
-	// change the model, usually to a PRT
-	fxname = NULL;
-	if( g_testParticle.GetInteger() == TEST_PARTICLE_IMPACT )
-	{
-		fxname = g_testParticleName.GetString();
-	}
-	else
-	{
-		fxname = spawnArgs.GetString( "model_detonate" );
-	}
-
-	int surfaceType = collision.c.material != NULL ? collision.c.material->GetSurfaceType() : SURFTYPE_METAL;
-	if( !( fxname && *fxname ) )
-	{
-		if( ( surfaceType == SURFTYPE_NONE ) || ( surfaceType == SURFTYPE_METAL ) || ( surfaceType == SURFTYPE_STONE ) )
-		{
-			fxname = spawnArgs.GetString( "model_smokespark" );
-		}
-		else if( surfaceType == SURFTYPE_RICOCHET )
-		{
-			fxname = spawnArgs.GetString( "model_ricochet" );
-		}
-		else
-		{
-			fxname = spawnArgs.GetString( "model_smoke" );
-		}
-	}
-
-	if( fxname && *fxname )
-	{
-		SetModel( fxname );
-		renderEntity.shaderParms[SHADERPARM_RED] =
-			renderEntity.shaderParms[SHADERPARM_GREEN] =
-				renderEntity.shaderParms[SHADERPARM_BLUE] =
-					renderEntity.shaderParms[SHADERPARM_ALPHA] = 1.0f;
-		renderEntity.shaderParms[SHADERPARM_TIMEOFFSET] = -MS2SEC( gameLocal.time );
-		renderEntity.shaderParms[SHADERPARM_DIVERSITY] = gameLocal.random.CRandomFloat();
-		Show();
-		removeTime = ( removeTime > 3000 ) ? removeTime : 3000;
-	}
-
-	// explosion light
-	light_shader = spawnArgs.GetString( "mtr_explode_light_shader" );
-	if( *light_shader )
-	{
-		renderLight.shader = declManager->FindMaterial( light_shader, false );
-		renderLight.pointLight = true;
-		renderLight.lightRadius[0] =
-			renderLight.lightRadius[1] =
-				renderLight.lightRadius[2] = spawnArgs.GetFloat( "explode_light_radius" );
-		spawnArgs.GetVector( "explode_light_color", "1 1 1", lightColor );
-		renderLight.shaderParms[SHADERPARM_RED] = lightColor.x;
-		renderLight.shaderParms[SHADERPARM_GREEN] = lightColor.y;
-		renderLight.shaderParms[SHADERPARM_BLUE] = lightColor.z;
-		renderLight.shaderParms[SHADERPARM_ALPHA] = 1.0f;
-		renderLight.shaderParms[SHADERPARM_TIMEOFFSET] = -MS2SEC( gameLocal.time );
-		light_fadetime = spawnArgs.GetFloat( "explode_light_fadetime", "0.5" );
-		lightStartTime = gameLocal.time;
-		lightEndTime = gameLocal.time + SEC2MS( light_fadetime );
-		BecomeActive( TH_THINK );
-	}
-
-	fl.takedamage = false;
-	physicsObj.SetContents( 0 );
-	physicsObj.PutToRest();
-
-	state = EXPLODED;
-
-	if( gameLocal.isClient )
-	{
-		return;
-	}
-
-	// alert the ai
-	gameLocal.AlertAI( owner.GetEntity() );
-
-	// bind the projectile to the impact entity if necesary
-	/*
-	if ( gameLocal.entities[collision.c.entityNum] && spawnArgs.GetBool( "bindOnImpact" ) ) {
-		Bind( gameLocal.entities[collision.c.entityNum], true );
-	}
-	*/
-
-	// spawn portal instead of debris
-	const idDict* portalDict = gameLocal.FindEntityDefDict( "portal", false );
-	if( portalDict && owner.GetEntity() && owner.GetEntity()->IsType( idPlayer::Type ) )
-	{
-		idPlayer* player = static_cast<idPlayer*>( owner.GetEntity() );
-
-		// find first portal belonging to the player
-		idStr portal1Name = player->GetName();
-		portal1Name += "_portal1";
-		idEntity* portal1Entity = gameLocal.FindEntity( portal1Name );
-		bool portal1Open = portal1Entity != NULL;
-
-		// find second portal belonging to the player
-		idStr portal2Name = player->GetName();
-		portal2Name += "_portal2";
-		idEntity* portal2Entity = gameLocal.FindEntity( portal2Name );
-		bool portal2Open = portal2Entity != NULL;
-
-#if 1
-		if( portal2Entity )
-		{
-			if( portal1Entity )
-			{
-				//portal1Entity->PostEventMS( &EV_Remove, 0 );
-				delete portal1Entity;
-			}
-
-			//portal2Entity->PostEventMS( &EV_Remove, 0 );
-			delete portal2Entity;
-		}
-#endif
-
-		idEntity* ent;
-		idVec3 dir;
-		idDict args = *portalDict;
-		args.Set( "model", "models/portals/portal_simple.ase" );
-		args.Set( "clipmodel", "models/portals/portal_simple_clip.ase" );
-		args.Set( "gui", "guis/cameras/cam_portal.gui" );
-		args.Set( "gui_parm1", "1" );
-
-		if( portal1Open && !portal2Open )
-		{
-			args.Set( "name", portal2Name );
-			//args.Set( "cameraTarget", portal2Name );
-		}
-		else
-		{
-			args.Set( "name", portal1Name );
-			//args.Set( "cameraTarget", portal1Name );
-		}
-
-		gameLocal.SpawnEntityDef( args, &ent, false );
-		if( !ent || !ent->IsType( tyPortal::Type ) )
-		{
-			gameLocal.Error( "'portal' is not an tyPortal" );
-		}
-
-		tyPortal* portal = static_cast<tyPortal*>( ent );
-
-		if( portal1Open && !portal2Open )
-		{
-			tyPortal* destinationPortal = static_cast<tyPortal*>( portal1Entity );
-
-			portal->Create( owner.GetEntity(), destinationPortal, physicsObj.GetOrigin(), collision.c.normal.ToMat3() );
-		}
-		else
-		{
-			portal->Create( owner.GetEntity(), NULL, physicsObj.GetOrigin(), collision.c.normal.ToMat3() );
-		}
-	}
-
-	CancelEvents( &EV_Explode );
-	PostEventMS( &EV_Remove, removeTime );
-}
-
-
-/*
-===============================================================================
-
 	idDebris
 
 ===============================================================================
@@ -2850,11 +2375,6 @@ void idDebris::Create( idEntity* owner, const idVec3& start, const idMat3& axis 
 	smokeFly = NULL;
 	smokeFlyTime = 0;
 	sndBounce = NULL;
-// RB begin
-#if defined(STANDALONE)
-	noGrab = true;
-#endif
-// RB end
 	UpdateVisuals();
 }
 
@@ -3045,13 +2565,7 @@ void idDebris::Launch()
 	{
 		smokeFly = static_cast<const idDeclParticle*>( declManager->FindType( DECL_PARTICLE, smokeName ) );
 		smokeFlyTime = gameLocal.time;
-// RB begin
-#if defined(STANDALONE)
-		gameLocal.smokeParticles->EmitSmoke( smokeFly, smokeFlyTime, gameLocal.random.CRandomFloat(), GetPhysics()->GetOrigin(), GetPhysics()->GetAxis(), timeGroup /*_D3XP*/ );
-#else
 		gameLocal.smokeParticles->EmitSmoke( smokeFly, smokeFlyTime, gameLocal.random.CRandomFloat(), GetPhysics()->GetOrigin(), GetPhysics()->GetAxis() );
-#endif
-// RB end
 	}
 
 	const char* sndName = spawnArgs.GetString( "snd_bounce" );
@@ -3077,12 +2591,7 @@ void idDebris::Think()
 
 	if( smokeFly && smokeFlyTime )
 	{
-// RB begin
-#if defined(STANDALONE)
-		if( !gameLocal.smokeParticles->EmitSmoke( smokeFly, smokeFlyTime, gameLocal.random.CRandomFloat(), GetPhysics()->GetOrigin(), GetPhysics()->GetAxis(), timeGroup /*_D3XP*/ ) )
-#else
 		if( !gameLocal.smokeParticles->EmitSmoke( smokeFly, smokeFlyTime, gameLocal.random.CRandomFloat(), GetPhysics()->GetOrigin(), GetPhysics()->GetAxis() ) )
-#endif
 		{
 			smokeFlyTime = 0;
 		}
@@ -3144,14 +2653,7 @@ void idDebris::Fizzle()
 	{
 		smokeFly = static_cast<const idDeclParticle*>( declManager->FindType( DECL_PARTICLE, smokeName ) );
 		smokeFlyTime = gameLocal.time;
-
-// RB begin
-#if defined(STANDALONE)
-		gameLocal.smokeParticles->EmitSmoke( smokeFly, smokeFlyTime, gameLocal.random.CRandomFloat(), GetPhysics()->GetOrigin(), GetPhysics()->GetAxis(), timeGroup /*_D3XP*/ );
-#else
 		gameLocal.smokeParticles->EmitSmoke( smokeFly, smokeFlyTime, gameLocal.random.CRandomFloat(), GetPhysics()->GetOrigin(), GetPhysics()->GetAxis() );
-#endif
-// RB end
 	}
 
 	fl.takedamage = false;
@@ -3195,14 +2697,7 @@ void idDebris::Explode()
 	{
 		smokeFly = static_cast<const idDeclParticle*>( declManager->FindType( DECL_PARTICLE, smokeName ) );
 		smokeFlyTime = gameLocal.time;
-
-// RB begin
-#if defined(STANDALONE)
-		gameLocal.smokeParticles->EmitSmoke( smokeFly, smokeFlyTime, gameLocal.random.CRandomFloat(), GetPhysics()->GetOrigin(), GetPhysics()->GetAxis(), timeGroup /*_D3XP*/ );
-#else
 		gameLocal.smokeParticles->EmitSmoke( smokeFly, smokeFlyTime, gameLocal.random.CRandomFloat(), GetPhysics()->GetOrigin(), GetPhysics()->GetAxis() );
-#endif
-// RB end
 	}
 
 	fl.takedamage = false;

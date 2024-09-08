@@ -236,33 +236,12 @@ public:
 	void					Restore( idRestoreGame* savefile );
 	virtual void			Present();
 	virtual	void			Damage( idEntity* inflictor, idEntity* attacker, const idVec3& dir, const char* damageDefName, const float damageScale, const int location );
-// RB begin
-#if defined(STANDALONE)
-	void					SetThrown( bool isThrown );
-	virtual bool			Collide( const trace_t& collision, const idVec3& velocity );
-#endif
-// RB end
 	virtual void			SpawnGibs( const idVec3& dir, const char* damageDefName );
-
-// RB begin
-#if defined(STANDALONE)
-	bool					IsGibbed()
-	{
-		return gibbed;
-	};
-#endif
-// RB end
 
 protected:
 	idRenderModel* 			skeletonModel;
 	int						skeletonModelDefHandle;
 	bool					gibbed;
-
-// RB begin
-#if defined(STANDALONE)
-	bool					wasThrown;
-#endif
-// RB end
 
 	virtual void			Gib( const idVec3& dir, const char* damageDefName );
 	void					InitSkeletonModel();
@@ -339,13 +318,7 @@ public:
 protected:
 	virtual void			Gib( const idVec3& dir, const char* damageDefName );
 
-// RB begin
-#if !defined(STANDALONE)
 private:
-#else
-public:
-#endif
-// RB end
 	idEntityPtr<idAFAttachment>	head;
 
 	void					Event_Gib( const char* damageDefName );
@@ -455,14 +428,6 @@ public:
 	void					Spawn();
 	virtual void			Think();
 
-// RB begin
-#if defined(STANDALONE)
-	float					force;
-	float					velocity;
-	float					steerAngle;
-#endif
-// RB end
-
 private:
 	idAFBody* 				wheels[6];
 	idAFConstraint_Hinge* 	steering[4];
@@ -470,40 +435,6 @@ private:
 	float					wheelAngles[6];
 };
 
-// RB begin
-#if defined(STANDALONE)
-/*
-===============================================================================
-
-idAFEntity_VehicleAutomated
-
-===============================================================================
-*/
-
-class idAFEntity_VehicleAutomated : public idAFEntity_VehicleSixWheels
-{
-public:
-	CLASS_PROTOTYPE( idAFEntity_VehicleAutomated );
-
-	void					Spawn();
-	void					PostSpawn();
-	virtual void			Think();
-
-private:
-
-	idEntity*	waypoint;
-	float		steeringSpeed;
-	float		currentSteering;
-	float		idealSteering;
-	float		originHeight;
-
-	void		Event_SetVelocity( float _velocity );
-	void		Event_SetTorque( float _torque );
-	void		Event_SetSteeringSpeed( float _steeringSpeed );
-	void		Event_SetWayPoint( idEntity* _waypoint );
-};
-#endif
-// RB end
 
 /*
 ===============================================================================
@@ -564,7 +495,5 @@ private:
 	void					Event_SetFingerAngle( float angle );
 	void					Event_StopFingers();
 };
-
-
 
 #endif /* !__GAME_AFENTITY_H__ */

@@ -35,14 +35,13 @@ If you have questions concerning this license or the applicable additional terms
 ===============================================================================
 */
 
-#define GAME_NAME						"Tekuum"		// appears on window titles and errors
-#define GAME_NAME_LOWER					"tekuum"		// appears in screenshot names
+#define GAME_NAME						"DOOM 3"		// appears on window titles and errors
+#define GAME_NAME_LOWER					"rbdoom3"		// appears in screenshot names
 
-#define ENGINE_VERSION					"Tekuum 0.4.0"	// printed in console
+#define ENGINE_VERSION					"RBDOOM 3 0.4.0"	// printed in console
 
 // paths
-#define	CD_BASEDIR						"Tekuum"
-
+#define	CD_BASEDIR						"Doom"
 #if defined(STANDALONE)
 	#if !defined(BASE_GAMEDIR)
 		#define	BASE_GAMEDIR					"assets"
@@ -56,11 +55,11 @@ If you have questions concerning this license or the applicable additional terms
 #endif
 
 // filenames
-#define	CD_EXE							"tekuum.exe"
-#define CONFIG_FILE						"TekuumConfig.cfg"
+#define	CD_EXE							"doom.exe"
+#define CONFIG_FILE						"DoomConfig.cfg"
 
 // base folder where the source code lives
-#define SOURCE_CODE_BASE_FOLDER			"src"
+#define SOURCE_CODE_BASE_FOLDER			"neo"
 
 
 // default idnet host address
@@ -99,25 +98,25 @@ If you have questions concerning this license or the applicable additional terms
 
 // editor info
 #define EDITOR_DEFAULT_PROJECT			"doom.qe4"
-#define EDITOR_REGISTRY_KEY				"TekuumRadiant"
-#define EDITOR_WINDOWTEXT				"TekuumEdit"
+#define EDITOR_REGISTRY_KEY				"DOOMRadiant"
+#define EDITOR_WINDOWTEXT				"DOOMEdit"
 
 // win32 info
-#define WIN32_CONSOLE_CLASS				"TECHYON WinConsole"
-#define	WIN32_WINDOW_CLASS_NAME			"TECHYON"
-#define	WIN32_FAKE_WINDOW_CLASS_NAME	"TECHYON_WGL_FAKE"
+#define WIN32_CONSOLE_CLASS				"DOOM3_WinConsole"
+#define	WIN32_WINDOW_CLASS_NAME			"DOOM3"
+#define	WIN32_FAKE_WINDOW_CLASS_NAME	"DOOM3_WGL_FAKE"
 
 // Linux info
 #ifdef ID_DEMO_BUILD
-	#define LINUX_DEFAULT_PATH				"/usr/local/games/tekuum-demo"
+	#define LINUX_DEFAULT_PATH			"/usr/local/games/doom3-demo"
 #else
-	#define LINUX_DEFAULT_PATH				"/usr/local/games/tekuum"
+	#define LINUX_DEFAULT_PATH			"/usr/local/games/doom3"
 #endif
 
 // CD Key file info
 // goes into BASE_GAMEDIR whatever the fs_game is set to
 // two distinct files for easier win32 installer job
-#define CDKEY_FILE						"tekuumkey"
+#define CDKEY_FILE						"doomkey"
 #define XPKEY_FILE						"xpkey"
 #define CDKEY_TEXT						"\n// Do not give this file to ANYONE.\n" \
 										"// id Software or Zenimax will NEVER ask you to send this file to them.\n"

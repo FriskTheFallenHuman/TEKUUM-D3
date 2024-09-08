@@ -149,7 +149,7 @@ idRenderModel* idRenderModelPrt::InstantiateDynamicModel( const struct renderEnt
 #if defined(STANDALONE)
 		int stageAge = g.renderView->time[renderEntity->timeGroup] + renderEntity->shaderParms[SHADERPARM_TIMEOFFSET] * 1000 - stage->timeOffset * 1000;
 #else
-		int stageAge = g.renderView->time[TIME_GROUP1] + renderEntity->shaderParms[SHADERPARM_TIMEOFFSET] * 1000 - stage->timeOffset * 1000;
+		int stageAge = g.renderView->time[0] + renderEntity->shaderParms[SHADERPARM_TIMEOFFSET] * 1000 - stage->timeOffset * 1000;
 #endif
 // RB end
 		int	stageCycle = stageAge / stage->cycleMsec;
@@ -220,7 +220,7 @@ idRenderModel* idRenderModelPrt::InstantiateDynamicModel( const struct renderEnt
 #if defined(STANDALONE)
 			if( renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] && g.renderView->time[renderEntity->timeGroup] - inCycleTime >= renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] * 1000 )
 #else
-			if( renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] && g.renderView->time[TIME_GROUP1] - inCycleTime >= renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] * 1000 )
+			if( renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] && g.renderView->time[0] - inCycleTime >= renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] * 1000 )
 #endif
 // RB end
 			{

@@ -107,10 +107,7 @@ void idSaveGame::Close()
 
 	objects.Clear();
 
-// RB begin
-// RB: this crashes
-#if 0 //def ID_DEBUG_MEMORY
-// RB end
+#ifdef ID_DEBUG_MEMORY
 	idStr gameState = file->GetName();
 	gameState.StripFileExtension();
 	WriteGameState_f( idCmdArgs( va( "test %s_save", gameState.c_str() ), false ) );
@@ -614,13 +611,6 @@ void idSaveGame::WriteRenderEntity( const renderEntity_t& renderEntity )
 	WriteBool( renderEntity.weaponDepthHack );
 
 	WriteInt( renderEntity.forceUpdate );
-
-// RB begin
-#if defined(STANDALONE)
-	WriteInt( renderEntity.timeGroup );
-	WriteInt( renderEntity.xrayIndex );
-#endif
-// RB end
 }
 
 /*
@@ -752,10 +742,8 @@ void idSaveGame::WriteUsercmd( const usercmd_t& usercmd )
 	WriteShort( usercmd.angles[2] );
 	WriteShort( usercmd.mx );
 	WriteShort( usercmd.my );
-	// RB begin
 	WriteByte( usercmd.impulse );
 	WriteByte( usercmd.impulseSequence );
-	// RB end
 	WriteInt( usercmd.sequence );
 }
 
@@ -924,11 +912,9 @@ void idRestoreGame::CreateObjects()
 		}
 		objects[ i ] = type->CreateInstance();
 
-// RB: disabled
-#if 0 //def ID_DEBUG_MEMORY
+#ifdef ID_DEBUG_MEMORY
 		InitTypeVariables( objects[i], type->classname, 0xce );
 #endif
-// RB end
 	}
 }
 
@@ -963,15 +949,13 @@ void idRestoreGame::RestoreObjects()
 		}
 	}
 
-// RB: disabled
-#if 0 //def ID_DEBUG_MEMORY
+#ifdef ID_DEBUG_MEMORY
 	idStr gameState = file->GetName();
 	gameState.StripFileExtension();
 	WriteGameState_f( idCmdArgs( va( "test %s_restore", gameState.c_str() ), false ) );
 	//CompareGameState_f( idCmdArgs( va( "test %s_save", gameState.c_str() ) ) );
 	gameLocal.Error( "dumped game states" );
 #endif
-// RB end
 }
 
 /*
@@ -1505,13 +1489,6 @@ void idRestoreGame::ReadRenderEntity( renderEntity_t& renderEntity )
 	ReadBool( renderEntity.weaponDepthHack );
 
 	ReadInt( renderEntity.forceUpdate );
-
-// RB begin
-#if defined(STANDALONE)
-	ReadInt( renderEntity.timeGroup );
-	ReadInt( renderEntity.xrayIndex );
-#endif
-// RB end
 }
 
 /*
@@ -1635,10 +1612,8 @@ void idRestoreGame::ReadUsercmd( usercmd_t& usercmd )
 	ReadShort( usercmd.angles[2] );
 	ReadShort( usercmd.mx );
 	ReadShort( usercmd.my );
-	// RB begin
 	ReadByte( usercmd.impulse );
 	ReadByte( usercmd.impulseSequence );
-	// RB end
 	ReadInt( usercmd.sequence );
 }
 

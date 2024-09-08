@@ -85,8 +85,8 @@ private:
 	byte			ReadByte();
 	void			WriteShort( int s );
 	int				ReadShort();
-	void			WriteLong( int l );
-	int				ReadLong();
+	void			WriteInt( int l );
+	int				ReadInt();
 	void			WriteData( const byte* data, const int size );
 	void			ReadData( byte* data, const int size );
 };

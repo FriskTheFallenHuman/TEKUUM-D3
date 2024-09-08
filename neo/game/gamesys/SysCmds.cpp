@@ -95,7 +95,7 @@ void Cmd_EntityList_f( const idCmdArgs& args )
 		size += check->spawnArgs.Allocated();
 	}
 
-	gameLocal.Printf( "...%d entities\n...%" PRIuSIZE  " bytes of spawnargs\n", count, size );
+	gameLocal.Printf( "...%d entities\n...%zd bytes of spawnargs\n", count, size );
 }
 
 /*
@@ -414,14 +414,6 @@ void Cmd_Give_f( const idCmdArgs& args )
 		return;
 	}
 
-	// RB begin
-	if( idStr::Icmp( name, "adrenaline" ) == 0 )
-	{
-		player->GivePowerUp( ADRENALINE, SEC2MS( 30.0f ) );
-		return;
-	}
-	// RB end
-
 	if( !give_all && !player->Give( args.Argv( 1 ), args.Argv( 2 ) ) )
 	{
 		gameLocal.Printf( "unknown item\n" );
@@ -455,12 +447,12 @@ void Cmd_CenterView_f( const idCmdArgs& args )
 ==================
 Cmd_God_f
 
-Sets client to nodamage
+Sets client to godmode
 
-argv(0) nodamage
+argv(0) god
 ==================
 */
-void Cmd_Nodamage_f( const idCmdArgs& args )
+void Cmd_God_f( const idCmdArgs& args )
 {
 	const char*	msg;
 	idPlayer*	player;
@@ -471,15 +463,15 @@ void Cmd_Nodamage_f( const idCmdArgs& args )
 		return;
 	}
 
-	if( player->nodamage )
+	if( player->godmode )
 	{
-		player->nodamage = false;
-		msg = "nodamage OFF\n";
+		player->godmode = false;
+		msg = "godmode OFF\n";
 	}
 	else
 	{
-		player->nodamage = true;
-		msg = "nodamage ON\n";
+		player->godmode = true;
+		msg = "godmode ON\n";
 	}
 
 	gameLocal.Printf( "%s", msg );
@@ -1405,7 +1397,8 @@ PrintFloat
 */
 static void PrintFloat( float f )
 {
-	char buf[128], i;
+	char buf[128];
+	int i;
 
 	for( i = sprintf( buf, "%3.2f", f ); i < 7; i++ )
 	{
@@ -1544,6 +1537,68 @@ static void Cmd_CollisionModelInfo_f( const idCmdArgs& args )
 
 /*
 ==================
+Cmd_ExportModels_f
+==================
+*/
+static void Cmd_ExportModels_f( const idCmdArgs& args )
+{
+	idModelExport	exporter;
+	idStr			name;
+
+	// don't allow exporting models when cheats are disabled,
+	// but if we're not in the game, it's ok
+	if( gameLocal.GetLocalPlayer() && !gameLocal.CheatsOk( false ) )
+	{
+		return;
+	}
+
+	if( args.Argc() < 2 )
+	{
+		exporter.ExportModels( "def", ".def" );
+	}
+	else
+	{
+		name = args.Argv( 1 );
+		name = "def/" + name;
+		name.DefaultFileExtension( ".def" );
+		exporter.ExportDefFile( name );
+	}
+}
+
+/*
+==================
+Cmd_ReexportModels_f
+==================
+*/
+static void Cmd_ReexportModels_f( const idCmdArgs& args )
+{
+	idModelExport	exporter;
+	idStr			name;
+
+	// don't allow exporting models when cheats are disabled,
+	// but if we're not in the game, it's ok
+	if( gameLocal.GetLocalPlayer() && !gameLocal.CheatsOk( false ) )
+	{
+		return;
+	}
+
+	idAnimManager::forceExport = true;
+	if( args.Argc() < 2 )
+	{
+		exporter.ExportModels( "def", ".def" );
+	}
+	else
+	{
+		name = args.Argv( 1 );
+		name = "def/" + name;
+		name.DefaultFileExtension( ".def" );
+		exporter.ExportDefFile( name );
+	}
+	idAnimManager::forceExport = false;
+}
+
+/*
+==================
 Cmd_ReloadAnims_f
 ==================
 */
@@ -1614,7 +1669,7 @@ static void Cmd_ListAnims_f( const idCmdArgs& args )
 			}
 		}
 
-		gameLocal.Printf( "%" PRIuSIZE "memory used in %d entity animators\n", size, num );
+		gameLocal.Printf( "%zd memory used in %d entity animators\n", size, num );
 	}
 }
 
@@ -2564,45 +2619,10 @@ void Cmd_NextGUI_f( const idCmdArgs& args )
 	player->Teleport( origin, angles, NULL );
 }
 
-// RB begin
-#if defined(STANDALONE)
-void Cmd_SetActorState_f( const idCmdArgs& args )
-{
-
-	if( args.Argc() != 3 )
-	{
-		common->Printf( "usage: setActorState <entity name> <state>\n" );
-		return;
-	}
-
-	idEntity* ent;
-	ent = gameLocal.FindEntity( args.Argv( 1 ) );
-	if( !ent )
-	{
-		gameLocal.Printf( "entity not found\n" );
-		return;
-	}
-
-
-	if( !ent->IsType( idActor::Type ) )
-	{
-		gameLocal.Printf( "entity not an actor\n" );
-		return;
-	}
-
-	idActor* actor = ( idActor* )ent;
-	actor->PostEventMS( &AI_SetState, 0, args.Argv( 2 ) );
-}
-#endif
-// RB end
-
-#if 0
-// not used
 static void ArgCompletion_DefFile( const idCmdArgs& args, void( *callback )( const char* s ) )
 {
 	cmdSystem->ArgCompletion_FolderExtension( args, callback, "def/", true, ".def", NULL );
 }
-#endif
 
 /*
 ===============
@@ -2641,13 +2661,9 @@ so it can perform tab completion
 */
 void idGameLocal::InitConsoleCommands()
 {
-	// RB: disabled unneeded debugging tools
-#if 0
 	cmdSystem->AddCommand( "listTypeInfo",			ListTypeInfo_f,				CMD_FL_GAME,				"list type info" );
 	cmdSystem->AddCommand( "writeGameState",		WriteGameState_f,			CMD_FL_GAME,				"write game state" );
 	cmdSystem->AddCommand( "testSaveGame",			TestSaveGame_f,				CMD_FL_GAME | CMD_FL_CHEAT,	"test a save game for a level" );
-#endif
-	// RB end
 	cmdSystem->AddCommand( "game_memory",			idClass::DisplayInfo_f,		CMD_FL_GAME,				"displays game class info" );
 	cmdSystem->AddCommand( "listClasses",			idClass::ListClasses_f,		CMD_FL_GAME,				"lists game classes" );
 	cmdSystem->AddCommand( "listThreads",			idThread::ListThreads_f,	CMD_FL_GAME | CMD_FL_CHEAT,	"lists script threads" );
@@ -2661,7 +2677,7 @@ void idGameLocal::InitConsoleCommands()
 	cmdSystem->AddCommand( "gameKick",				Cmd_Kick_f,					CMD_FL_GAME,				"same as kick, but recognizes player names" );
 	cmdSystem->AddCommand( "give",					Cmd_Give_f,					CMD_FL_GAME | CMD_FL_CHEAT,	"gives one or more items" );
 	cmdSystem->AddCommand( "centerview",			Cmd_CenterView_f,			CMD_FL_GAME,				"centers the view" );
-	cmdSystem->AddCommand( "nodamage",				Cmd_Nodamage_f,				CMD_FL_GAME | CMD_FL_CHEAT,	"disables damage for the player" );
+	cmdSystem->AddCommand( "god",					Cmd_God_f,					CMD_FL_GAME | CMD_FL_CHEAT,	"enables god mode" );
 	cmdSystem->AddCommand( "notarget",				Cmd_Notarget_f,				CMD_FL_GAME | CMD_FL_CHEAT,	"disables the player as a target" );
 	cmdSystem->AddCommand( "noclip",				Cmd_Noclip_f,				CMD_FL_GAME | CMD_FL_CHEAT,	"disables collision detection for the player" );
 	cmdSystem->AddCommand( "kill",					Cmd_Kill_f,					CMD_FL_GAME,				"kills the player" );
@@ -2704,6 +2720,7 @@ void idGameLocal::InitConsoleCommands()
 	cmdSystem->AddCommand( "script",				Cmd_Script_f,				CMD_FL_GAME | CMD_FL_CHEAT,	"executes a line of script" );
 	cmdSystem->AddCommand( "listCollisionModels",	Cmd_ListCollisionModels_f,	CMD_FL_GAME,				"lists collision models" );
 	cmdSystem->AddCommand( "collisionModelInfo",	Cmd_CollisionModelInfo_f,	CMD_FL_GAME,				"shows collision model info" );
+	cmdSystem->AddCommand( "reexportmodels",		Cmd_ReexportModels_f,		CMD_FL_GAME | CMD_FL_CHEAT,	"reexports models", ArgCompletion_DefFile );
 	cmdSystem->AddCommand( "reloadanims",			Cmd_ReloadAnims_f,			CMD_FL_GAME | CMD_FL_CHEAT,	"reloads animations" );
 	cmdSystem->AddCommand( "listAnims",				Cmd_ListAnims_f,			CMD_FL_GAME,				"lists all animations" );
 	cmdSystem->AddCommand( "aasStats",				Cmd_AASStats_f,				CMD_FL_GAME,				"shows AAS stats" );
@@ -2725,7 +2742,7 @@ void idGameLocal::InitConsoleCommands()
 	cmdSystem->AddCommand( "recordViewNotes",		Cmd_RecordViewNotes_f,		CMD_FL_GAME | CMD_FL_CHEAT,	"record the current view position with notes" );
 	cmdSystem->AddCommand( "showViewNotes",			Cmd_ShowViewNotes_f,		CMD_FL_GAME | CMD_FL_CHEAT,	"show any view notes for the current map, successive calls will cycle to the next note" );
 	cmdSystem->AddCommand( "closeViewNotes",		Cmd_CloseViewNotes_f,		CMD_FL_GAME | CMD_FL_CHEAT,	"close the view showing any notes for this map" );
-	cmdSystem->AddCommand( "exportScriptEvents",	idClass::ExportScriptEvents_f,	CMD_FL_GAME | CMD_FL_CHEAT,	"export doom script events" );
+	cmdSystem->AddCommand( "exportmodels",			Cmd_ExportModels_f,			CMD_FL_GAME | CMD_FL_CHEAT,	"exports models", ArgCompletion_DefFile );
 
 	// multiplayer client commands ( replaces old impulses stuff )
 	cmdSystem->AddCommand( "clientDropWeapon",		idMultiplayerGame::DropWeapon_f, CMD_FL_GAME,			"drop current weapon" );
@@ -2738,19 +2755,13 @@ void idGameLocal::InitConsoleCommands()
 
 	// multiplayer server commands
 	cmdSystem->AddCommand( "serverMapRestart",		idGameLocal::MapRestart_f,	CMD_FL_GAME,				"restart the current game" );
-	cmdSystem->AddCommand( "serverForceReady",		idMultiplayerGame::ForceReady_f, CMD_FL_GAME,				"force all players ready" );
+	cmdSystem->AddCommand( "serverForceReady",	idMultiplayerGame::ForceReady_f, CMD_FL_GAME,				"force all players ready" );
 	cmdSystem->AddCommand( "serverNextMap",			idGameLocal::NextMap_f,		CMD_FL_GAME,				"change to the next map" );
 #endif
 
 	// localization help commands
 	cmdSystem->AddCommand( "nextGUI",				Cmd_NextGUI_f,				CMD_FL_GAME | CMD_FL_CHEAT,	"teleport the player to the next func_static with a gui" );
 	cmdSystem->AddCommand( "testid",				Cmd_TestId_f,				CMD_FL_GAME | CMD_FL_CHEAT,	"output the string for the specified id." );
-
-// RB begin
-#if defined(STANDALONE)
-	cmdSystem->AddCommand( "setActorState",			Cmd_SetActorState_f,		CMD_FL_GAME | CMD_FL_CHEAT,	"Manually sets an actors script state", idGameLocal::ArgCompletion_EntityName );
-#endif
-// RB end
 }
 
 /*

@@ -82,7 +82,7 @@ idPhysics_RigidBody::Integrate
   Calculate next state from the current state using an integrator.
 ================
 */
-void idPhysics_RigidBody::Integrate( float deltaTime, rigidBodyPState_t& next_ )
+void idPhysics_RigidBody::Integrate( float deltaTime, rigidBodyPState_t& next )
 {
 	idVec3 position;
 
@@ -91,19 +91,19 @@ void idPhysics_RigidBody::Integrate( float deltaTime, rigidBodyPState_t& next_ )
 
 	current.i.orientation.TransposeSelf();
 
-	integrator->Evaluate( ( float* ) &current.i, ( float* ) &next_.i, 0, deltaTime );
-	next_.i.orientation.OrthoNormalizeSelf();
+	integrator->Evaluate( ( float* ) &current.i, ( float* ) &next.i, 0, deltaTime );
+	next.i.orientation.OrthoNormalizeSelf();
 
 	// apply gravity
-	next_.i.linearMomentum += deltaTime * gravityVector * mass;
+	next.i.linearMomentum += deltaTime * gravityVector * mass;
 
 	current.i.orientation.TransposeSelf();
-	next_.i.orientation.TransposeSelf();
+	next.i.orientation.TransposeSelf();
 
 	current.i.position = position;
-	next_.i.position -= centerOfMass * next_.i.orientation;
+	next.i.position -= centerOfMass * next.i.orientation;
 
-	next_.atRest = current.atRest;
+	next.atRest = current.atRest;
 }
 
 /*
@@ -177,7 +177,7 @@ idPhysics_RigidBody::CheckForCollisions
   If there is a collision the next state is set to the state at the moment of impact.
 ================
 */
-bool idPhysics_RigidBody::CheckForCollisions( const float deltaTime, rigidBodyPState_t& next_, trace_t& collision )
+bool idPhysics_RigidBody::CheckForCollisions( const float deltaTime, rigidBodyPState_t& next, trace_t& collision )
 {
 //#define TEST_COLLISION_DETECTION
 	idMat3 axis;
@@ -192,23 +192,23 @@ bool idPhysics_RigidBody::CheckForCollisions( const float deltaTime, rigidBodyPS
 	}
 #endif
 
-	TransposeMultiply( current.i.orientation, next_.i.orientation, axis );
+	TransposeMultiply( current.i.orientation, next.i.orientation, axis );
 	rotation = axis.ToRotation();
 	rotation.SetOrigin( current.i.position );
 
 	// if there was a collision
-	if( gameLocal.clip.Motion( collision, current.i.position, next_.i.position, rotation, clipModel, current.i.orientation, clipMask, self ) )
+	if( gameLocal.clip.Motion( collision, current.i.position, next.i.position, rotation, clipModel, current.i.orientation, clipMask, self ) )
 	{
 		// set the next state to the state at the moment of impact
-		next_.i.position = collision.endpos;
-		next_.i.orientation = collision.endAxis;
-		next_.i.linearMomentum = current.i.linearMomentum;
-		next_.i.angularMomentum = current.i.angularMomentum;
+		next.i.position = collision.endpos;
+		next.i.orientation = collision.endAxis;
+		next.i.linearMomentum = current.i.linearMomentum;
+		next.i.angularMomentum = current.i.angularMomentum;
 		collided = true;
 	}
 
 #ifdef TEST_COLLISION_DETECTION
-	if( gameLocal.clip.Contents( next.i.position, clipModel, next_.i.orientation, clipMask, self ) )
+	if( gameLocal.clip.Contents( next.i.position, clipModel, next.i.orientation, clipMask, self ) )
 	{
 		if( !startsolid )
 		{
@@ -900,7 +900,7 @@ idPhysics_RigidBody::Evaluate
 */
 bool idPhysics_RigidBody::Evaluate( int timeStepMSec, int endTimeMSec )
 {
-	rigidBodyPState_t next_step;
+	rigidBodyPState_t next;
 	idAngles angles;
 	trace_t collision;
 	idVec3 impulse;
@@ -962,24 +962,24 @@ bool idPhysics_RigidBody::Evaluate( int timeStepMSec, int endTimeMSec )
 
 	clipModel->Unlink();
 
-	next_step = current;
+	next = current;
 
 	// calculate next position and orientation
-	Integrate( timeStep, next_step );
+	Integrate( timeStep, next );
 
 #ifdef RB_TIMINGS
 	timer_collision.Start();
 #endif
 
 	// check for collisions from the current to the next state
-	collided = CheckForCollisions( timeStep, next_step, collision );
+	collided = CheckForCollisions( timeStep, next, collision );
 
 #ifdef RB_TIMINGS
 	timer_collision.Stop();
 #endif
 
 	// set the new state
-	current = next_step;
+	current = next;
 
 	if( collided )
 	{
@@ -1059,7 +1059,7 @@ bool idPhysics_RigidBody::Evaluate( int timeStepMSec, int endTimeMSec )
 
 	if( rb_showTimings->integer == 1 )
 	{
-		gameLocal.Printf( "%12s: t %1.4f cd %1.4f\n",
+		gameLocal.Printf( "%12s: t %u cd %u\n",
 						  self->name.c_str(),
 						  timer_total.Milliseconds(), timer_collision.Milliseconds() );
 		lastTimerReset = 0;
@@ -1069,7 +1069,7 @@ bool idPhysics_RigidBody::Evaluate( int timeStepMSec, int endTimeMSec )
 		numRigidBodies++;
 		if( endTimeMSec > lastTimerReset )
 		{
-			gameLocal.Printf( "rb %d: t %1.4f cd %1.4f\n",
+			gameLocal.Printf( "rb %d: t %u cd %u\n",
 							  numRigidBodies,
 							  timer_total.Milliseconds(), timer_collision.Milliseconds() );
 		}
@@ -1085,52 +1085,6 @@ bool idPhysics_RigidBody::Evaluate( int timeStepMSec, int endTimeMSec )
 
 	return true;
 }
-
-/*
-================
-idPhysics_RigidBody::Interpolate
-
-  Simply interpolate between snapshots of the state of the rigid body
-  for MP clients.
-================
-*/
-/*
-bool idPhysics_RigidBody::Interpolate( const float fraction )
-{
-	if( !self )
-	{
-		return false;
-	}
-
-	if( self->GetInterpolationBehavior() == idEntity::USE_LATEST_SNAP_ONLY )
-	{
-		current = next;
-		return true;
-	}
-	else if( self->GetInterpolationBehavior() == idEntity::USE_INTERPOLATION )
-	{
-		current.i.position = Lerp( previous.i.position, next.i.position, fraction );
-		current.i.orientation = idQuat().Slerp( previous.i.orientation.ToQuat(), next.i.orientation.ToQuat(), fraction ).ToMat3();
-		current.i.linearMomentum = Lerp( previous.i.linearMomentum, next.i.linearMomentum, fraction );
-		return true;
-	}
-
-	return false;
-}
-*/
-
-/*
-================
-idPhysics_RigidBody::ResetInterpolationState
-================
-*/
-/*
-void idPhysics_RigidBody::ResetInterpolationState( const idVec3& origin, const idMat3& axis )
-{
-	previous = current;
-	next = current;
-}
-*/
 
 /*
 ================
@@ -1650,7 +1604,7 @@ void idPhysics_RigidBody::WriteToSnapshot( idBitMsgDelta& msg ) const
 	quat = current.i.orientation.ToCQuat();
 	localQuat = current.localAxis.ToCQuat();
 
-	msg.WriteLong( current.atRest );
+	msg.WriteInt( current.atRest );
 	msg.WriteFloat( current.i.position[0] );
 	msg.WriteFloat( current.i.position[1] );
 	msg.WriteFloat( current.i.position[2] );
@@ -1689,7 +1643,7 @@ void idPhysics_RigidBody::ReadFromSnapshot( const idBitMsgDelta& msg )
 {
 	idCQuat quat, localQuat;
 
-	current.atRest = msg.ReadLong();
+	current.atRest = msg.ReadInt();
 	current.i.position[0] = msg.ReadFloat();
 	current.i.position[1] = msg.ReadFloat();
 	current.i.position[2] = msg.ReadFloat();

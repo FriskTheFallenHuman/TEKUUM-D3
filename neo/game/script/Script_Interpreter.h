@@ -29,33 +29,30 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __SCRIPT_INTERPRETER_H__
 #define __SCRIPT_INTERPRETER_H__
 
-#define MAX_STACK_DEPTH 	64
-
-// RB: doubled local stack size
+#define MAX_STACK_DEPTH	64
 #define LOCALSTACK_SIZE 	(6144 * 2)
-// RB end
 
 typedef struct prstack_s
 {
-	int 				s;
+	int					s;
 	const function_t*	f;
-	int 				stackbase;
+	int					stackbase;
 } prstack_t;
 
 class idInterpreter
 {
 private:
 	prstack_t			callStack[ MAX_STACK_DEPTH ];
-	int 				callStackDepth;
-	int 				maxStackDepth;
+	int					callStackDepth;
+	int					maxStackDepth;
 
 	byte				localstack[ LOCALSTACK_SIZE ];
-	int 				localstackUsed;
-	int 				localstackBase;
-	int 				maxLocalstackUsed;
+	int					localstackUsed;
+	int					localstackBase;
+	int					maxLocalstackUsed;
 
 	const function_t*	currentFunction;
-	int 				instructionPointer;
+	int					instructionPointer;
 
 	int					popParms;
 	const idEventDef*	multiFrameEvent;
@@ -65,13 +62,8 @@ private:
 
 	void				PopParms( int numParms );
 	void				PushString( const char* string );
-	// RB begin
-	// RB: 64 bit fix, changed int to intptr_t
-	void				Push( intptr_t value );
-
-	// RB: added PushVector for new E_EVENT_SIZEOF_VEC
 	void				PushVector( const idVec3& vector );
-	// RB end
+	void				Push( intptr_t value );
 	const char*			FloatToString( float value );
 	void				AppendString( idVarDef* def, const char* from );
 	void				SetString( idVarDef* def, const char* from );
@@ -104,8 +96,8 @@ public:
 	int					CurrentLine() const;
 	const char*			CurrentFile() const;
 
-	void				Error( VERIFY_FORMAT_STRING const char* fmt, ... ) const;
-	void				Warning( VERIFY_FORMAT_STRING const char* fmt, ... ) const;
+	void				Error( const char* fmt, ... ) const id_attribute( ( format( printf, 2, 3 ) ) );
+	void				Warning( const char* fmt, ... ) const id_attribute( ( format( printf, 2, 3 ) ) );
 	void				DisplayInfo() const;
 
 	bool				BeginMultiFrameEvent( idEntity* ent, const idEventDef* event );
@@ -148,19 +140,16 @@ ID_INLINE void idInterpreter::PopParms( int numParms )
 idInterpreter::Push
 ====================
 */
-// RB: 64 bit fix, changed int to intptr_t
 ID_INLINE void idInterpreter::Push( intptr_t value )
 {
 	if( localstackUsed + sizeof( intptr_t ) > LOCALSTACK_SIZE )
 	{
 		Error( "Push: locals stack overflow\n" );
 	}
-	*( intptr_t* )&localstack[ localstackUsed ] = value;
+	*( intptr_t* )&localstack[ localstackUsed ]	= value;
 	localstackUsed += sizeof( intptr_t );
 }
-// RB end
 
-// RB begin
 /*
 ====================
 idInterpreter::PushVector
@@ -175,8 +164,6 @@ ID_INLINE void idInterpreter::PushVector( const idVec3& vector )
 	*( idVec3* )&localstack[ localstackUsed ] = vector;
 	localstackUsed += E_EVENT_SIZEOF_VEC;
 }
-// RB end
-
 
 /*
 ====================
@@ -281,6 +268,42 @@ ID_INLINE varEval_t idInterpreter::GetVariable( idVarDef* def )
 	{
 		return def->value;
 	}
+}
+
+/*
+================
+idInterpreter::GetEntity
+================
+*/
+ID_INLINE idEntity* idInterpreter::GetEntity( int entnum ) const
+{
+	assert( entnum <= MAX_GENTITIES );
+	if( ( entnum > 0 ) && ( entnum <= MAX_GENTITIES ) )
+	{
+		return gameLocal.entities[ entnum - 1 ];
+	}
+	return NULL;
+}
+
+/*
+================
+idInterpreter::GetScriptObject
+================
+*/
+ID_INLINE idScriptObject* idInterpreter::GetScriptObject( int entnum ) const
+{
+	idEntity* ent;
+
+	assert( entnum <= MAX_GENTITIES );
+	if( ( entnum > 0 ) && ( entnum <= MAX_GENTITIES ) )
+	{
+		ent = gameLocal.entities[ entnum - 1 ];
+		if( ent && ent->scriptObject.data )
+		{
+			return &ent->scriptObject;
+		}
+	}
+	return NULL;
 }
 
 /*

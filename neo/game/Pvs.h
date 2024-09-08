@@ -97,12 +97,6 @@ public:
 	void				ReadPVS( const pvsHandle_t handle, const idBitMsg& msg );
 #endif
 
-// RB begin
-#if defined(STANDALONE)
-	bool				CheckAreasForPortalSky( const pvsHandle_t handle, const idVec3& origin );
-#endif
-// RB end
-
 private:
 	int					numAreas;
 	int					numPortals;
@@ -113,9 +107,9 @@ private:
 	mutable pvsCurrent_t currentPVS[MAX_CURRENT_PVS];
 	// used to create PVS
 	int					portalVisBytes;
-	int					portalVisLongs;
+	int					portalVisInts;
 	int					areaVisBytes;
-	int					areaVisLongs;
+	int					areaVisInts;
 	struct pvsPortal_s* pvsPortals;
 	struct pvsArea_s* 	pvsAreas;
 

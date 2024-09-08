@@ -29,6 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __GAME_LOCAL_H__
 #define	__GAME_LOCAL_H__
 
+#include "GameBase.h"
+
 /*
 ===============================================================================
 
@@ -36,18 +38,6 @@ If you have questions concerning this license or the applicable additional terms
 
 ===============================================================================
 */
-
-#define LAGO_IMG_WIDTH 64
-#define LAGO_IMG_HEIGHT 64
-#define LAGO_WIDTH	64
-#define LAGO_HEIGHT	44
-#define LAGO_MATERIAL	"textures/sfx/lagometer"
-#define LAGO_IMAGE		"textures/sfx/lagometer.tga"
-
-// if set to 1 the server sends the client PVS with snapshots and the client compares against what it sees
-#ifndef ASYNC_WRITE_PVS
-	#define ASYNC_WRITE_PVS 0
-#endif
 
 #ifdef ID_DEBUG_UNINITIALIZED_MEMORY
 	// This is real evil but allows the code to inspect arbitrary class variables.
@@ -57,9 +47,6 @@ If you have questions concerning this license or the applicable additional terms
 
 extern idRenderWorld* 				gameRenderWorld;
 extern idSoundWorld* 				gameSoundWorld;
-
-// the "gameversion" client command will print this plus compile date
-#define	GAME_VERSION		"baseTekuum-1"
 
 // classes used by idGameLocal
 class idEntity;
@@ -77,13 +64,6 @@ class idProgram;
 class idThread;
 class idEditEntities;
 class idLocationEntity;
-
-#define	MAX_CLIENTS				32
-#define	GENTITYNUM_BITS			12
-#define	MAX_GENTITIES			(1<<GENTITYNUM_BITS)
-#define	ENTITYNUM_NONE			(MAX_GENTITIES-1)
-#define	ENTITYNUM_WORLD			(MAX_GENTITIES-2)
-#define	ENTITYNUM_MAX_NORMAL	(MAX_GENTITIES-2)
 
 //============================================================================
 
@@ -109,9 +89,6 @@ void gameError( const char* fmt, ... );
 
 //============================================================================
 
-const int MAX_GAME_MESSAGE_SIZE		= 8192;
-const int MAX_ENTITY_STATE_SIZE		= 512;
-const int ENTITY_PVS_SIZE			= ( ( MAX_GENTITIES + 31 ) >> 5 );
 const int NUM_RENDER_PORTAL_BITS	= idMath::BitsForInteger( PS_BLOCK_ALL );
 
 typedef struct entityState_s
@@ -251,50 +228,6 @@ private:
 	int						spawnId;
 };
 
-// RB begin
-#if defined(STANDALONE)
-struct timeState_t
-{
-	int					time;
-	int					previousTime;
-	int					realClientTime;
-
-	void				Set( int t, int pt, int rct )
-	{
-		time = t;
-		previousTime = pt;
-		realClientTime = rct;
-	};
-	void				Get( int& t, int& pt, int& rct )
-	{
-		t = time;
-		pt = previousTime;
-		rct = realClientTime;
-	};
-	void				Save( idSaveGame* savefile ) const
-	{
-		savefile->WriteInt( time );
-		savefile->WriteInt( previousTime );
-		savefile->WriteInt( realClientTime );
-	}
-	void				Restore( idRestoreGame* savefile )
-	{
-		savefile->ReadInt( time );
-		savefile->ReadInt( previousTime );
-		savefile->ReadInt( realClientTime );
-	}
-};
-
-enum slowmoState_t
-{
-	SLOWMO_STATE_OFF,
-	SLOWMO_STATE_RAMPUP,
-	SLOWMO_STATE_ON,
-	SLOWMO_STATE_RAMPDOWN
-};
-#endif
-// RB end
-
 //============================================================================
 
 class idGameLocal : public idGame
@@ -371,40 +304,6 @@ public:
 	idEntityPtr<idEntity>	lastGUIEnt;				// last entity with a GUI, used by Cmd_NextGUI_f
 	int						lastGUI;				// last GUI on the lastGUIEnt
 
-// RB begin
-#if defined(STANDALONE)
-	idEntityPtr<idEntity>	portalSkyEnt;
-	bool					portalSkyActive;
-
-	void					SetPortalSkyEnt( idEntity* ent );
-	bool					IsPortalSkyAcive();
-
-	timeState_t				fast;
-	timeState_t				slow;
-	int						selectedGroup;
-
-	slowmoState_t			slowmoState;
-	float					slowmoScale;
-
-	bool					quickSlowmoReset;
-
-	void					ComputeSlowScale();
-	void					RunTimeGroup2();
-
-	void					ResetSlowTimeVars();
-	void					QuickSlowmoReset();
-#endif
-
-	virtual void			SelectTimeGroup( int timeGroup );
-	virtual int				GetTimeGroupTime( int timeGroup );
-
-	virtual void			GetBestGameType( const char* map, const char* gametype, char buf[ MAX_STRING_CHARS ] );
-
-	void					Tokenize( idStrList& out, const char* in );
-
-	bool					NeedRestart();
-// RB end
-
 	// ---------------------- Public idGame Interface -------------------
 
 	idGameLocal();
@@ -448,8 +347,6 @@ public:
 	virtual void			SwitchTeam( int clientNum, int team );
 
 	virtual bool			DownloadRequest( const char* IP, const char* guid, const char* paks, char urls[ MAX_STRING_CHARS ] );
-
-	virtual void			GetMapLoadingGUI( char gui[ MAX_STRING_CHARS ] );
 
 	// ---------------------- Public idGameLocal Interface -------------------
 
@@ -500,15 +397,6 @@ public:
 	bool					InPlayerPVS( idEntity* ent ) const;
 	bool					InPlayerConnectedArea( idEntity* ent ) const;
 
-// RB begin
-#if defined(STANDALONE)
-	pvsHandle_t				GetPlayerPVS()
-	{
-		return playerPVS;
-	};
-#endif
-// RB end
-
 	void					SetCamera( idCamera* cam );
 	idCamera* 				GetCamera() const;
 	bool					SkipCinematic();
@@ -544,17 +432,15 @@ public:
 	int						GetFrameNum() const
 	{
 		return framenum;
-	}
-
+	};
 	int						GetTime() const
 	{
 		return time;
-	}
-
+	};
 	int						GetFrameTime() const
 	{
 		return ( time - previousTime );
-	}
+	};
 
 	int						GetNextClientNum( int current ) const;
 	idPlayer* 				GetClientByNum( int current ) const;
@@ -584,6 +470,8 @@ public:
 	{
 		return nextGibTime;
 	};
+
+	bool					NeedRestart();
 
 private:
 	const static int		INITIAL_SPAWN_COUNT = 1;
@@ -655,7 +543,6 @@ private:
 	void					RunDebugInfo();
 
 	void					InitScriptForMap();
-	void					SetScriptFPS( const float com_engineHz );
 
 	void					InitConsoleCommands();
 	void					ShutdownConsoleCommands();
@@ -681,13 +568,29 @@ private:
 	void					DumpOggSounds();
 	void					GetShakeSounds( const idDict* dict );
 
+	virtual void			SelectTimeGroup( int timeGroup );
+	virtual int				GetTimeGroupTime( int timeGroup );
+	virtual void			GetBestGameType( const char* map, const char* gametype, char buf[ MAX_STRING_CHARS ] );
+
+	void					Tokenize( idStrList& out, const char* in );
+
 	void					UpdateLagometer( int aheadOfServer, int dupeUsercmds );
+
+	virtual void			GetMapLoadingGUI( char gui[ MAX_STRING_CHARS ] );
 };
 
 //============================================================================
 
 extern idGameLocal			gameLocal;
 extern idAnimManager		animationLib;
+
+//============================================================================
+
+class idGameError : public idException
+{
+public:
+	idGameError( const char* text ) : idException( text ) {}
+};
 
 //============================================================================
 
@@ -750,7 +653,7 @@ template< class type >
 ID_INLINE type* idEntityPtr<type>::GetEntity() const
 {
 	int entityNum = spawnId & ( ( 1 << GENTITYNUM_BITS ) - 1 );
-	if( ( gameLocal.spawnIds[ entityNum ] == ( spawnId >> GENTITYNUM_BITS ) ) )
+	if( gameLocal.spawnIds[ entityNum ] == ( spawnId >> GENTITYNUM_BITS ) )
 	{
 		return static_cast<type*>( gameLocal.entities[ entityNum ] );
 	}
@@ -763,16 +666,7 @@ ID_INLINE int idEntityPtr<type>::GetEntityNum() const
 	return ( spawnId & ( ( 1 << GENTITYNUM_BITS ) - 1 ) );
 }
 
-//============================================================================
-
-class idGameError : public idException
-{
-public:
-	idGameError( const char* text ) : idException( text ) {}
-};
-
-//============================================================================
-
+//  ===========================================================================
 
 //
 // these defines work for all startsounds from all entity types
@@ -798,25 +692,7 @@ typedef enum
 	SND_CHANNEL_DAMAGE
 } gameSoundChannel_t;
 
-// content masks
-#define	MASK_ALL					(-1)
-#define	MASK_SOLID					(CONTENTS_SOLID)
-#define	MASK_MONSTERSOLID			(CONTENTS_SOLID|CONTENTS_MONSTERCLIP|CONTENTS_BODY)
-#define	MASK_PLAYERSOLID			(CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_BODY)
-#define	MASK_DEADSOLID				(CONTENTS_SOLID|CONTENTS_PLAYERCLIP)
-#define	MASK_WATER					(CONTENTS_WATER)
-#define	MASK_OPAQUE					(CONTENTS_OPAQUE)
-#define	MASK_SHOT_RENDERMODEL		(CONTENTS_SOLID|CONTENTS_RENDERMODEL)
-#define	MASK_SHOT_BOUNDINGBOX		(CONTENTS_SOLID|CONTENTS_BODY)
-
 const float DEFAULT_GRAVITY			= 1066.0f;
-
-#if defined(STANDALONE)
-	#define DEFAULT_GRAVITY_STRING		"-1066"	// RB: added - sign because of 3 directions gravity
-#else
-	#define DEFAULT_GRAVITY_STRING		"1066"
-#endif
-
 const idVec3 DEFAULT_GRAVITY_VEC3( 0, 0, -DEFAULT_GRAVITY );
 
 const int	CINEMATIC_SKIP_DELAY	= SEC2MS( 2.0f );
@@ -826,11 +702,6 @@ const int	CINEMATIC_SKIP_DELAY	= SEC2MS( 2.0f );
 #include "physics/Force.h"
 #include "physics/Force_Constant.h"
 #include "physics/Force_Drag.h"
-// RB begin
-#if defined(STANDALONE)
-	#include "physics/Force_Grab.h"
-#endif
-// RB end
 #include "physics/Force_Field.h"
 #include "physics/Force_Spring.h"
 #include "physics/Physics.h"
@@ -848,11 +719,6 @@ const int	CINEMATIC_SKIP_DELAY	= SEC2MS( 2.0f );
 
 #include "Entity.h"
 #include "GameEdit.h"
-// RB begin
-#if defined(STANDALONE)
-	#include "Grabber.h"
-#endif
-// RB end
 #include "AF.h"
 #include "IK.h"
 #include "AFEntity.h"
@@ -875,9 +741,6 @@ const int	CINEMATIC_SKIP_DELAY	= SEC2MS( 2.0f );
 #include "Fx.h"
 #include "SecurityCamera.h"
 #include "BrittleFracture.h"
-// RB begin
-#include "Portal.h"
-// RB end
 
 #include "ai/AI.h"
 #include "anim/Anim_Testmodel.h"

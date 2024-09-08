@@ -516,6 +516,17 @@ void idLight::SetColor( float red, float green, float blue )
 idLight::SetColor
 ================
 */
+void idLight::SetColor( const idVec3& color )
+{
+	baseColor = color;
+	SetLightLevel();
+}
+
+/*
+================
+idLight::SetColor
+================
+*/
 void idLight::SetColor( const idVec4& color )
 {
 	baseColor = color.ToVec3();
@@ -1155,14 +1166,14 @@ void idLight::WriteToSnapshot( idBitMsgDelta& msg ) const
 	WriteBindToSnapshot( msg );
 
 	msg.WriteByte( currentLevel );
-	msg.WriteLong( PackColor( baseColor ) );
+	msg.WriteInt( PackColor( baseColor ) );
 	// msg.WriteBits( lightParent.GetEntityNum(), GENTITYNUM_BITS );
 
 	/*	// only helps prediction
-		msg.WriteLong( PackColor( fadeFrom ) );
-		msg.WriteLong( PackColor( fadeTo ) );
-		msg.WriteLong( fadeStart );
-		msg.WriteLong( fadeEnd );
+		msg.WriteInt( PackColor( fadeFrom ) );
+		msg.WriteInt( PackColor( fadeTo ) );
+		msg.WriteInt( fadeStart );
+		msg.WriteInt( fadeEnd );
 	*/
 
 	// FIXME: send renderLight.shader
@@ -1170,13 +1181,13 @@ void idLight::WriteToSnapshot( idBitMsgDelta& msg ) const
 	msg.WriteFloat( renderLight.lightRadius[1], 5, 10 );
 	msg.WriteFloat( renderLight.lightRadius[2], 5, 10 );
 
-	msg.WriteLong( PackColor( idVec4( renderLight.shaderParms[SHADERPARM_RED],
-									  renderLight.shaderParms[SHADERPARM_GREEN],
-									  renderLight.shaderParms[SHADERPARM_BLUE],
-									  renderLight.shaderParms[SHADERPARM_ALPHA] ) ) );
+	msg.WriteInt( PackColor( idVec4( renderLight.shaderParms[SHADERPARM_RED],
+									 renderLight.shaderParms[SHADERPARM_GREEN],
+									 renderLight.shaderParms[SHADERPARM_BLUE],
+									 renderLight.shaderParms[SHADERPARM_ALPHA] ) ) );
 
 	msg.WriteFloat( renderLight.shaderParms[SHADERPARM_TIMESCALE], 5, 10 );
-	msg.WriteLong( renderLight.shaderParms[SHADERPARM_TIMEOFFSET] );
+	msg.WriteInt( renderLight.shaderParms[SHADERPARM_TIMEOFFSET] );
 	//msg.WriteByte( renderLight.shaderParms[SHADERPARM_DIVERSITY] );
 	msg.WriteShort( renderLight.shaderParms[SHADERPARM_MODE] );
 
@@ -1212,14 +1223,14 @@ void idLight::ReadFromSnapshot( const idBitMsgDelta& msg )
 			Off();
 		}
 	}
-	UnpackColor( msg.ReadLong(), baseColor );
+	UnpackColor( msg.ReadInt(), baseColor );
 	// lightParentEntityNum = msg.ReadBits( GENTITYNUM_BITS );
 
 	/*	// only helps prediction
-		UnpackColor( msg.ReadLong(), fadeFrom );
-		UnpackColor( msg.ReadLong(), fadeTo );
-		fadeStart = msg.ReadLong();
-		fadeEnd = msg.ReadLong();
+		UnpackColor( msg.ReadInt(), fadeFrom );
+		UnpackColor( msg.ReadInt(), fadeTo );
+		fadeStart = msg.ReadInt();
+		fadeEnd = msg.ReadInt();
 	*/
 
 	// FIXME: read renderLight.shader
@@ -1227,14 +1238,14 @@ void idLight::ReadFromSnapshot( const idBitMsgDelta& msg )
 	renderLight.lightRadius[1] = msg.ReadFloat( 5, 10 );
 	renderLight.lightRadius[2] = msg.ReadFloat( 5, 10 );
 
-	UnpackColor( msg.ReadLong(), shaderColor );
+	UnpackColor( msg.ReadInt(), shaderColor );
 	renderLight.shaderParms[SHADERPARM_RED] = shaderColor[0];
 	renderLight.shaderParms[SHADERPARM_GREEN] = shaderColor[1];
 	renderLight.shaderParms[SHADERPARM_BLUE] = shaderColor[2];
 	renderLight.shaderParms[SHADERPARM_ALPHA] = shaderColor[3];
 
 	renderLight.shaderParms[SHADERPARM_TIMESCALE] = msg.ReadFloat( 5, 10 );
-	renderLight.shaderParms[SHADERPARM_TIMEOFFSET] = msg.ReadLong();
+	renderLight.shaderParms[SHADERPARM_TIMEOFFSET] = msg.ReadInt();
 	//renderLight.shaderParms[SHADERPARM_DIVERSITY] = msg.ReadFloat();
 	renderLight.shaderParms[SHADERPARM_MODE] = msg.ReadShort();
 
@@ -1270,9 +1281,8 @@ bool idLight::ClientReceiveEvent( int event, int time, const idBitMsg& msg )
 			return true;
 		}
 		default:
-		{
-			return idEntity::ClientReceiveEvent( event, time, msg );
-		}
+			break;
 	}
-	return false;
+
+	return idEntity::ClientReceiveEvent( event, time, msg );
 }

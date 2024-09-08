@@ -310,7 +310,7 @@ void R_SetupDrawSurfShader( drawSurf_t* drawSurf, const idMaterial* shader, cons
 #else
 			renderEntity->referenceShader->EvaluateRegisters( refRegs, renderEntity->shaderParms,
 					tr.viewDef->renderView.shaderParms,
-					tr.viewDef->renderView.time[TIME_GROUP1] * 0.001f, renderEntity->referenceSound );
+					tr.viewDef->renderView.time[0] * 0.001f, renderEntity->referenceSound );
 #endif
 // RB end
 
@@ -336,7 +336,7 @@ void R_SetupDrawSurfShader( drawSurf_t* drawSurf, const idMaterial* shader, cons
 								   tr.viewDef->renderView.time[renderEntity->timeGroup] * 0.001f, renderEntity->referenceSound );
 #else
 		shader->EvaluateRegisters( regs, shaderParms, tr.viewDef->renderView.shaderParms,
-								   tr.viewDef->renderView.time[TIME_GROUP1] * 0.001f, renderEntity->referenceSound );
+								   tr.viewDef->renderView.time[0] * 0.001f, renderEntity->referenceSound );
 #endif
 // RB end
 	}

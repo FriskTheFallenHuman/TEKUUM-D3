@@ -3035,14 +3035,14 @@ bool idFileSystemLocal::UpdateGamePakChecksums()
 
 	// some sanity checks on the game code references
 	// make sure that at least the local OS got a pure reference
-	if( !gamePakForOS[ BUILD_OS_ID ] )
+	if( !gamePakForOS[ OS_ID ] )
 	{
 		common->Warning( "No game code pak reference found for the local OS" );
 		return false;
 	}
 
 	if( !cvarSystem->GetCVarBool( "net_serverAllowServerMod" ) &&
-			gamePakChecksum != gamePakForOS[ BUILD_OS_ID ] )
+			gamePakChecksum != gamePakForOS[ OS_ID ] )
 	{
 		common->Warning( "The current game code doesn't match pak files (net_serverAllowServerMod is off)" );
 		return false;

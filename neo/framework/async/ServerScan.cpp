@@ -628,13 +628,13 @@ bool idServerScan::IsFiltered( const networkServer_t server )
 	keyval = server.serverInfo.FindKey( "si_pure" );
 	if( keyval && !idStr::Cmp( keyval->GetValue(), "1" ) )
 	{
-		if( ( server.OSMask & ( 1 << BUILD_OS_ID ) ) == 0 )
+		if( ( server.OSMask & ( 1 << OS_ID ) ) == 0 )
 		{
 			return true;
 		}
 	}
 #else
-	if( ( server.OSMask & ( 1 << BUILD_OS_ID ) ) == 0 )
+	if( ( server.OSMask & ( 1 << OS_ID ) ) == 0 )
 	{
 		return true;
 	}

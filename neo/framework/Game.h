@@ -37,19 +37,6 @@ If you have questions concerning this license or the applicable additional terms
 ===============================================================================
 */
 
-// default scripts
-// RB begin
-#if defined(USE_DOOMSHARP)
-	#define SCRIPT_DEFAULTDEFS			"scriptsharp/doom_defs.script"
-	#define SCRIPT_DEFAULT				"scriptsharp/doom_main.script"
-	#define SCRIPT_DEFAULTFUNC			"main"
-#else
-	#define SCRIPT_DEFAULTDEFS			"script/doom_defs.script"
-	#define SCRIPT_DEFAULT				"script/doom_main.script"
-	#define SCRIPT_DEFAULTFUNC			"doom_main"
-#endif
-// RB end
-
 typedef struct
 {
 	char		sessionCommand[MAX_STRING_CHARS];	// "map", "disconnect", "victory", etc
@@ -76,9 +63,6 @@ typedef enum
 	ESC_MAIN,		// start main menu GUI
 	ESC_GUI			// set an explicit GUI
 } escReply_t;
-
-#define TIME_GROUP1		0
-#define TIME_GROUP2		1
 
 class idGame
 {
@@ -333,7 +317,7 @@ extern idGameEdit* 				gameEdit;
 ===============================================================================
 */
 
-const int GAME_API_VERSION		= 8;
+const int GAME_API_VERSION		= 9;
 
 typedef struct
 {

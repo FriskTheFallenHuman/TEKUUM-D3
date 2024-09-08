@@ -43,10 +43,7 @@ idPlayerView::idPlayerView()
 	memset( &view, 0, sizeof( view ) );
 	player = NULL;
 	dvMaterial = declManager->FindMaterial( "_scratch" );
-
-	//tunnelMaterial = declManager->FindMaterial( "textures/decals/tunnel" );
-	tunnelMaterial = declManager->FindMaterial( "postprocess/chromatic_aberration/blurred" );
-
+	tunnelMaterial = declManager->FindMaterial( "textures/decals/tunnel" );
 	armorMaterial = declManager->FindMaterial( "armorViewEffect" );
 	berserkMaterial = declManager->FindMaterial( "textures/decals/berserk" );
 	irGogglesMaterial = declManager->FindMaterial( "textures/decals/irblend" );
@@ -234,88 +231,90 @@ which will determine the head kick direction
 */
 void idPlayerView::DamageImpulse( idVec3 localKickDir, const idDict* damageDef )
 {
-	//
-	// double vision effect
-	//
-	if( lastDamageTime > 0.0f && SEC2MS( lastDamageTime ) + IMPULSE_DELAY > gameLocal.time )
+	if( g_hitEffect.GetBool() )
 	{
-		// keep shotgun from obliterating the view
-		return;
-	}
-
-	float	dvTime = damageDef->GetFloat( "dv_time" );
-	if( dvTime )
-	{
-		if( dvFinishTime < gameLocal.time )
+		//
+		// double vision effect
+		//
+		if( lastDamageTime > 0.0f && SEC2MS( lastDamageTime ) + IMPULSE_DELAY > gameLocal.time )
 		{
-			dvFinishTime = gameLocal.time;
+			// keep shotgun from obliterating the view
+			return;
 		}
-		dvFinishTime += g_dvTime.GetFloat() * dvTime;
-		// don't let it add up too much in god mode
-		if( dvFinishTime > gameLocal.time + 5000 )
+
+		float	dvTime = damageDef->GetFloat( "dv_time" );
+		if( dvTime )
 		{
-			dvFinishTime = gameLocal.time + 5000;
+			if( dvFinishTime < gameLocal.time )
+			{
+				dvFinishTime = gameLocal.time;
+			}
+			dvFinishTime += g_dvTime.GetFloat() * dvTime;
+			// don't let it add up too much in god mode
+			if( dvFinishTime > gameLocal.time + 5000 )
+			{
+				dvFinishTime = gameLocal.time + 5000;
+			}
 		}
-	}
 
-	//
-	// head angle kick
-	//
-	float	kickTime = damageDef->GetFloat( "kick_time" );
-	if( kickTime )
-	{
-		kickFinishTime = gameLocal.time + g_kickTime.GetFloat() * kickTime;
-
-		// forward / back kick will pitch view
-		kickAngles[0] = localKickDir[0];
-
-		// side kick will yaw view
-		kickAngles[1] = localKickDir[1] * 0.5f;
-
-		// up / down kick will pitch view
-		kickAngles[0] += localKickDir[2];
-
-		// roll will come from  side
-		kickAngles[2] = localKickDir[1];
-
-		float kickAmplitude = damageDef->GetFloat( "kick_amplitude" );
-		if( kickAmplitude )
+		//
+		// head angle kick
+		//
+		float	kickTime = damageDef->GetFloat( "kick_time" );
+		if( kickTime )
 		{
-			kickAngles *= kickAmplitude;
+			kickFinishTime = gameLocal.time + g_kickTime.GetFloat() * kickTime;
+
+			// forward / back kick will pitch view
+			kickAngles[0] = localKickDir[0];
+
+			// side kick will yaw view
+			kickAngles[1] = localKickDir[1] * 0.5f;
+
+			// up / down kick will pitch view
+			kickAngles[0] += localKickDir[2];
+
+			// roll will come from  side
+			kickAngles[2] = localKickDir[1];
+
+			float kickAmplitude = damageDef->GetFloat( "kick_amplitude" );
+			if( kickAmplitude )
+			{
+				kickAngles *= kickAmplitude;
+			}
 		}
+
+		//
+		// screen blob
+		//
+		float	blobTime = damageDef->GetFloat( "blob_time" );
+		if( blobTime )
+		{
+			screenBlob_t* blob = GetScreenBlob();
+			blob->startFadeTime = gameLocal.time;
+			blob->finishTime = gameLocal.time + blobTime * g_blobTime.GetFloat();
+
+			const char* materialName = damageDef->GetString( "mtr_blob" );
+			blob->material = declManager->FindMaterial( materialName );
+			blob->x = damageDef->GetFloat( "blob_x" );
+			blob->x += ( gameLocal.random.RandomInt() & 63 ) - 32;
+			blob->y = damageDef->GetFloat( "blob_y" );
+			blob->y += ( gameLocal.random.RandomInt() & 63 ) - 32;
+
+			float scale = ( 256 + ( ( gameLocal.random.RandomInt() & 63 ) - 32 ) ) / 256.0f;
+			blob->w = damageDef->GetFloat( "blob_width" ) * g_blobSize.GetFloat() * scale;
+			blob->h = damageDef->GetFloat( "blob_height" ) * g_blobSize.GetFloat() * scale;
+			blob->s1 = 0;
+			blob->t1 = 0;
+			blob->s2 = 1;
+			blob->t2 = 1;
+		}
+
+		//
+		// save lastDamageTime for tunnel vision accentuation
+		//
+		lastDamageTime = MS2SEC( gameLocal.time );
 	}
-
-	//
-	// screen blob
-	//
-	float	blobTime = damageDef->GetFloat( "blob_time" );
-	if( blobTime )
-	{
-		screenBlob_t*	blob = GetScreenBlob();
-		blob->startFadeTime = gameLocal.time;
-		blob->finishTime = gameLocal.time + blobTime * g_blobTime.GetFloat();
-
-		const char* materialName = damageDef->GetString( "mtr_blob" );
-		blob->material = declManager->FindMaterial( materialName );
-		blob->x = damageDef->GetFloat( "blob_x" );
-		blob->x += ( gameLocal.random.RandomInt() & 63 ) - 32;
-		blob->y = damageDef->GetFloat( "blob_y" );
-		blob->y += ( gameLocal.random.RandomInt() & 63 ) - 32;
-
-		float scale = ( 256 + ( ( gameLocal.random.RandomInt() & 63 ) - 32 ) ) / 256.0f;
-		blob->w = damageDef->GetFloat( "blob_width" ) * g_blobSize.GetFloat() * scale;
-		blob->h = damageDef->GetFloat( "blob_height" ) * g_blobSize.GetFloat() * scale;
-		blob->s1 = 0;
-		blob->t1 = 0;
-		blob->s2 = 1;
-		blob->t2 = 1;
-	}
-
-	//
-	// save lastDamageTime for tunnel vision accentuation
-	//
-	lastDamageTime = MS2SEC( gameLocal.time );
-
 }
 
 /*
@@ -462,6 +461,7 @@ idPlayerView::SingleView
 */
 void idPlayerView::SingleView( idUserInterface* hud, const renderView_t* view )
 {
+
 	// normal rendering
 	if( !view )
 	{
@@ -513,8 +513,19 @@ void idPlayerView::SingleView( idUserInterface* hud, const renderView_t* view )
 				renderSystem->DrawStretchPic( blob->x, blob->y, blob->w, blob->h, blob->s1, blob->t1, blob->s2, blob->t2, blob->material );
 			}
 		}
+		player->DrawHUD( hud );
 
-		// RB: chromatic tunnel vision
+		// armor impulse feedback
+		float	armorPulse = ( gameLocal.time - player->lastArmorPulse ) / 250.0f;
+
+		if( armorPulse > 0.0f && armorPulse < 1.0f )
+		{
+			renderSystem->SetColor4( 1, 1, 1, 1.0 - armorPulse );
+			renderSystem->DrawStretchPic( 0, 0, 640, 480, 0, 0, 1, 1, armorMaterial );
+		}
+
+
+		// tunnel vision
 		float	health = 0.0f;
 		if( g_testHealthVision.GetFloat() != 0.0f )
 		{
@@ -555,21 +566,6 @@ void idPlayerView::SingleView( idUserInterface* hud, const renderView_t* view )
 
 			renderSystem->DrawStretchPic( 0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 0.0f, 1.0f, 1.0f, tunnelMaterial );
 		}
-		// RB end
-
-		player->DrawHUD( hud );
-
-		// armor impulse feedback
-		float	armorPulse = ( gameLocal.time - player->lastArmorPulse ) / 250.0f;
-
-		if( armorPulse > 0.0f && armorPulse < 1.0f )
-		{
-			renderSystem->SetColor4( 1, 1, 1, 1.0 - armorPulse );
-			renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 1, 1, armorMaterial );
-		}
-
-
-
 
 		if( player->PowerUpActive( BERSERK ) )
 		{
@@ -579,14 +575,14 @@ void idPlayerView::SingleView( idUserInterface* hud, const renderView_t* view )
 				// start fading if within 10 seconds of going away
 				alpha = ( berserkTime < 10000 ) ? ( float )berserkTime / 10000 : 1.0f;
 				renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, alpha );
-				renderSystem->DrawStretchPic( 0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 0.0f, 1.0f, 1.0f, berserkMaterial );
+				renderSystem->DrawStretchPic( 0.0f, 0.0f, 640.0f, 480.0f, 0.0f, 0.0f, 1.0f, 1.0f, berserkMaterial );
 			}
 		}
 
 		if( bfgVision )
 		{
 			renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
-			renderSystem->DrawStretchPic( 0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 0.0f, 1.0f, 1.0f, bfgMaterial );
+			renderSystem->DrawStretchPic( 0.0f, 0.0f, 640.0f, 480.0f, 0.0f, 0.0f, 1.0f, 1.0f, bfgMaterial );
 		}
 
 	}
@@ -603,28 +599,10 @@ void idPlayerView::SingleView( idUserInterface* hud, const renderView_t* view )
 		else
 		{
 			renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
-			renderSystem->DrawStretchPic( 0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, 0.0f, 0.0f, 1.0f, 1.0f, mtr );
+			renderSystem->DrawStretchPic( 0.0f, 0.0f, 640.0f, 480.0f, 0.0f, 0.0f, 1.0f, 1.0f, mtr );
 		}
 	}
 }
-
-// RB begin
-void idPlayerView::SingleViewOrStereo( idUserInterface* hud, const renderView_t* view )
-{
-	if( renderSystem->GetStereo3DMode() != STEREO3D_OFF )
-	{
-		// render both eye views each frame on the PC
-		for( int eye = 1 ; eye >= -1 ; eye -= 2 )
-		{
-			EmitStereoEyeView( eye, hud );
-		}
-	}
-	else
-	{
-		SingleView( hud, view );
-	}
-}
-// RB end
 
 /*
 ===================
@@ -633,6 +611,7 @@ idPlayerView::DoubleVision
 */
 void idPlayerView::DoubleVision( idUserInterface* hud, const renderView_t* view, int offset )
 {
+
 	if( !g_doubleVision.GetBool() )
 	{
 		SingleView( hud, view );
@@ -648,10 +627,10 @@ void idPlayerView::DoubleVision( idUserInterface* hud, const renderView_t* view,
 	shift = fabs( shift );
 
 	// if double vision, render to a texture
-	//renderSystem->CropRenderSize( 512, 256, true );
-	SingleViewOrStereo( hud, view );
+	renderSystem->CropRenderSize( 512, 256, true );
+	SingleView( hud, view );
 	renderSystem->CaptureRenderToImage( "_scratch" );
-	//renderSystem->UnCrop();
+	renderSystem->UnCrop();
 
 	// carry red tint if in berserk mode
 	idVec4 color( 1, 1, 1, 1 );
@@ -674,10 +653,10 @@ idPlayerView::BerserkVision
 */
 void idPlayerView::BerserkVision( idUserInterface* hud, const renderView_t* view )
 {
-	//renderSystem->CropRenderSize( 512, 256, true );
-	SingleViewOrStereo( hud, view );
+	renderSystem->CropRenderSize( 512, 256, true );
+	SingleView( hud, view );
 	renderSystem->CaptureRenderToImage( "_scratch" );
-	//renderSystem->UnCrop();
+	renderSystem->UnCrop();
 	renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
 	renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 1, 1, 0, dvMaterial );
 }
@@ -706,11 +685,6 @@ assumes: color.w is 0 or 1
 */
 void idPlayerView::Fade( idVec4 color, int time )
 {
-// RB begin
-#if defined(STANDALONE)
-	SetTimeState ts( player->timeGroup );
-#endif
-// RB end
 
 	if( !fadeTime )
 	{
@@ -758,12 +732,6 @@ void idPlayerView::ScreenFade()
 		return;
 	}
 
-// RB begin
-#if defined(STANDALONE)
-	SetTimeState ts( player->timeGroup );
-#endif
-// RB end
-
 	msec = fadeTime - gameLocal.realClientTime;
 
 	if( msec <= 0 )
@@ -783,7 +751,7 @@ void idPlayerView::ScreenFade()
 	if( fadeColor[ 3 ] != 0.0f )
 	{
 		renderSystem->SetColor4( fadeColor[ 0 ], fadeColor[ 1 ], fadeColor[ 2 ], fadeColor[ 3 ] );
-		renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_WIDTH, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
+		renderSystem->DrawStretchPic( 0, 0, 640, 480, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
 	}
 }
 
@@ -808,14 +776,14 @@ void idPlayerView::InfluenceVision( idUserInterface* hud, const renderView_t* vi
 	}
 	if( player->GetInfluenceMaterial() )
 	{
-		SingleViewOrStereo( hud, view );
+		SingleView( hud, view );
 		renderSystem->CaptureRenderToImage( "_currentRender" );
 		renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, pct );
-		renderSystem->DrawStretchPic( 0.0f, 0.0f, SCREEN_WIDTH, SCREEN_WIDTH, 0.0f, 0.0f, 1.0f, 1.0f, player->GetInfluenceMaterial() );
+		renderSystem->DrawStretchPic( 0.0f, 0.0f, 640.0f, 480.0f, 0.0f, 0.0f, 1.0f, 1.0f, player->GetInfluenceMaterial() );
 	}
 	else if( player->GetInfluenceEntity() == NULL )
 	{
-		SingleViewOrStereo( hud, view );
+		SingleView( hud, view );
 		return;
 	}
 	else
@@ -824,133 +792,6 @@ void idPlayerView::InfluenceVision( idUserInterface* hud, const renderView_t* vi
 		DoubleVision( hud, view, pct * offset );
 	}
 }
-
-// RB begin
-idCVar	stereoRender_interOccularCentimeters( "stereoRender_interOccularCentimeters", "3.0", CVAR_ARCHIVE | CVAR_RENDERER, "Distance between eyes" );
-idCVar	stereoRender_convergence( "stereoRender_convergence", "6", CVAR_RENDERER, "0 = head mounted display, otherwise world units to convergence plane" );
-
-// In a head mounted display with separate displays for each eye,
-// screen separation will be zero and world separation will be the eye distance.
-struct stereoDistances_t
-{
-	// Offset to projection matrix, positive one eye, negative the other.
-	// Total distance is twice this, so 0.05 would give a 10% of screen width
-	// separation for objects at infinity.
-	float	screenSeparation;
-
-	// Game world units from one eye to the centerline.
-	// Total distance is twice this.
-	float	worldSeparation;
-};
-
-float CentimetersToInches( const float cm )
-{
-	return cm / 2.54f;
-}
-
-float CentimetersToWorldUnits( const float cm )
-{
-	// In Doom 3, one world unit == one inch
-	return CentimetersToInches( cm );
-}
-
-float	CalculateWorldSeparation(
-	const float screenSeparation,
-	const float convergenceDistance,
-	const float fov_x_degrees )
-{
-
-	const float fovRadians = DEG2RAD( fov_x_degrees );
-	const float screen = tan( fovRadians * 0.5f ) * fabs( screenSeparation );
-	const float worldSeparation = screen * convergenceDistance / 0.5f;
-
-	return worldSeparation;
-}
-
-stereoDistances_t	CaclulateStereoDistances(
-	const float	interOcularCentimeters,		// distance between two eyes, typically 6.0 - 7.0
-	const float screenWidthCentimeters,		// read from operating system
-	const float convergenceWorldUnits,		// pass 0 for head mounted display mode
-	const float	fov_x_degrees )  			// edge to edge horizontal field of view, typically 60 - 90
-{
-
-	stereoDistances_t	dists = {};
-
-	if( convergenceWorldUnits == 0.0f )
-	{
-		// head mounted display mode
-		dists.worldSeparation = CentimetersToInches( interOcularCentimeters * 0.5 );
-		dists.screenSeparation = 0.0f;
-		return dists;
-	}
-
-	// 3DTV mode
-	dists.screenSeparation = 0.5f * interOcularCentimeters / screenWidthCentimeters;
-	dists.worldSeparation = CalculateWorldSeparation( dists.screenSeparation, convergenceWorldUnits, fov_x_degrees );
-
-	return dists;
-}
-
-float	GetScreenSeparationForGuis()
-{
-	const stereoDistances_t dists = CaclulateStereoDistances(
-										stereoRender_interOccularCentimeters.GetFloat(),
-										renderSystem->GetPhysicalScreenWidthInCentimeters(),
-										stereoRender_convergence.GetFloat(),
-										80.0f /* fov */ );
-
-	return dists.screenSeparation;
-}
-
-/*
-===================
-idPlayerView::EmitStereoEyeView
-===================
-*/
-void idPlayerView::EmitStereoEyeView( const int eye, idUserInterface* hud )
-{
-	renderView_t* view = player->GetRenderView();
-	if( view == NULL )
-	{
-		return;
-	}
-
-	renderView_t eyeView = *view;
-
-	const stereoDistances_t dists = CaclulateStereoDistances(
-										stereoRender_interOccularCentimeters.GetFloat(),
-										renderSystem->GetPhysicalScreenWidthInCentimeters(),
-										stereoRender_convergence.GetFloat(),
-										view->fov_x );
-
-	eyeView.vieworg += eye * dists.worldSeparation * eyeView.viewaxis[1];
-	eyeView.viewEyeBuffer = cvarSystem->GetCVarBool( "stereoRender_swapEyes" ) ? eye : -eye;
-	eyeView.stereoScreenSeparation = eye * dists.screenSeparation;
-
-	SingleView( hud, &eyeView );
-}
-
-/*
-===================
-IsGameStereoRendered
-
-The crosshair is swapped for a laser sight in stereo rendering
-===================
-*/
-bool	IsGameStereoRendered()
-{
-	if( renderSystem->GetStereo3DMode() != STEREO3D_OFF )
-	{
-		return true;
-	}
-	return false;
-}
-
-int EyeForHalfRateFrame( const int frameCount )
-{
-	return ( renderSystem->GetFrameCount() & 1 ) ? -1 : 1;
-}
-// RB end
 
 /*
 ===================
@@ -963,7 +804,7 @@ void idPlayerView::RenderPlayerView( idUserInterface* hud )
 
 	if( g_skipViewEffects.GetBool() )
 	{
-		SingleViewOrStereo( hud, view );
+		SingleView( hud, view );
 	}
 	else
 	{
@@ -981,9 +822,8 @@ void idPlayerView::RenderPlayerView( idUserInterface* hud )
 		}
 		else
 		{
-			SingleViewOrStereo( hud, view );
+			SingleView( hud, view );
 		}
-
 		ScreenFade();
 	}
 
@@ -993,4 +833,3 @@ void idPlayerView::RenderPlayerView( idUserInterface* hud )
 		renderSystem->DrawStretchPic( 10.0f, 380.0f, 64.0f, 64.0f, 0.0f, 0.0f, 1.0f, 1.0f, lagoMaterial );
 	}
 }
-

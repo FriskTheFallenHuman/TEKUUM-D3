@@ -160,7 +160,7 @@ public:	// common physics interface
 	virtual const contactInfo_t& GetContact( int num ) const = 0;
 	virtual void				ClearContacts() = 0;
 	virtual void				AddContactEntity( idEntity* e ) = 0;
-	virtual void 				RemoveContactEntity( idEntity* e ) = 0;
+	virtual void				RemoveContactEntity( idEntity* e ) = 0;
 	// ground contacts
 	virtual bool				HasGroundContacts() const = 0;
 	virtual bool				IsGroundEntity( int entityNum ) const = 0;

@@ -103,7 +103,7 @@ public:
 	const idVec3& 			PlayerGetOrigin() const;	// != GetOrigin
 
 public:	// common physics interface
-	virtual bool			Evaluate( int timeStepMSec, int endTimeMSec );
+	bool					Evaluate( int timeStepMSec, int endTimeMSec );
 	void					UpdateTime( int endTimeMSec );
 	int						GetTime() const;
 
@@ -134,7 +134,7 @@ public:	// common physics interface
 	void					WriteToSnapshot( idBitMsgDelta& msg ) const;
 	void					ReadFromSnapshot( const idBitMsgDelta& msg );
 
-protected: // RB: was private
+private:
 	// player physics state
 	playerPState_t			current;
 	playerPState_t			saved;
@@ -171,7 +171,7 @@ protected: // RB: was private
 	waterLevel_t			waterLevel;
 	int						waterType;
 
-protected: // RB: was private
+private:
 	float					CmdScale( const usercmd_t& cmd ) const;
 	void					Accelerate( const idVec3& wishdir, const float wishspeed, const float accel );
 	bool					SlideMove( bool gravity, bool stepUp, bool stepDown, bool push );
@@ -180,61 +180,20 @@ protected: // RB: was private
 	void					WaterMove();
 	void					FlyMove();
 	void					AirMove();
-	virtual void			WalkMove();
+	void					WalkMove();
 	void					DeadMove();
 	void					NoclipMove();
 	void					SpectatorMove();
 	void					LadderMove();
-	virtual void			CorrectAllSolid( trace_t& trace, int contents );
-	virtual void			CheckGround();
+	void					CorrectAllSolid( trace_t& trace, int contents );
+	void					CheckGround();
 	void					CheckDuck();
 	void					CheckLadder();
 	bool					CheckJump();
 	bool					CheckWaterJump();
 	void					SetWaterLevel();
 	void					DropTimers();
-	virtual void			MovePlayer( int msec );
-};
-
-
-
-// RB begin
-class tyPhysics_Player : public idPhysics_Player
-{
-public:
-	CLASS_PROTOTYPE( tyPhysics_Player );
-
-	tyPhysics_Player();
-
-	void					Save( idSaveGame* savefile ) const;
-	void					Restore( idRestoreGame* savefile );
-
-	void					SetGravity( const idVec3& wishGravity );
-	bool					IsGravityFlipping();
-
-public:	// common physics interface
-	bool					Evaluate( int timeStepMSec, int endTimeMSec );
-
-private:
-	// gravity flipping
-	idVec3					oldGravityVector;
-	idVec3					oldGravityNormal;
-
-	idVec3					wishGravityVector;
-	idVec3					wishGravityNormal;
-	int						wishGravityTime;
-
-	// walk movement
-	bool					wallwalking;
-	idVec3					wallwalkNormal;
-
-private:
-	void					UpdateGravity();
-	void					WalkMove();
-	void					CorrectAllSolid( trace_t& trace, int contents );
-	void					CheckGround();
 	void					MovePlayer( int msec );
 };
-// RB end
 
 #endif /* !__PHYSICS_PLAYER_H__ */

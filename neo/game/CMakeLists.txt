@@ -1,85 +1,19 @@
-project( game CXX )
-add_definitions(-DGAME_DLL)
+project( Game CXX )
 
-set( GAME_INCLUDES
-	AF.h
-	AFEntity.h
-	Actor.h
-	BrittleFracture.h
-	Camera.h
-	#EndLevel.h
-	Entity.h
-	Fx.h
-	Game.def
-	Game.h
-	GameEdit.h
-	Game_local.h
-	Grabber.h
-	IK.h
-	Item.h
-	Light.h
-	Misc.h
-	Moveable.h
-	Mover.h
-	MultiplayerGame.h
-	Player.h
-	PlayerIcon.h
-	PlayerView.h
-	Portal.h
-	Projectile.h
-	Pvs.h
-	SecurityCamera.h
-	SmokeParticles.h
-	Sound.h
-	Target.h
-	Trigger.h
-	Weapon.h
-	WorldSpawn.h )
-set( GAME_SOURCES
-	AF.cpp
-	AFEntity.cpp
-	Actor.cpp
-	BrittleFracture.cpp
-	Camera.cpp
-	#EndLevel.cpp
-	Entity.cpp
-	Fx.cpp
-	GameEdit.cpp
-	Game_local.cpp
-	Game_network.cpp
-	Grabber.cpp
-	IK.cpp
-	Item.cpp
-	Light.cpp
-	Misc.cpp
-	Moveable.cpp
-	Mover.cpp
-	MultiplayerGame.cpp
-	Player.cpp
-	PlayerIcon.cpp
-	PlayerView.cpp
-	Portal.cpp
-	Projectile.cpp
-	Pvs.cpp
-	SecurityCamera.cpp
-	SmokeParticles.cpp
-	Sound.cpp
-	Target.cpp
-	Trigger.cpp
-	Weapon.cpp
-	WorldSpawn.cpp )
+file( GLOB GAME_INCLUDES *.h )
+file( GLOB GAME_SOURCES *.cpp )
 file( GLOB GAME_AI_INCLUDES ai/*.h )
 file( GLOB GAME_AI_SOURCES ai/*.cpp )
 file( GLOB GAME_ANIM_INCLUDES anim/*.h )
 file( GLOB GAME_ANIM_SOURCES anim/*.cpp)
 file( GLOB GAME_GAMESYS_INCLUDES gamesys/*.h )
 set( GAME_GAMESYS_SOURCES
-	#gamesys/Callbacks.cpp
 	gamesys/Class.cpp
 	gamesys/Event.cpp
 	gamesys/SaveGame.cpp
 	gamesys/SysCmds.cpp
-	gamesys/SysCvar.cpp )
+	gamesys/SysCvar.cpp
+	gamesys/TypeInfo.cpp )
 file( GLOB GAME_PHYSICS_INCLUDES physics/*.h )
 file( GLOB GAME_PHYSICS_SOURCES physics/*.cpp )
 file( GLOB GAME_SCRIPT_INCLUDES script/*.h )
@@ -92,7 +26,7 @@ set( GAME_INCLUDES_ALL
 	${GAME_GAMESYS_INCLUDES}
 	${GAME_PHYSICS_INCLUDES}
 	${GAME_SCRIPT_INCLUDES} )
-			
+
 set( GAME_SOURCES_ALL
 	${GAME_SOURCES}
 	${GAME_AI_SOURCES}
@@ -116,12 +50,12 @@ source_group( "Script" FILES ${GAME_SCRIPT_SOURCES} )
 
 if( MSVC )
 	add_library( ${PROJECT_NAME} SHARED ${GAME_SOURCES_ALL} ${GAME_INCLUDES_ALL} )
-	target_link_options( ${PROJECT_NAME} PRIVATE /DEF:${CMAKE_CURRENT_SOURCE_DIR}/Game.def )
 	target_include_directories( ${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/idlib )
 	add_dependencies( ${PROJECT_NAME} idlib )
 	target_link_libraries( ${PROJECT_NAME} idlib )
 
 	#GK: Make sure the name is right
+	set_target_properties( ${PROJECT_NAME} PROPERTIES OUTPUT_NAME "game" )
 	set_target_properties( ${PROJECT_NAME} PROPERTIES PREFIX "" )
 	if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
 		set_target_properties( ${PROJECT_NAME} PROPERTIES SUFFIX "x86_64.dll" )
@@ -178,6 +112,7 @@ else()
 	target_link_libraries( ${PROJECT_NAME} idlib )
 
 	#GK: Make sure the name is right
+	set_target_properties( ${PROJECT_NAME} PROPERTIES OUTPUT_NAME "game" )
 	set_target_properties( ${PROJECT_NAME} PROPERTIES PREFIX "" )
 	if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
 		set_target_properties( ${PROJECT_NAME} PROPERTIES SUFFIX "x86_64.so" )
@@ -185,5 +120,7 @@ else()
 		set_target_properties( ${PROJECT_NAME} PROPERTIES SUFFIX "x86.so" )
 	endif()
 endif()
+
+target_compile_definitions( ${PROJECT_NAME} PRIVATE GAME_DLL )
 
 set_target_properties( ${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:>${CMAKE_SOURCE_DIR}/../base LIBRARY_OUTPUT_DIRECTORY $<1:>${CMAKE_SOURCE_DIR}/../base )

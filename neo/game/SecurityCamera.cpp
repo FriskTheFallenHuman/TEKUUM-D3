@@ -25,13 +25,6 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
-/*
-
-  SecurityCamera.cpp
-
-  Security camera that triggers targets when player is in view
-
-*/
 
 #include "precompiled.h"
 #pragma hdrstop
@@ -42,6 +35,8 @@ If you have questions concerning this license or the applicable additional terms
 /***********************************************************************
 
   idSecurityCamera
+
+  Security camera that triggers targets when player is in view
 
 ***********************************************************************/
 
@@ -146,7 +141,7 @@ void idSecurityCamera::Spawn()
 	}
 
 	negativeSweep = ( sweepAngle < 0 ) ? true : false;
-	sweepAngle = abs( sweepAngle );
+	sweepAngle = idMath::Fabs( sweepAngle );
 
 	scanFovCos = cos( scanFov * idMath::PI / 360.0f );
 

@@ -331,10 +331,10 @@ void idBitMsg::WriteDeltaShortCounter( int oldValue, int newValue )
 
 /*
 ================
-idBitMsg::WriteDeltaLongCounter
+idBitMsg::WriteDeltaIntCounter
 ================
 */
-void idBitMsg::WriteDeltaLongCounter( int oldValue, int newValue )
+void idBitMsg::WriteDeltaIntCounter( int oldValue, int newValue )
 {
 	int i, x;
 
@@ -636,10 +636,10 @@ int idBitMsg::ReadDeltaShortCounter( int oldValue ) const
 
 /*
 ================
-idBitMsg::ReadDeltaLongCounter
+idBitMsg::ReadDeltaIntCounter
 ================
 */
-int idBitMsg::ReadDeltaLongCounter( int oldValue ) const
+int idBitMsg::ReadDeltaIntCounter( int oldValue ) const
 {
 	int i, newValue;
 
@@ -1080,10 +1080,10 @@ void idBitMsgDelta::WriteDeltaShortCounter( int oldValue, int newValue )
 
 /*
 ================
-idBitMsgDelta::WriteDeltaLongCounter
+idBitMsgDelta::WriteDeltaIntCounter
 ================
 */
-void idBitMsgDelta::WriteDeltaLongCounter( int oldValue, int newValue )
+void idBitMsgDelta::WriteDeltaIntCounter( int oldValue, int newValue )
 {
 	if( newBase )
 	{
@@ -1092,7 +1092,7 @@ void idBitMsgDelta::WriteDeltaLongCounter( int oldValue, int newValue )
 
 	if( !base )
 	{
-		writeDelta->WriteDeltaLongCounter( oldValue, newValue );
+		writeDelta->WriteDeltaIntCounter( oldValue, newValue );
 		changed = true;
 	}
 	else
@@ -1105,7 +1105,7 @@ void idBitMsgDelta::WriteDeltaLongCounter( int oldValue, int newValue )
 		else
 		{
 			writeDelta->WriteBits( 1, 1 );
-			writeDelta->WriteDeltaLongCounter( oldValue, newValue );
+			writeDelta->WriteDeltaIntCounter( oldValue, newValue );
 			changed = true;
 		}
 	}
@@ -1282,16 +1282,16 @@ int idBitMsgDelta::ReadDeltaShortCounter( int oldValue ) const
 
 /*
 ================
-idBitMsgDelta::ReadDeltaLongCounter
+idBitMsgDelta::ReadDeltaIntCounter
 ================
 */
-int idBitMsgDelta::ReadDeltaLongCounter( int oldValue ) const
+int idBitMsgDelta::ReadDeltaIntCounter( int oldValue ) const
 {
 	int value;
 
 	if( !base )
 	{
-		value = readDelta->ReadDeltaLongCounter( oldValue );
+		value = readDelta->ReadDeltaIntCounter( oldValue );
 		changed = true;
 	}
 	else
@@ -1303,7 +1303,7 @@ int idBitMsgDelta::ReadDeltaLongCounter( int oldValue ) const
 		}
 		else
 		{
-			value = readDelta->ReadDeltaLongCounter( oldValue );
+			value = readDelta->ReadDeltaIntCounter( oldValue );
 			changed = true;
 		}
 	}
