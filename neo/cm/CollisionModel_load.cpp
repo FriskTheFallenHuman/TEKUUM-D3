@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013-2015 Robert Beckebans
+Copyright (C) 2013-2016 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -49,7 +49,6 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-
 #include "CollisionModel_local.h"
 
 #define CMODEL_BINARYFILE_EXT	"bcmodel"
@@ -66,7 +65,6 @@ idHashIndex* 					cm_edgeHash;
 
 idBounds						cm_modelBounds;
 int								cm_vertexShift;
-
 
 /*
 ===============================================================================
@@ -132,9 +130,7 @@ void idCollisionModelManagerLocal::LoadProcBSP( const char* name )
 		return;
 	}
 
-	// RB: added PROC_FILE_ID2
-	if( !src->ReadToken( &token ) || ( token.Icmp( PROC_FILE_ID ) && token.Icmp( PROC_FILE_ID2 ) ) )
-		// RB end
+	if( !src->ReadToken( &token ) || token.Icmp( PROC_FILE_ID ) )
 	{
 		common->Warning( "idCollisionModelManagerLocal::LoadProcBSP: bad id '%s' instead of '%s'", token.c_str(), PROC_FILE_ID );
 		delete src;
@@ -166,14 +162,6 @@ void idCollisionModelManagerLocal::LoadProcBSP( const char* name )
 			src->SkipBracedSection();
 			continue;
 		}
-
-		// RB begin
-		if( token == "lightGridPoints" )
-		{
-			src->SkipBracedSection();
-			continue;
-		}
-		// RB end
 
 		if( token == "nodes" )
 		{
@@ -3490,7 +3478,8 @@ void idCollisionModelManagerLocal::FinishModel( cm_model_t* model )
 						model->numBrushRefs * sizeof( cm_brushRef_t );
 }
 
-
+static const byte BCM_VERSION = 100;
+static const unsigned int BCM_MAGIC = ( 'B' << 24 ) | ( 'C' << 16 ) | ( 'M' << 16 ) | BCM_VERSION;
 
 /*
 ================
@@ -3509,11 +3498,13 @@ cm_model_t* idCollisionModelManagerLocal::LoadBinaryModelFromFile( idFile* file,
 	ID_TIME_T storedTimeStamp = FILE_NOT_FOUND_TIMESTAMP;
 	file->ReadBig( storedTimeStamp );
 
-	// RB: source might be from pk4, so we ignore the time stamp and assume a release build
-	if( /*!fileSystem->InProductionMode() &&*/ sourceTimeStamp != FILE_NOT_FOUND_TIMESTAMP && sourceTimeStamp != 0 && storedTimeStamp != sourceTimeStamp )
+	// RB: source might be from .pk4, so we ignore the time stamp and assume a release build
+	if( ( sourceTimeStamp != FILE_NOT_FOUND_TIMESTAMP ) && ( sourceTimeStamp != 0 ) && ( sourceTimeStamp != storedTimeStamp ) )
 	{
 		return NULL;
 	}
+	// RB end
+
 	cm_model_t* model = AllocModel();
 	file->ReadString( model->name );
 	file->ReadBig( model->bounds );
@@ -3521,10 +3512,8 @@ cm_model_t* idCollisionModelManagerLocal::LoadBinaryModelFromFile( idFile* file,
 	file->ReadBig( model->isConvex );
 	file->ReadBig( model->numVertices );
 	file->ReadBig( model->numEdges );
-	// RB begin
-	//file->ReadBig( model->numPolygons );
-	//file->ReadBig( model->numBrushes );
-	// RB end
+	file->ReadBig( model->numPolygons );
+	file->ReadBig( model->numBrushes );
 	file->ReadBig( model->numNodes );
 	file->ReadBig( model->numBrushRefs );
 	file->ReadBig( model->numPolygonRefs );
@@ -3538,7 +3527,7 @@ cm_model_t* idCollisionModelManagerLocal::LoadBinaryModelFromFile( idFile* file,
 	for( int i = 0; i < model->numVertices; i++ )
 	{
 		file->ReadBig( model->vertices[i].p );
-		//file->ReadBig( model->vertices[i].checkcount );
+		file->ReadBig( model->vertices[i].checkcount );
 		file->ReadBig( model->vertices[i].side );
 		file->ReadBig( model->vertices[i].sideSet );
 	}
@@ -3547,7 +3536,7 @@ cm_model_t* idCollisionModelManagerLocal::LoadBinaryModelFromFile( idFile* file,
 	model->edges = ( cm_edge_t* ) Mem_ClearedAlloc( model->maxEdges * sizeof( cm_edge_t ) );
 	for( int i = 0; i < model->numEdges; i++ )
 	{
-		//file->ReadBig( model->edges[i].checkcount );
+		file->ReadBig( model->edges[i].checkcount );
 		file->ReadBig( model->edges[i].internal );
 		file->ReadBig( model->edges[i].numUsers );
 		file->ReadBig( model->edges[i].side );
@@ -3585,44 +3574,10 @@ cm_model_t* idCollisionModelManagerLocal::LoadBinaryModelFromFile( idFile* file,
 			materials[i] = declManager->FindMaterial( materialName );
 		}
 	}
-
-
-#if 0
-	struct local
-	{
-		static cm_node_t* ReadNodeTree( idFile* file, cm_model_t* model, cm_node_t* parent )
-		{
-			cm_node_t* node;
-
-			node = collisionModelManagerLocal.AllocNode( model, model->numNodes < NODE_BLOCK_SIZE_SMALL ? NODE_BLOCK_SIZE_SMALL : NODE_BLOCK_SIZE_LARGE );
-			node->brushes = NULL;
-			node->polygons = NULL;
-			node->parent = parent;
-
-			file->ReadBig( node->planeType );
-			file->ReadBig( node->planeDist );
-
-			if( node->planeType != -1 )
-			{
-				node->children[0] = ReadNodeTree( file, model, node );
-				node->children[1] = ReadNodeTree( file, model, node );
-			}
-
-			return node;
-		}
-	};
-
-	model->node = local::ReadNodeTree( file, model, model->node );
-#endif
-
-
 	idList< cm_polygon_t* > polys;
 	idList< cm_brush_t* > brushes;
-
-	// RB begin
-	file->ReadBig( model->numPolygons );
 	polys.SetNum( model->numPolygons );
-	// RB end
+	brushes.SetNum( model->numBrushes );
 	for( int i = 0; i < polys.Num(); i++ )
 	{
 		int materialIndex = 0;
@@ -3633,20 +3588,11 @@ cm_model_t* idCollisionModelManagerLocal::LoadBinaryModelFromFile( idFile* file,
 		polys[i]->numEdges = numEdges;
 		polys[i]->material = materials[materialIndex];
 		file->ReadBig( polys[i]->bounds );
-		//file->ReadBig( polys[i]->checkcount );
-		polys[i]->checkcount = 0;
+		file->ReadBig( polys[i]->checkcount );
 		file->ReadBig( polys[i]->contents );
 		file->ReadBig( polys[i]->plane );
 		file->ReadBigArray( polys[i]->edges, polys[i]->numEdges );
-
-		// filter polygon into tree
-		//R_FilterPolygonIntoTree( model, model->node, NULL, polys[i] );
 	}
-
-	// RB begin
-	file->ReadBig( model->numBrushes );
-	brushes.SetNum( model->numBrushes );
-	// RB end
 	for( int i = 0; i < brushes.Num(); i++ )
 	{
 		int materialIndex = 0;
@@ -3656,27 +3602,19 @@ cm_model_t* idCollisionModelManagerLocal::LoadBinaryModelFromFile( idFile* file,
 		brushes[i] = AllocBrush( model, numPlanes );
 		brushes[i]->numPlanes = numPlanes;
 		brushes[i]->material = materials[materialIndex];
-		//file->ReadBig( brushes[i]->checkcount );
-		brushes[i]->checkcount = 0;
+		file->ReadBig( brushes[i]->checkcount );
 		file->ReadBig( brushes[i]->bounds );
 		file->ReadBig( brushes[i]->contents );
 		file->ReadBig( brushes[i]->primitiveNum );
 		file->ReadBigArray( brushes[i]->planes, brushes[i]->numPlanes );
-
-		// filter brush into tree
-		//R_FilterBrushIntoTree( model, model->node, NULL, brushes[i] );
 	}
-
-#if 1
 	struct local
 	{
 		static void ReadNodeTree( idFile* file, cm_model_t* model, cm_node_t* node, idList< cm_polygon_t* >& polys, idList< cm_brush_t* >& brushes )
 		{
 			file->ReadBig( node->planeType );
 			file->ReadBig( node->planeDist );
-
 			int i = 0;
-
 			while( file->ReadBig( i ) == sizeof( i ) && ( i >= 0 ) )
 			{
 				cm_polygonRef_t* pref = collisionModelManagerLocal.AllocPolygonReference( model, model->numPolygonRefs );
@@ -3684,7 +3622,6 @@ cm_model_t* idCollisionModelManagerLocal::LoadBinaryModelFromFile( idFile* file,
 				pref->next = node->polygons;
 				node->polygons = pref;
 			}
-
 			while( file->ReadBig( i ) == sizeof( i ) && ( i >= 0 ) )
 			{
 				cm_brushRef_t* bref = collisionModelManagerLocal.AllocBrushReference( model, model->numBrushRefs );
@@ -3692,7 +3629,6 @@ cm_model_t* idCollisionModelManagerLocal::LoadBinaryModelFromFile( idFile* file,
 				bref->next = node->brushes;
 				node->brushes = bref;
 			}
-
 			if( node->planeType != -1 )
 			{
 				node->children[0] = collisionModelManagerLocal.AllocNode( model, model->numNodes );
@@ -3704,20 +3640,16 @@ cm_model_t* idCollisionModelManagerLocal::LoadBinaryModelFromFile( idFile* file,
 			}
 		}
 	};
-
 	model->node = AllocNode( model, model->numNodes + 1 );
 	local::ReadNodeTree( file, model, model->node, polys, brushes );
-#endif
 
 	// We should have only allocated a single block, and used every entry in the block
 	// assert( model->nodeBlocks != NULL && model->nodeBlocks->next == NULL && model->nodeBlocks->nextNode == NULL );
-
-	// RB: FIXME
 	assert( model->brushRefBlocks == NULL || ( model->brushRefBlocks->next == NULL && model->brushRefBlocks->nextRef == NULL ) );
 	assert( model->polygonRefBlocks == NULL || ( model->polygonRefBlocks->next == NULL && model->polygonRefBlocks->nextRef == NULL ) );
 
 	// RB: FIXME
-#if !defined(__x86_64__) && !defined(_WIN64)
+#if !defined(__x86_64__) && !defined(_WIN64) && !defined(__PPC64__) && !defined(__e2k__) && !defined(__aarch64__) && !(defined(__mips64) || defined(__mips64_))
 	assert( model->polygonBlock->bytesRemaining == 0 );
 	assert( model->brushBlock->bytesRemaining == 0 );
 #endif
@@ -3740,13 +3672,7 @@ idCollisionModelManagerLocal::LoadBinaryModel
 */
 cm_model_t* idCollisionModelManagerLocal::LoadBinaryModel( const char* fileName, ID_TIME_T sourceTimeStamp )
 {
-	// RB: don't waste memory on low memory systems
-#if 0 //defined(__ANDROID__)
-	idFileLocal file( fileSystem->OpenFileRead( fileName ) );
-#else
 	idFileLocal file( fileSystem->OpenFileReadMemory( fileName ) );
-#endif
-	// RB end
 	if( file == NULL )
 	{
 		return NULL;
@@ -3770,10 +3696,8 @@ void idCollisionModelManagerLocal::WriteBinaryModelToFile( cm_model_t* model, id
 	file->WriteBig( model->isConvex );
 	file->WriteBig( model->numVertices );
 	file->WriteBig( model->numEdges );
-	// RB
-	//file->WriteBig( model->numPolygons );
-	//file->WriteBig( model->numBrushes );
-	// RB end
+	file->WriteBig( model->numPolygons );
+	file->WriteBig( model->numBrushes );
 	file->WriteBig( model->numNodes );
 	file->WriteBig( model->numBrushRefs );
 	file->WriteBig( model->numPolygonRefs );
@@ -3785,14 +3709,13 @@ void idCollisionModelManagerLocal::WriteBinaryModelToFile( cm_model_t* model, id
 	for( int i = 0; i < model->numVertices; i++ )
 	{
 		file->WriteBig( model->vertices[i].p );
-		//file->WriteBig( model->vertices[i].checkcount );
+		file->WriteBig( model->vertices[i].checkcount );
 		file->WriteBig( model->vertices[i].side );
 		file->WriteBig( model->vertices[i].sideSet );
 	}
-
 	for( int i = 0; i < model->numEdges; i++ )
 	{
-		//file->WriteBig( model->edges[i].checkcount );
+		file->WriteBig( model->edges[i].checkcount );
 		file->WriteBig( model->edges[i].internal );
 		file->WriteBig( model->edges[i].numUsers );
 		file->WriteBig( model->edges[i].side );
@@ -3803,9 +3726,6 @@ void idCollisionModelManagerLocal::WriteBinaryModelToFile( cm_model_t* model, id
 	}
 	file->WriteBig( model->polygonMemory );
 	file->WriteBig( model->brushMemory );
-
-	int numNodes = 0;
-
 	struct local
 	{
 		static void BuildUniqueLists( cm_node_t* node, idList< cm_polygon_t* >& polys, idList< cm_brush_t* >& brushes )
@@ -3814,40 +3734,30 @@ void idCollisionModelManagerLocal::WriteBinaryModelToFile( cm_model_t* model, id
 			{
 				polys.AddUnique( pr->p );
 			}
-
 			for( cm_brushRef_t* br = node->brushes; br != NULL; br = br->next )
 			{
 				brushes.AddUnique( br->b );
 			}
-
 			if( node->planeType != -1 )
 			{
 				BuildUniqueLists( node->children[0], polys, brushes );
 				BuildUniqueLists( node->children[1], polys, brushes );
 			}
 		}
-
 		static void WriteNodeTree( idFile* file, cm_node_t* node, idList< cm_polygon_t* >& polys, idList< cm_brush_t* >& brushes )
 		{
-			//numNodes++;
-
 			file->WriteBig( node->planeType );
 			file->WriteBig( node->planeDist );
-
-#if 1
 			for( cm_polygonRef_t* pr = node->polygons; pr != NULL; pr = pr->next )
 			{
 				file->WriteBig( polys.FindIndex( pr->p ) );
 			}
-
-			file->WriteBig( -2 );
+			file->WriteBig( -1 );
 			for( cm_brushRef_t* br = node->brushes; br != NULL; br = br->next )
 			{
 				file->WriteBig( brushes.FindIndex( br->b ) );
 			}
-
-			file->WriteBig( -2 );
-#endif
+			file->WriteBig( -1 );
 			if( node->planeType != -1 )
 			{
 				WriteNodeTree( file, node->children[0], polys, brushes );
@@ -3858,11 +3768,8 @@ void idCollisionModelManagerLocal::WriteBinaryModelToFile( cm_model_t* model, id
 	idList< cm_polygon_t* > polys;
 	idList< cm_brush_t* > brushes;
 	local::BuildUniqueLists( model->node, polys, brushes );
-
-	// RB: FIXME
 	assert( polys.Num() == model->numPolygons );
 	assert( brushes.Num() == model->numBrushes );
-	// RB end
 
 	idList< const idMaterial* > materials;
 	for( int i = 0; i < polys.Num(); i++ )
@@ -3873,7 +3780,6 @@ void idCollisionModelManagerLocal::WriteBinaryModelToFile( cm_model_t* model, id
 	{
 		materials.AddUnique( brushes[i]->material );
 	}
-
 	file->WriteBig( materials.Num() );
 	for( int i = 0; i < materials.Num(); i++ )
 	{
@@ -3886,33 +3792,26 @@ void idCollisionModelManagerLocal::WriteBinaryModelToFile( cm_model_t* model, id
 			file->WriteString( materials[i]->GetName() );
 		}
 	}
-
-	file->WriteBig( polys.Num() );
 	for( int i = 0; i < polys.Num(); i++ )
 	{
 		file->WriteBig( ( int )materials.FindIndex( polys[i]->material ) );
 		file->WriteBig( polys[i]->numEdges );
 		file->WriteBig( polys[i]->bounds );
-		//file->WriteBig( polys[i]->checkcount );
+		file->WriteBig( polys[i]->checkcount );
 		file->WriteBig( polys[i]->contents );
 		file->WriteBig( polys[i]->plane );
 		file->WriteBigArray( polys[i]->edges, polys[i]->numEdges );
 	}
-
-	file->WriteBig( brushes.Num() );
 	for( int i = 0; i < brushes.Num(); i++ )
 	{
 		file->WriteBig( ( int )materials.FindIndex( brushes[i]->material ) );
 		file->WriteBig( brushes[i]->numPlanes );
-		//file->WriteBig( brushes[i]->checkcount );
+		file->WriteBig( brushes[i]->checkcount );
 		file->WriteBig( brushes[i]->bounds );
 		file->WriteBig( brushes[i]->contents );
 		file->WriteBig( brushes[i]->primitiveNum );
 		file->WriteBigArray( brushes[i]->planes, brushes[i]->numPlanes );
 	}
-
-	numNodes = 0;
-	//file->WriteBig( numNodes );
 	local::WriteNodeTree( file, model->node, polys, brushes );
 }
 
@@ -3929,9 +3828,6 @@ void idCollisionModelManagerLocal::WriteBinaryModel( cm_model_t* model, const ch
 		common->Printf( "Failed to open %s\n", fileName );
 		return;
 	}
-
-	common->Printf( "writing %s\n", fileName );
-
 	WriteBinaryModelToFile( model, file, sourceTimeStamp );
 }
 
@@ -3978,7 +3874,7 @@ cm_model_t* idCollisionModelManagerLocal::LoadRenderModel( const char* fileName 
 	{
 		return model;
 	}
-	//idLib::Printf( "Writing %s\n", generatedFileName.c_str() );
+	idLib::Printf( "Writing %s\n", generatedFileName.c_str() );
 
 	model = AllocModel();
 	model->name = fileName;
@@ -4416,6 +4312,7 @@ void idCollisionModelManagerLocal::LoadMap( const idMapFile* mapFile )
 	if( mapFile == NULL )
 	{
 		common->Error( "idCollisionModelManagerLocal::LoadMap: NULL mapFile" );
+		return;
 	}
 
 	// check whether we can keep the current collision map based on the mapName and mapFileTime
@@ -4598,7 +4495,7 @@ bool idCollisionModelManagerLocal::GetModelPolygon( cmHandle_t model, int polygo
 idCollisionModelManagerLocal::LoadModel
 ==================
 */
-cmHandle_t idCollisionModelManagerLocal::LoadModel( const char* modelName, const bool precache )
+cmHandle_t idCollisionModelManagerLocal::LoadModel( const char* modelName )
 {
 	int handle;
 
@@ -4619,6 +4516,14 @@ cmHandle_t idCollisionModelManagerLocal::LoadModel( const char* modelName, const
 	generatedFileName.SetFileExtension( CMODEL_BINARYFILE_EXT );
 
 	ID_TIME_T sourceTimeStamp = fileSystem->GetTimestamp( modelName );
+
+	if( models == NULL )
+	{
+		// raynorpat: best clear this if there are no models ( hit by dmap )
+		maxModels = MAX_SUBMODELS;
+		numModels = 0;
+		models = ( cm_model_t** ) Mem_ClearedAlloc( ( maxModels + 1 ) * sizeof( cm_model_t* ) );
+	}
 
 	models[ numModels ] = LoadBinaryModel( generatedFileName, sourceTimeStamp );
 	if( models[ numModels ] != NULL )
@@ -4641,22 +4546,13 @@ cmHandle_t idCollisionModelManagerLocal::LoadModel( const char* modelName, const
 		if( handle >= 0  && handle < numModels )
 		{
 			cm_model_t* cm = models[ handle ];
-			// RB: LoadCollisionModelFile already wrote a .bcm file if necessary
-			// don't write another .cmodel file
-			//WriteBinaryModel( cm, generatedFileName, sourceTimeStamp );
-			// RB end
+			WriteBinaryModel( cm, generatedFileName, sourceTimeStamp );
 			return handle;
 		}
 		else
 		{
 			common->Warning( "idCollisionModelManagerLocal::LoadModel: collision file for '%s' contains different model", modelName );
 		}
-	}
-
-	// if only precaching .cm files do not waste memory converting render models
-	if( precache )
-	{
-		return 0;
 	}
 
 	// try to load a .ASE or .LWO model and convert it to a collision model
@@ -4838,7 +4734,7 @@ bool idCollisionModelManagerLocal::TrmFromModel( const char* modelName, idTraceM
 {
 	cmHandle_t handle;
 
-	handle = LoadModel( modelName, false );
+	handle = LoadModel( modelName );
 	if( !handle )
 	{
 		common->Printf( "idCollisionModelManagerLocal::TrmFromModel: model %s not found.\n", modelName );

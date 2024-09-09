@@ -52,7 +52,6 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "posix_public.h"
 
-#define					MAX_OSPATH 256
 #define					COMMAND_HISTORY 64
 
 static int				input_hide = 0;
@@ -496,26 +495,6 @@ const char* Posix_Cwd()
 
 /*
 =================
-Sys_GetMemoryStatus
-=================
-*/
-void Sys_GetMemoryStatus( sysMemoryStats_t& stats )
-{
-	common->Printf( "FIXME: Sys_GetMemoryStatus stub\n" );
-}
-
-void Sys_GetCurrentMemoryStatus( sysMemoryStats_t& stats )
-{
-	common->Printf( "FIXME: Sys_GetCurrentMemoryStatus\n" );
-}
-
-void Sys_GetExeLaunchMemoryStatus( sysMemoryStats_t& stats )
-{
-	common->Printf( "FIXME: Sys_GetExeLaunchMemoryStatus\n" );
-}
-
-/*
-=================
 Sys_Init
 Posix_EarlyInit/Posix_LateInit is better
 =================
@@ -541,18 +520,36 @@ Sys_DLL_Load
 TODO: OSX - use the native API instead? NSModule
 =================
 */
-// RB: 64 bit fixes, changed int to intptr_t
-intptr_t Sys_DLL_Load( const char* path )
+uintptr_t Sys_DLL_Load( const char* path )
 {
-	void* handle = dlopen( path, RTLD_NOW );
-	if( !handle )
+	void* ret = dlopen( path, RTLD_NOW );
+	if( ret == NULL )
 	{
-		Sys_Printf( "dlopen '%s' failed: %s\n", path, dlerror() );
-	}
+		// dlopen() failed - this might be ok (we tried one possible path and the next will work)
+		// or it might be worth warning about (the lib existed but still couldn't be loaded,
+		// maybe a missing symbol or permission problems)
+		// unfortunately we only get a string from dlerror(), not some distinctive error code..
+		// so use try to open() the file to get a better idea what went wrong
 
-	return ( intptr_t )handle;
+		int fd = open( path, O_RDONLY );
+		if( fd < 0 )  // couldn't open file for reading either
+		{
+			int e = errno;
+			if( e != ENOENT )
+			{
+				// it didn't fail because the file doesn't exist - log it, might be interesting (=> likely permission problem)
+				common->Warning( "Failed to load lib '%s'! Reason: %s ( %s )\n", path, dlerror(), strerror( e ) );
+			}
+		}
+		else
+		{
+			// file could be opened, so it exists => log just dlerror()
+			close( fd );
+			common->Warning( "Failed to load lib '%s' even though it exists and is readable! Reason: %s\n", path, dlerror() );
+		}
+	}
+	return ( uintptr_t )ret;
 }
-// RB end
 
 /*
 =================
@@ -592,12 +589,6 @@ Sys_ShowConsole
 void Sys_ShowConsole( int visLevel, bool quitOnClose ) { }
 
 // ---------------------------------------------------------------------------
-
-// only relevant when specified on command line
-const char* Sys_DefaultCDPath()
-{
-	return "";
-}
 
 ID_TIME_T Sys_FileTimeStamp( FILE* fp )
 {
@@ -647,28 +638,7 @@ void Sys_SetClipboardData( const char* string )
 	Sys_Printf( "TODO: Sys_SetClipboardData\n" );
 }
 
-
-// stub pretty much everywhere - heavy calling
-void Sys_FlushCacheMemory( void* base, int bytes )
-{
-//  Sys_Printf("Sys_FlushCacheMemory stub\n");
-}
-
-bool Sys_FPU_StackIsEmpty()
-{
-	return true;
-}
-
-void Sys_FPU_ClearStack()
-{
-}
-
-const char* Sys_FPU_GetState()
-{
-	return "";
-}
-
-void Sys_FPU_SetPrecision( int precision )
+void Sys_FPU_SetPrecision()
 {
 }
 
@@ -715,17 +685,6 @@ int Sys_GetDriveFreeSpace( const char* path )
 }
 
 /*
-================
-Sys_AlreadyRunning
-return true if there is a copy of D3 running already
-================
-*/
-bool Sys_AlreadyRunning()
-{
-	return false;
-}
-
-/*
 ===============
 Posix_EarlyInit
 ===============
@@ -751,9 +710,6 @@ void Posix_LateInit()
 	com_pid.SetInteger( getpid() );
 	common->Printf( "pid: %d\n", com_pid.GetInteger() );
 	common->Printf( "%d MB System Memory\n", Sys_GetSystemRam() );
-#ifndef ID_DEDICATED
-	common->Printf( "%d MB Video Memory\n", Sys_GetVideoRam() );
-#endif
 
 	// RB begin
 #if !defined(USE_SDL_ASYNC)
@@ -1209,9 +1165,6 @@ char* Posix_ConsoleInput()
 	}
 	else
 	{
-		// disabled on OSX. works fine from a terminal, but launching from Finder is causing trouble
-		// I'm pretty sure it could be re-enabled if needed, and just handling the Finder failure case right (TTimo)
-#ifndef MACOS_X
 		// no terminal support - read only complete lines
 		int				len;
 		fd_set			fdset;
@@ -1246,7 +1199,6 @@ char* Posix_ConsoleInput()
 
 		input_ret[ len - 1 ] = '\0';		// rip off the \n and terminate
 		return input_ret;
-#endif
 	}
 	return NULL;
 }
@@ -1364,10 +1316,3 @@ void Sys_Error( const char* error, ... )
 
 	Posix_Exit( EXIT_FAILURE );
 }
-
-/*
-===============
-Sys_FreeOpenAL
-===============
-*/
-void Sys_FreeOpenAL() { }

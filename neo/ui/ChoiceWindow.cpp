@@ -84,9 +84,7 @@ idChoiceWindow::~idChoiceWindow()
 
 }
 
-// RB: added parm recurseChildren
-void idChoiceWindow::RunNamedEvent( const char* eventName, bool recurseChildren )
-// RB end
+void idChoiceWindow::RunNamedEvent( const char* eventName )
 {
 	idStr event, group;
 
@@ -142,8 +140,7 @@ const char* idChoiceWindow::HandleEvent( const sysEvent_t* event, bool* updateVi
 	{
 		key = event->evValue;
 
-		// RB: added gamepad controls
-		if( key == K_RIGHTARROW || key == K_KP_6 || key == K_MOUSE1 || key == K_JOY_DPAD_RIGHT )
+		if( key == K_RIGHTARROW || key == K_KP_6 || key == K_MOUSE1 )
 		{
 			// never affects the state, but we want to execute script handlers anyway
 			if( !event->evValue2 )
@@ -159,7 +156,7 @@ const char* idChoiceWindow::HandleEvent( const sysEvent_t* event, bool* updateVi
 			runAction = true;
 		}
 
-		if( key == K_LEFTARROW || key == K_KP_4 || key == K_MOUSE2 || key == K_JOY_DPAD_LEFT )
+		if( key == K_LEFTARROW || key == K_KP_4 || key == K_MOUSE2 )
 		{
 			// never affects the state, but we want to execute script handlers anyway
 			if( !event->evValue2 )
@@ -174,7 +171,6 @@ const char* idChoiceWindow::HandleEvent( const sysEvent_t* event, bool* updateVi
 			}
 			runAction = true;
 		}
-		// RB end
 
 		if( !event->evValue2 )
 		{

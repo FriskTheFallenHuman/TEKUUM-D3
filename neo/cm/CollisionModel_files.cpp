@@ -3,7 +3,6 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -38,15 +37,12 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-
 #include "CollisionModel_local.h"
 
 #define CM_FILE_EXT			"cm"
 #define CM_BINARYFILE_EXT	"bcm"
 #define CM_FILEID			"CM"
 #define CM_FILEVERSION		"1.00"
-
-
 
 /*
 ===============================================================================
@@ -260,15 +256,15 @@ idCollisionModelManagerLocal::WriteCollisionModelsToFile
 */
 void idCollisionModelManagerLocal::WriteCollisionModelsToFile( const char* filename, int firstModel, int lastModel, unsigned int mapFileCRC )
 {
-	// RB: added generated/collision
-	idStrStatic< MAX_OSPATH > name = "generated/collision";
-	name.AppendPath( filename );
-	// RB end
+	int i;
+	idFile* fp;
+	idStr name;
+
+	name = filename;
 	name.SetFileExtension( CM_FILE_EXT );
 
 	common->Printf( "writing %s\n", name.c_str() );
-
-	idFile* fp = fileSystem->OpenFileWrite( name, "fs_devpath" );
+	fp = fileSystem->OpenFileWrite( name, "fs_devpath" );
 	if( !fp )
 	{
 		common->Warning( "idCollisionModelManagerLocal::WriteCollisionModelsToFile: Error opening file %s\n", name.c_str() );
@@ -277,12 +273,11 @@ void idCollisionModelManagerLocal::WriteCollisionModelsToFile( const char* filen
 
 	// write file id and version
 	fp->WriteFloatString( "%s \"%s\"\n\n", CM_FILEID, CM_FILEVERSION );
-
 	// write the map file crc
 	fp->WriteFloatString( "%u\n\n", mapFileCRC );
 
 	// write the collision models
-	for( int i = firstModel; i < lastModel; i++ )
+	for( i = firstModel; i < lastModel; i++ )
 	{
 		WriteCollisionModel( fp, models[ i ] );
 	}
@@ -551,7 +546,6 @@ cm_model_t* idCollisionModelManagerLocal::ParseCollisionModel( idLexer* src )
 	src->ExpectTokenString( "{" );
 	while( !src->CheckTokenString( "}" ) )
 	{
-
 		src->ReadToken( &token );
 
 		if( token == "vertices" )
@@ -621,12 +615,9 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char* name, uns
 	// load it
 	idStrStatic< MAX_OSPATH > fileName = name;
 
-	// RB: if called from dmap .cm might be missing
-	fileName.SetFileExtension( CM_FILE_EXT );
-
 	// check for generated file
-	idStrStatic< MAX_OSPATH > generatedFileName = "generated/collision/";
-	generatedFileName.AppendPath( fileName );
+	idStrStatic< MAX_OSPATH > generatedFileName = fileName;
+	generatedFileName.Insert( "generated/", 0 );
 	generatedFileName.SetFileExtension( CM_BINARYFILE_EXT );
 
 	// if we are reloading the same map, check the timestamp
@@ -635,38 +626,31 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char* name, uns
 
 	// see if we have a generated version of this
 	bool loaded = false;
-
-	// RB: don't waste memory on low memory systems
-#if 0 //defined(__ANDROID__)
-	idFileLocal file( fileSystem->OpenFileRead( generatedFileName ) );
-#else
 	idFileLocal file( fileSystem->OpenFileReadMemory( generatedFileName ) );
-#endif
-	// RB end
 	if( file != NULL )
 	{
-		unsigned int magic = 0;
-		file->ReadBig( magic );
-
 		int numEntries = 0;
 		file->ReadBig( numEntries );
-		//file->ReadString( mapName );
+		file->ReadString( mapName );
 		file->ReadBig( crc );
-		//idStrStatic< 32 > fileID;
-		//idStrStatic< 32 > fileVersion;
-		//file->ReadString( fileID );
-		//file->ReadString( fileVersion );
-		if( magic == BCM_MAGIC /*&& fileID == CM_FILEID && fileVersion == CM_FILEVERSION*/ && crc == mapFileCRC && numEntries > 0 )
+		idStrStatic< 32 > fileID;
+		idStrStatic< 32 > fileVersion;
+		file->ReadString( fileID );
+		file->ReadString( fileVersion );
+		if( fileID == CM_FILEID && fileVersion == CM_FILEVERSION && crc == mapFileCRC && numEntries > 0 )
 		{
-			loaded = true;
+			loaded = true; // DG: moved this up here to prevent segfaults, see below
 			for( int i = 0; i < numEntries; i++ )
 			{
 				cm_model_t* model = LoadBinaryModelFromFile( file, currentTimeStamp );
+				// DG: handle the case that loading the binary model fails gracefully
+				//     (otherwise we'll get a segfault when someone wants to use models[numModels])
 				if( model == NULL )
 				{
 					loaded = false;
 					break;
 				}
+				// DG end
 				models[ numModels ] = model;
 				numModels++;
 			}
@@ -681,35 +665,19 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char* name, uns
 		src->SetFlags( LEXFL_NOSTRINGCONCAT | LEXFL_NODOLLARPRECOMPILE );
 		if( !src->IsLoaded() )
 		{
-			// RB: double check for new generated/collision/*.cm
-			idStrStatic< MAX_OSPATH > asciiGeneratedFileName = "generated/collision/";
-			asciiGeneratedFileName.AppendPath( fileName );
-			asciiGeneratedFileName.SetFileExtension( CM_FILE_EXT );
-			src = new idLexer( asciiGeneratedFileName );
-			src->SetFlags( LEXFL_NOSTRINGCONCAT | LEXFL_NODOLLARPRECOMPILE );
-			if( !src->IsLoaded() )
-			{
-				delete src;
-				return false;
-			}
-
-			fileName = asciiGeneratedFileName;
-			// RB end
+			delete src;
+			return false;
 		}
-
-		// RB: update timestamp from .cm file
-		//currentTimeStamp = fileSystem->GetTimestamp( fileName );
 
 		int numEntries = 0;
 		idFileLocal outputFile( fileSystem->OpenFileWrite( generatedFileName, "fs_basepath" ) );
 		if( outputFile != NULL )
 		{
-			outputFile->WriteBig( BCM_MAGIC );
 			outputFile->WriteBig( numEntries );
-			//outputFile->WriteString( mapName );
+			outputFile->WriteString( mapName );
 			outputFile->WriteBig( mapFileCRC );
-			//outputFile->WriteString( CM_FILEID );
-			//outputFile->WriteString( CM_FILEVERSION );
+			outputFile->WriteString( CM_FILEID );
+			outputFile->WriteString( CM_FILEVERSION );
 		}
 
 		if( !src->ExpectTokenString( CM_FILEID ) )
@@ -733,7 +701,7 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char* name, uns
 			return false;
 		}
 
-		crc = token.GetUnsignedLongValue();
+		crc = token.GetUnsignedIntValue();
 		if( mapFileCRC && crc != mapFileCRC )
 		{
 			common->Printf( "%s is out of date\n", fileName.c_str() );
@@ -770,7 +738,7 @@ bool idCollisionModelManagerLocal::LoadCollisionModelFile( const char* name, uns
 		delete src;
 		if( outputFile != NULL )
 		{
-			outputFile->Seek( sizeof( BCM_MAGIC ), FS_SEEK_SET );
+			outputFile->Seek( 0, FS_SEEK_SET );
 			outputFile->WriteBig( numEntries );
 		}
 	}

@@ -267,9 +267,7 @@ idDict::Checksum
 */
 int	idDict::Checksum() const
 {
-	// RB: 64 bit fix, changed long to int
 	unsigned int ret;
-	// RB end
 	int i, n;
 
 	idList<idKeyValue> sorted = args;
@@ -598,9 +596,7 @@ int idDict::FindKeyIndex( const char* key ) const
 	if( key == NULL || key[0] == '\0' )
 	{
 		idLib::common->DWarning( "idDict::FindKeyIndex: empty key" );
-		// RB: 64 bit fix, changed NULL to -1
-		return -1;
-		// RB end
+		return 0;
 	}
 
 	int hash = argHash.GenerateKey( key, false );
@@ -708,7 +704,7 @@ idDict::WriteToFileHandle
 */
 void idDict::WriteToFileHandle( idFile* f ) const
 {
-	int c = LittleLong( args.Num() );
+	int c = LittleInt( args.Num() );
 	f->Write( &c, sizeof( c ) );
 	for( int i = 0; i < args.Num(); i++ )  	// don't loop on the swapped count use the original
 	{
@@ -783,12 +779,211 @@ void idDict::ReadFromFileHandle( idFile* f )
 	Clear();
 
 	f->Read( &c, sizeof( c ) );
-	c = LittleLong( c );
+	c = LittleInt( c );
 	for( int i = 0; i < c; i++ )
 	{
 		key = ReadString( f );
 		val = ReadString( f );
 		Set( key, val );
+	}
+}
+
+/*
+================
+idDict::WriteToIniFile
+================
+*/
+void idDict::WriteToIniFile( idFile* f ) const
+{
+	// make a copy so we don't affect the checksum of the original dict
+	idList< idKeyValue > sortedArgs( args );
+	sortedArgs.SortWithTemplate( idSort_KeyValue() );
+
+	idList< idStr > prefixList;
+	idTempArray< int > prefixIndex( sortedArgs.Num() );	// for each keyValue in the args, this is an index into which prefix it uses.
+	// 0 means no prefix, otherwise, it's an index + (-1) into prefixList
+	// we do this so we can print all the non-prefix based pairs first
+	idStr prevPrefix = "";
+	idStr skipFirstLine = "";
+
+	// Scan for all the prefixes
+	for( int i = 0; i < sortedArgs.Num(); i++ )
+	{
+		const idKeyValue* kv = &sortedArgs[i];
+		int slashPosition = kv->GetKey().Last( '/' );
+		if( slashPosition != idStr::INVALID_POSITION )
+		{
+			idStr prefix = kv->GetKey().Mid( 0, slashPosition );
+			if( prefix != prevPrefix )
+			{
+				prevPrefix = prefix;
+				prefixList.Append( prefix );
+			}
+			prefixIndex[i] = prefixList.Num();
+		}
+		else
+		{
+			prefixIndex[i] = 0;
+
+			// output all the prefix-less first
+			idStr str = va( "%s=%s\n", kv->GetKey().c_str(), idStr::CStyleQuote( kv->GetValue() ) );
+			f->Write( ( void* )str.c_str(), str.Length() );
+
+			skipFirstLine = "\n";
+		}
+	}
+
+	int prevPrefixIndex = 0;
+	int prefixLength = 0;
+
+	// output all the rest without their prefix
+	for( int i = 0; i < sortedArgs.Num(); i++ )
+	{
+		if( prefixIndex[i] == 0 )
+		{
+			continue;
+		}
+
+		if( prefixIndex[i] != prevPrefixIndex )
+		{
+			prevPrefixIndex = prefixIndex[i];
+			prefixLength = prefixList[prevPrefixIndex - 1].Length() + 1; // to skip past the '/' too
+
+			// output prefix
+			idStr str = va( "%s[%s]\n", skipFirstLine.c_str(), prefixList[prevPrefixIndex - 1].c_str() );
+			f->Write( ( void* )str.c_str(), str.Length() );
+		}
+
+		const idKeyValue* kv = &sortedArgs[i];
+		idStr str = va( "%s=%s\n", kv->GetKey().c_str() + prefixLength, idStr::CStyleQuote( kv->GetValue() ) );
+		f->Write( ( void* )str.c_str(), str.Length() );
+	}
+}
+
+/*
+================
+idDict::ReadFromIniFile
+================
+*/
+bool idDict::ReadFromIniFile( idFile* f )
+{
+	int length = f->Length();
+	idTempArray< char > buffer( length );
+	if( ( int )f->Read( buffer.Ptr(), length ) != length )
+	{
+		return false;
+	}
+	buffer[length - 1] = '\0';	// Since the .ini files are not null terminated, make sure we mark where the end of the .ini file is in our read buffer
+
+	idLexer parser( LEXFL_NOFATALERRORS | LEXFL_ALLOWPATHNAMES /*| LEXFL_ONLYSTRINGS */ );
+	idStr name = f->GetName();
+	name.Append( " dictionary INI reader" );
+	if( !parser.LoadMemory( ( const char* )buffer.Ptr(), length, name.c_str() ) )
+	{
+		return false;
+	}
+
+	idToken	token;
+	idToken	token2;
+	idStr prefix = "";
+	idStr valueStr;
+	bool success = true;
+
+	Clear();
+
+	const punctuation_t ini_punctuations[] =
+	{
+		{ "[", P_SQBRACKETOPEN },
+		{ "]", P_SQBRACKETCLOSE },
+		{ "=", P_ASSIGN },
+		{ NULL, 0 }
+	};
+	parser.SetPunctuations( ini_punctuations );
+
+	while( success && !parser.EndOfFile() )
+	{
+		if( parser.PeekTokenType( TT_PUNCTUATION, P_SQBRACKETOPEN, &token ) )
+		{
+			success = success && parser.ExpectTokenType( TT_PUNCTUATION, P_SQBRACKETOPEN, &token );
+			success = success && parser.ReadToken( &token );
+			prefix = token.c_str();
+			prefix.Append( '/' );
+			success = success && parser.ExpectTokenType( TT_PUNCTUATION, P_SQBRACKETCLOSE, &token );
+		}
+
+		if( !parser.PeekTokenType( TT_NAME, 0, &token ) )
+		{
+			// end of file most likely
+			break;
+		}
+
+		success = success && parser.ExpectTokenType( TT_NAME, 0, &token );
+		success = success && parser.ExpectTokenType( TT_PUNCTUATION, P_ASSIGN, &token2 );
+		success = success && ( parser.ParseRestOfLine( valueStr ) != NULL );
+
+		valueStr = idStr::CStyleUnQuote( valueStr );
+
+		idStr key = va( "%s%s", prefix.c_str(), token.c_str() );
+		if( FindKey( key.c_str() ) )
+		{
+			parser.Warning( "'%s' already defined", key.c_str() );
+		}
+
+		Set( key.c_str(), valueStr.c_str() );
+	}
+
+	return success;
+}
+
+CONSOLE_COMMAND( TestDictIniFile, "Tests the writing/reading of various items in a dict to/from an ini file", 0 )
+{
+	// Write to the file
+	idFile* file = fileSystem->OpenFileWrite( "idDict_ini_test.ini" );
+	if( file == NULL )
+	{
+		idLib::Printf( "[^1FAILED^0] Couldn't open file for writing.\n" );
+		return;
+	}
+
+	idDict vars;
+	vars.SetInt( "section1/section3/a", -1 );
+	vars.SetInt( "section1/section3/b", 0 );
+	vars.SetInt( "section1/section3/c", 3 );
+	vars.SetFloat( "section2/d", 4.0f );
+	vars.SetFloat( "section2/e", -5.0f );
+	vars.SetBool( "section2/f", true );
+	vars.SetBool( "section1/g", false );
+	vars.Set( "section1/h", "test1" );
+	vars.Set( "i", "1234" );
+	vars.SetInt( "j", 9 );
+	vars.WriteToIniFile( file );
+	delete file;
+
+	// Read from the file
+	file = fileSystem->OpenFileRead( "idDict_ini_test.ini" );
+	if( file == NULL )
+	{
+		idLib::Printf( "[^1FAILED^0] Couldn't open file for reading.\n" );
+	}
+
+	idDict readVars;
+	readVars.ReadFromIniFile( file );
+	delete file;
+
+	if( vars.Checksum() != readVars.Checksum() )
+	{
+		idLib::Printf( "[^1FAILED^0] Dictionaries do not match.\n" );
+	}
+	else
+	{
+		idLib::Printf( "[^2PASSED^0] Dictionaries match.\n" );
+	}
+
+	// Output results
+	for( int i = 0; i < readVars.GetNumKeyVals(); i++ )
+	{
+		const idKeyValue* kv = readVars.GetKeyVal( i );
+		idLib::Printf( "%s=%s\n", kv->GetKey().c_str(), kv->GetValue().c_str() );
 	}
 }
 

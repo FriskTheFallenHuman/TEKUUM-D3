@@ -37,7 +37,6 @@ const int SETUP_CONNECTION_RESEND_TIME	= 1000;
 const int EMPTY_RESEND_TIME				= 500;
 const int PREDICTION_FAST_ADJUST		= 4;
 
-
 /*
 ==================
 idAsyncClient::idAsyncClient
@@ -1514,7 +1513,6 @@ void idAsyncClient::ProcessAuthKeyMessage( const netadr_t from, const idBitMsg& 
 		common->DPrintf( "auth deny: %s\n", auth_msg.c_str() );
 
 		// keys to be cleared. applies to both net connect and game auth
-#if defined(USE_CDKEY)
 		session->ClearCDKey( valid );
 
 		// get rid of the bad key - at least that's gonna annoy people who stole a fake key
@@ -1550,16 +1548,13 @@ void idAsyncClient::ProcessAuthKeyMessage( const netadr_t from, const idBitMsg& 
 			// forward the auth status information to the session code
 			session->CDKeysAuthReply( false, auth_msg );
 		}
-#endif // #if defined(USE_CDKEY)
 	}
 	else
 	{
 		msg.ReadString( read_string, MAX_STRING_CHARS );
 		cvarSystem->SetCVarString( "com_guid", read_string );
 		common->Printf( "guid set to %s\n", read_string );
-#if defined(USE_CDKEY)
 		session->CDKeysAuthReply( true, NULL );
-#endif
 	}
 }
 
@@ -1708,8 +1703,9 @@ bool idAsyncClient::ValidatePureServerChecksums( const netadr_t from, const idBi
 			cmdSystem->BufferCommandText( CMD_EXEC_NOW, "disconnect" );
 			return false;
 		default:
-			return true;
+			break;
 	}
+
 	return true;
 }
 
@@ -1947,14 +1943,13 @@ void idAsyncClient::SetupConnection()
 		// do not make the protocol depend on PB
 		msg.WriteShort( 0 );
 		clientPort.SendPacket( serverAddress, msg.GetData(), msg.GetSize() );
-
+#if ID_ENFORCE_KEY_CLIENT
 		if( idAsyncNetwork::LANServer.GetBool() )
 		{
 			common->Printf( "net_LANServer is set, connecting in LAN mode\n" );
 		}
 		else
 		{
-#if defined(USE_CDKEY)
 			// emit a cd key authorization request
 			// modified at protocol 1.37 for XP key addition
 			msg.BeginWriting();
@@ -1973,8 +1968,14 @@ void idAsyncClient::SetupConnection()
 				msg.WriteString( xpkey );
 			}
 			clientPort.SendPacket( idAsyncNetwork::GetMasterAddress(), msg.GetData(), msg.GetSize() );
-#endif
 		}
+#else
+		if( ! Sys_IsLANAddress( serverAddress ) )
+		{
+			common->Printf( "Build Does not have CD Key Enforcement enabled. The Server ( %s ) is not within the lan addresses. Attemting to connect.\n", Sys_NetAdrToString( serverAddress ) );
+		}
+		common->Printf( "Not Testing key.\n" );
+#endif
 	}
 	else
 	{
@@ -2319,7 +2320,7 @@ void idAsyncClient::HandleDownloads()
 						fileSystem->CloseFile( f );
 						if( session->MessageBox( MSG_YESNO, common->GetLanguageDict()->GetString( "#str_04331" ), common->GetLanguageDict()->GetString( "#str_04332" ), true, "yes" )[0] )
 						{
-							if( updateMime == FILE_EXEC )
+							if( updateMime == DL_FILE_EXEC )
 							{
 								sys->StartProcess( fullPath, true );
 							}

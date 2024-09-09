@@ -249,8 +249,8 @@ ID_INLINE void idVec2::Clamp( const idVec2& min, const idVec2& max )
 
 ID_INLINE void idVec2::Snap()
 {
-	x = floor( x + 0.5f );
-	y = floor( y + 0.5f );
+	x = floorf( x + 0.5f );
+	y = floorf( y + 0.5f );
 }
 
 ID_INLINE void idVec2::SnapInt()
@@ -429,6 +429,13 @@ public:
 	const float* 	ToFloatPtr() const;
 	float* 			ToFloatPtr();
 	const char* 	ToString( int precision = 2 ) const;
+
+	// RB: assumes to be normalized, result is an octrahedral vector on the [-1, +1] square
+	idVec2			ToOctahedral() const;
+
+	// builds a 3D unit vector from an an octrahedral vector on the [-1, +1] square
+	void			FromOctahedral( const idVec2& v );
+	// RB end
 
 	void			NormalVectors( idVec3& left, idVec3& down ) const;	// vector should be normalized
 	void			OrthogonalBasis( idVec3& left, idVec3& up ) const;
@@ -834,9 +841,9 @@ ID_INLINE void idVec3::Clamp( const idVec3& min, const idVec3& max )
 
 ID_INLINE void idVec3::Snap()
 {
-	x = floor( x + 0.5f );
-	y = floor( y + 0.5f );
-	z = floor( z + 0.5f );
+	x = floorf( x + 0.5f );
+	y = floorf( y + 0.5f );
+	z = floorf( z + 0.5f );
 }
 
 ID_INLINE void idVec3::SnapInt()

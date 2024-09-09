@@ -117,7 +117,7 @@ void idEditWindow::CommonInit()
 	sizeBias = 0;
 	lastTextLength = 0;
 	forceScroll = false;
-	password = false;
+	password = false; // DG: this is a bool, so use false, not NULL
 	cvar = NULL;
 	liveUpdate = true;
 	readonly = false;
@@ -137,7 +137,7 @@ idEditWindow::~idEditWindow()
 
 }
 
-void idEditWindow::GainFocus( bool scripts )
+void idEditWindow::GainFocus()
 {
 	cursorPos = text.Length();
 	EnsureCursorVisible();
@@ -806,9 +806,7 @@ void idEditWindow::UpdateCvar( bool read, bool force )
 idEditWindow::RunNamedEvent
 ============
 */
-// RB: added parm recurseChildren
-void idEditWindow::RunNamedEvent( const char* eventName, bool recurseChildren )
-// RB end
+void idEditWindow::RunNamedEvent( const char* eventName )
 {
 	idStr event, group;
 

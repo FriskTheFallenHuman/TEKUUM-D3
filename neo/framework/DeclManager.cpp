@@ -210,7 +210,7 @@ public:
 	//BSM Added for the material editors rename capabilities
 	virtual bool				RenameDecl( declType_t type, const char* oldName, const char* newName );
 
-	virtual void				MediaPrint( VERIFY_FORMAT_STRING const char* fmt, ... );
+	virtual void				MediaPrint( VERIFY_FORMAT_STRING const char* fmt, ... ) ID_INSTANCE_ATTRIBUTE_PRINTF( 1, 2 );
 	virtual void				WritePrecacheCommands( idFile* f );
 
 	virtual const idMaterial* 		FindMaterial( const char* name, bool makeDefault = true );
@@ -1280,12 +1280,16 @@ const idDecl* idDeclManagerLocal::FindType( declType_t type, const char* name, b
 	// if it hasn't been parsed yet, parse it now
 	if( decl->declState == DS_UNPARSED )
 	{
+		// GK: Let's hope I didn't break anything important with that
+		// RB answer: this should be no issue with Vulkan but could remain a problem with OpenGL
+#if 0
 		if( !idLib::IsMainThread() )
 		{
 			// we can't load images from a background thread on OpenGL,
 			// the renderer on the main thread should parse it if needed
 			idLib::Error( "Attempted to load %s decl '%s' from game thread!", GetDeclNameFromType( type ), name );
 		}
+#endif
 		decl->ParseLocal();
 	}
 
@@ -2291,6 +2295,7 @@ idDeclLocal::idDeclLocal()
 	everReferenced = false;
 	redefinedInReload = false;
 	nextInFile = NULL;
+	self = NULL;
 }
 
 /*

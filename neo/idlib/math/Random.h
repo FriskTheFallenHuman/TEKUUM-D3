@@ -145,7 +145,7 @@ ID_INLINE unsigned int idRandom2::GetSeed() const
 
 ID_INLINE int idRandom2::RandomInt()
 {
-	seed = 1664525L * seed + 1013904223L;
+	seed = 1664525 * seed + 1013904223;
 	return ( ( int ) seed & idRandom2::MAX_RAND );
 }
 
@@ -161,7 +161,7 @@ ID_INLINE int idRandom2::RandomInt( int max )
 ID_INLINE float idRandom2::RandomFloat()
 {
 	unsigned int i;
-	seed = 1664525L * seed + 1013904223L;
+	seed = 1664525 * seed + 1013904223;
 	i = idRandom2::IEEE_ONE | ( seed & idRandom2::IEEE_MASK );
 	return ( ( *( float* )&i ) - 1.0f );
 }
@@ -173,6 +173,5 @@ ID_INLINE float idRandom2::CRandomFloat()
 	i = idRandom2::IEEE_ONE | ( seed & idRandom2::IEEE_MASK );
 	return ( 2.0f * ( *( float* )&i ) - 3.0f );
 }
-// DG end
 
 #endif /* !__MATH_RANDOM_H__ */

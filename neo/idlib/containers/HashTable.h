@@ -208,7 +208,7 @@ ID_INLINE idHashTableT<_key_, _value_>::idHashTableT( const int tableSize )
 
 	this->tableSize = tableSize;
 
-	heads = new( TAG_IDLIB_HASH ) hashnode_t* [ tableSize ];
+	heads = new hashnode_t* [ tableSize ];
 	memset( heads, 0, sizeof( hashnode_t* ) * tableSize );
 
 	numEntries = 0;
@@ -688,7 +688,7 @@ ID_INLINE idHashTable<Type>::idHashTable( const idHashTable<Type>& map )
 	assert( map.tablesize > 0 );
 
 	tablesize		= map.tablesize;
-	heads			= new( TAG_IDLIB_HASH ) hashnode_s *[ tablesize ];
+	heads			= new hashnode_s *[ tablesize ];
 	numentries		= map.numentries;
 	tablesizemask	= map.tablesizemask;
 
@@ -703,7 +703,7 @@ ID_INLINE idHashTable<Type>::idHashTable( const idHashTable<Type>& map )
 		prev = &heads[ i ];
 		for( node = map.heads[ i ]; node != NULL; node = node->next )
 		{
-			*prev = new( TAG_IDLIB_HASH ) hashnode_s( node->key, node->value, NULL );
+			*prev = new hashnode_s( node->key, node->value, NULL );
 			prev = &( *prev )->next;
 		}
 	}

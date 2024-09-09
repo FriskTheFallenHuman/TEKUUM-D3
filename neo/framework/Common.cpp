@@ -109,7 +109,6 @@ idCVar com_timescale( "timescale", "1", CVAR_SYSTEM | CVAR_FLOAT, "scales the ti
 idCVar com_logFileName( "logFileName", "qconsole.log", CVAR_SYSTEM | CVAR_NOCHEAT, "name of log file, if empty, qconsole.log will be used" );
 idCVar com_makingBuild( "com_makingBuild", "0", CVAR_BOOL | CVAR_SYSTEM, "1 when making a build" );
 idCVar com_updateLoadSize( "com_updateLoadSize", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "update the load size after loading a map" );
-idCVar com_videoRam( "com_videoRam", "64", CVAR_INTEGER | CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_ARCHIVE, "holds the last amount of detected video ram" );
 
 idCVar com_productionMode( "com_productionMode", "0", CVAR_SYSTEM | CVAR_BOOL, "0 - no special behavior, 1 - building a production build, 2 - running a production build" );
 
@@ -156,7 +155,7 @@ class idCommonLocal : public idCommon
 public:
 	idCommonLocal();
 
-	virtual void				Init( int argc, const char* const* argv, const char* cmdline );
+	virtual void				Init( int argc, char** argv );
 	virtual void				Shutdown();
 	virtual void				Quit();
 	virtual bool				IsInitialized() const;
@@ -204,7 +203,7 @@ private:
 	void						InitRenderSystem();
 	void						InitSIMD();
 	bool						AddStartupCommands();
-	void						ParseCommandLine( int argc, const char* const* argv );
+	void						ParseCommandLine( int argc, char** argv );
 	void						ClearCommandLine();
 	bool						SafeMode();
 	void						CheckToolMode();
@@ -234,7 +233,7 @@ private:
 	idStrList					warningList;
 	idStrList					errorList;
 
-	int							gameDLL;
+	uintptr_t					gameDLL;
 
 	idLangDict					languageDict;
 
@@ -422,7 +421,7 @@ void idCommonLocal::VPrintf( const char* fmt, va_list args )
 	{
 		msg[sizeof( msg ) - 2] = '\n';
 		msg[sizeof( msg ) - 1] = '\0'; // avoid output garbling
-		Sys_Printf( "idCommon::VPrintf: truncated to %d characters\n", strlen( msg ) - 1 );
+		Sys_Printf( "idCommon::VPrintf: truncated to %zd characters\n", strlen( msg ) - 1 );
 	}
 
 	if( rd_buffer )
@@ -845,25 +844,19 @@ void idCommonLocal::Error( const char* fmt, ... )
 	if( code == ERP_DISCONNECT )
 	{
 		com_errorEntered = 0;
-#if defined(USE_EXCEPTIONS)
 		throw idException( errorMessage );
-#endif
 		// The gui editor doesnt want thing to com_error so it handles exceptions instead
 	}
 	else if( com_editors & ( EDITOR_GUI | EDITOR_DEBUGGER ) )
 	{
 		com_errorEntered = 0;
-#if defined(USE_EXCEPTIONS)
 		throw idException( errorMessage );
-#endif
 	}
 	else if( code == ERP_DROP )
 	{
 		Printf( "********************\nERROR: %s\n********************\n", errorMessage );
 		com_errorEntered = 0;
-#if defined(USE_EXCEPTIONS)
 		throw idException( errorMessage );
-#endif
 	}
 	else
 	{
@@ -924,7 +917,7 @@ void idCommonLocal::FatalError( const char* fmt, ... )
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, "vid_restart partial windowed\n" );
 	}
 
-	Sys_SetFatalError( errorMessage );
+	Sys_Printf( "shutting down: %s\n", errorMessage );
 
 	Shutdown();
 
@@ -939,9 +932,7 @@ idCommonLocal::Quit
 void idCommonLocal::Quit()
 {
 
-// RB begin
-#if defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 	if( com_editors & EDITOR_RADIANT )
 	{
 		RadiantInit();
@@ -985,12 +976,11 @@ idCmdArgs	com_consoleLines[MAX_CONSOLE_LINES];
 idCommonLocal::ParseCommandLine
 ==================
 */
-void idCommonLocal::ParseCommandLine( int argc, const char* const* argv )
+void idCommonLocal::ParseCommandLine( int argc, char** argv )
 {
-	int i, current_count;
+	int i;
 
 	com_numConsoleLines = 0;
-	current_count = 0;
 	// API says no program path
 	for( i = 0; i < argc; i++ )
 	{
@@ -1181,9 +1171,7 @@ idCommonLocal::InitTool
 */
 void idCommonLocal::InitTool( const toolFlag_t tool, const idDict* dict )
 {
-// RB begin
-#if defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 	if( tool & EDITOR_SOUND )
 	{
 		SoundEditorInit( dict );
@@ -1225,7 +1213,7 @@ void idCommonLocal::WriteFlaggedCVarsToFile( const char* filename, int flags, co
 {
 	idFile* f;
 
-	f = fileSystem->OpenFileWrite( filename );
+	f = fileSystem->OpenFileWrite( filename, "fs_configpath" );
 	if( !f )
 	{
 		Printf( "Couldn't write %s.\n", filename );
@@ -1251,7 +1239,7 @@ void idCommonLocal::WriteConfigToFile( const char* filename )
 	idBase64 out;
 #endif
 
-	f = fileSystem->OpenFileWrite( filename );
+	f = fileSystem->OpenFileWrite( filename, "fs_configpath" );
 	if( !f )
 	{
 		Printf( "Couldn't write %s.\n", filename );
@@ -1302,9 +1290,7 @@ void idCommonLocal::WriteConfiguration()
 	com_developer.SetBool( false );
 
 	WriteConfigToFile( CONFIG_FILE );
-#if defined(USE_CDKEY)
 	session->WriteCDKey( );
-#endif
 
 	// restore the developer cvar
 	com_developer.SetBool( developer );
@@ -1356,10 +1342,7 @@ int	idCommonLocal::KeyState( int key )
 
 //============================================================================
 
-
-// RB begin
-#if defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 /*
 ==================
 Com_Editor_f
@@ -1399,7 +1382,7 @@ Com_EditGUIs_f
 */
 static void Com_EditGUIs_f( const idCmdArgs& args )
 {
-	//GUIEditorInit();
+	GUIEditorInit();
 }
 
 /*
@@ -1413,46 +1396,7 @@ static void Com_MaterialEditor_f( const idCmdArgs& args )
 	soundSystem->SetMute( true );
 	MaterialEditorInit();
 }
-
-#endif // defined(USE_MFC_TOOLS)
-
-// RB begin
-#if defined(USE_GTK_TOOLS)
-/*
-=============
-Com_GtkTestEditor_f
-=============
-*/
-static void Com_GtkTestEditor_f( const idCmdArgs& args )
-{
-
-	GtkTestEditorInit();
-}
-#endif // defined(USE_GTK_TOOLS)
-
-
-#if defined(USE_QT_TOOLS)
-/*
-=============
-Com_QtRadiant_f
-=============
-*/
-static void Com_QtRadiant_f( const idCmdArgs& args )
-{
-	QtRadiantInit();
-}
-
-/*
-=============
-Com_QtStringEditor_f
-=============
-*/
-static void Com_QtStringEditor_f( const idCmdArgs& args )
-{
-	QtStringEditorInit();
-}
-#endif // defined(USE_QT_TOOLS)
-
+#endif // ID_ALLOW_TOOLS
 
 CONSOLE_COMMAND( testFormattingSizes, "test printf format security", 0 )
 {
@@ -1484,8 +1428,6 @@ static void PrintMemInfo_f( const idCmdArgs& args )
 	renderSystem->PrintMemInfo( &mi );			// textures and models
 	soundSystem->PrintMemInfo( &mi );			// sounds
 
-
-
 	common->Printf( " Used image memory: %s bytes\n", idStr::FormatNumber( mi.imageAssetsTotal ).c_str() );
 	mi.assetTotals += mi.imageAssetsTotal;
 
@@ -1512,9 +1454,7 @@ static void PrintMemInfo_f( const idCmdArgs& args )
 	fileSystem->CloseFile( f );
 }
 
-// RB begin
-#if defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 /*
 ==================
 Com_EditLights_f
@@ -1586,7 +1526,7 @@ static void Com_EditPDAs_f( const idCmdArgs& args )
 {
 	PDAEditorInit( NULL );
 }
-#endif // #if defined(USE_MFC_TOOLS)
+#endif // ID_ALLOW_TOOLS
 
 /*
 ==================
@@ -1666,15 +1606,11 @@ static void Com_Crash_f( const idCmdArgs& args )
 		return;
 	}
 
-// RB: added platform specific break point tools
-#if defined(MSVC)
-	__debugbreak();
-#elif defined(__GNUC__)
+#ifdef __GNUC__
 	__builtin_trap();
 #else
 	* ( int* ) 0 = 0x12345678;
 #endif
-// RB end
 }
 
 /*
@@ -1725,10 +1661,6 @@ void Com_SetMachineSpec_f( const idCmdArgs& args )
 Com_ExecMachineSpecs_f
 =================
 */
-#ifdef MACOS_X
-	void OSX_GetVideoCard( int& outVendorId, int& outDeviceId );
-	bool OSX_GetCPUIdentification( int& cpuId, bool& oldArchitecture );
-#endif
 void Com_ExecMachineSpec_f( const idCmdArgs& args )
 {
 	if( com_machineSpec.GetInteger() == 3 )
@@ -1820,41 +1752,8 @@ void Com_ExecMachineSpec_f( const idCmdArgs& args )
 		cvarSystem->SetCVarInteger( "r_multiSamples", 0, CVAR_ARCHIVE );
 	}
 
-	if( Sys_GetVideoRam() < 128 )
-	{
-		cvarSystem->SetCVarBool( "image_ignoreHighQuality", true, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "image_downSize", 1, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "image_downSizeLimit", 256, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "image_downSizeSpecular", 1, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "image_downSizeSpecularLimit", 64, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "image_downSizeBump", 1, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "image_downSizeBumpLimit", 256, CVAR_ARCHIVE );
-
-#if defined(__ANDROID__)
-		//if ( !glconfig.textureCompressionAvailable )
-		{
-			//cvarSystem->SetCVarInteger( "image_downSizeLimit", 64, CVAR_ARCHIVE );
-			//cvarSystem->SetCVarInteger( "image_downSizeBumpLimit", 64, CVAR_ARCHIVE );
-		}
-#endif
-	}
-
-	if( Sys_GetSystemRam() < 512 )
-	{
-		cvarSystem->SetCVarBool( "image_ignoreHighQuality", true, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "s_maxSoundsPerShader", 1, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "image_downSize", 1, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "image_downSizeLimit", 256, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "image_downSizeSpecular", 1, CVAR_ARCHIVE );
-		cvarSystem->SetCVarInteger( "image_downSizeSpecularLimit", 64, CVAR_ARCHIVE );
-		cvarSystem->SetCVarBool( "com_purgeAll", true, CVAR_ARCHIVE );
-		cvarSystem->SetCVarBool( "r_forceLoadImages", true, CVAR_ARCHIVE );
-	}
-	else
-	{
-		cvarSystem->SetCVarBool( "com_purgeAll", false, CVAR_ARCHIVE );
-		cvarSystem->SetCVarBool( "r_forceLoadImages", false, CVAR_ARCHIVE );
-	}
+	cvarSystem->SetCVarBool( "com_purgeAll", false, CVAR_ARCHIVE );
+	cvarSystem->SetCVarBool( "r_forceLoadImages", false, CVAR_ARCHIVE );
 
 	bool oldCard = false;
 	bool nv10or20 = false;
@@ -1877,23 +1776,6 @@ void Com_ExecMachineSpec_f( const idCmdArgs& args )
 	{
 		cvarSystem->SetCVarInteger( "image_useNormalCompression", 1, CVAR_ARCHIVE );
 	}
-
-#if MACOS_X
-	// On low settings, G4 systems & 64MB FX5200/NV34 Systems should default shadows off
-	bool oldArch;
-	int vendorId, deviceId, cpuId;
-	OSX_GetVideoCard( vendorId, deviceId );
-	OSX_GetCPUIdentification( cpuId, oldArch );
-	bool isFX5200 = vendorId == 0x10DE && ( deviceId & 0x0FF0 ) == 0x0320;
-	if( ( oldArch || ( isFX5200 && Sys_GetVideoRam() < 128 ) ) && com_machineSpec.GetInteger() == 0 )
-	{
-		cvarSystem->SetCVarBool( "r_shadows", false, CVAR_ARCHIVE );
-	}
-	else
-	{
-		cvarSystem->SetCVarBool( "r_shadows", true, CVAR_ARCHIVE );
-	}
-#endif
 }
 
 /*
@@ -2599,6 +2481,7 @@ void Com_LocalizeMaps_f( const idCmdArgs& args )
 	else
 	{
 		idStrList files;
+		//wow, what now? a hardcoded path?
 		GetFileList( "z:/d3xp/d3xp/maps/game", "*.map", files );
 		for( int i = 0; i < files.Num(); i++ )
 		{
@@ -2905,7 +2788,7 @@ void idCommonLocal::InitCommands()
 	cmdSystem->AddCommand( "setMachineSpec", Com_SetMachineSpec_f, CMD_FL_SYSTEM, "detects system capabilities and sets com_machineSpec to appropriate value" );
 	cmdSystem->AddCommand( "execMachineSpec", Com_ExecMachineSpec_f, CMD_FL_SYSTEM, "execs the appropriate config files and sets cvars based on com_machineSpec" );
 
-#if	!defined(ID_DEMO_BUILD) && !defined(ID_DEDICATED) && defined(USE_CMDLINE_TOOLS)
+#if	!defined(ID_DEDICATED) && defined(USE_CMDLINE_TOOLS)
 	// compilers
 	cmdSystem->AddCommand( "dmap", Dmap_f, CMD_FL_TOOL, "compiles a map", idCmdSystem::ArgCompletion_MapName );
 //	cmdSystem->AddCommand( "renderbump", RenderBump_f, CMD_FL_TOOL, "renders a bump map", idCmdSystem::ArgCompletion_ModelName );
@@ -2916,9 +2799,7 @@ void idCommonLocal::InitCommands()
 	cmdSystem->AddCommand( "roq", RoQFileEncode_f, CMD_FL_TOOL, "encodes a roq file" );
 #endif
 
-// RB begin
-#if defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 	// editors
 	cmdSystem->AddCommand( "editor", Com_Editor_f, CMD_FL_TOOL, "launches the level editor Radiant" );
 	cmdSystem->AddCommand( "editLights", Com_EditLights_f, CMD_FL_TOOL, "launches the in-game Light Editor" );
@@ -2933,16 +2814,6 @@ void idCommonLocal::InitCommands()
 
 	//BSM Nerve: Add support for the material editor
 	//cmdSystem->AddCommand( "materialEditor", Com_MaterialEditor_f, CMD_FL_TOOL, "launches the Material Editor" );
-#endif
-
-	// RB begin
-#if defined(USE_GTK_TOOLS)
-	cmdSystem->AddCommand( "gtkTestEditor", Com_GtkTestEditor_f, CMD_FL_TOOL, "launches the GtkTest Editor" );
-#endif
-
-#if defined(USE_QT_TOOLS)
-	cmdSystem->AddCommand( "qtRadiant", Com_QtRadiant_f, CMD_FL_TOOL, "launches the QtRadiant Level Editor" );
-	cmdSystem->AddCommand( "editStrings", Com_QtStringEditor_f, CMD_FL_TOOL, "launches the Qt localization String Editor" );
 #endif
 
 	cmdSystem->AddCommand( "generateMaterialTables", Com_GenerateSinCosTables_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "generates tables required by the engine to run" );
@@ -2999,11 +2870,7 @@ void idCommonLocal::InitRenderSystem()
 	// initialize the renderSystem data structures
 	renderSystem->Init();
 
-#if defined(STANDALONE)
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_idCommonLocal_InitRenderSystem_Loading" ) );
-#else
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04343" ) );
-#endif
 }
 
 /*
@@ -3090,13 +2957,8 @@ idCommonLocal::Frame
 */
 void idCommonLocal::Frame()
 {
-
-// RB begin
-#if defined(USE_EXCEPTIONS)
 	try
-#endif
 	{
-// RB end
 
 		// pump all the events
 		Sys_GenerateEvents();
@@ -3121,14 +2983,7 @@ void idCommonLocal::Frame()
 			if( idAsyncNetwork::serverDedicated.GetInteger() != 1 )
 			{
 				session->GuiFrameEvents();
-
-				// RB begin
-#if defined(__ANDROID__) && !defined(USE_NATIVE_ACTIVITY)
-				session->UpdateScreen( true, false, false );
-#else
 				session->UpdateScreen( true, false, true );
-#endif
-				// RB end
 			}
 		}
 		else
@@ -3136,14 +2991,7 @@ void idCommonLocal::Frame()
 			session->Frame();
 
 			// normal, in-sequence screen update
-
-			// RB begin
-#if defined(__ANDROID__) && !defined(USE_NATIVE_ACTIVITY)
-			session->UpdateScreen( true, false, false );
-#else
 			session->UpdateScreen( true, false, true );
-#endif
-			// RB end
 		}
 
 		// report timing information
@@ -3173,23 +3021,12 @@ void idCommonLocal::Frame()
 
 		// set idLib frame number for frame based memory dumps
 		idLib::frameNumber = com_frameNumber;
-
-		// the FPU stack better be empty at this point or some bad code or compiler bug left values on the stack
-		if( !Sys_FPU_StackIsEmpty() )
-		{
-			Printf( "%s", Sys_FPU_GetState() );
-			FatalError( "idCommon::Frame: the FPU stack is not empty at the end of the frame\n" );
-		}
 	}
 
-// RB begin
-#if defined(USE_EXCEPTIONS)
 	catch( idException& )
 	{
 		return;			// an ERP_DROP was thrown
 	}
-#endif
-// RB end
 }
 
 /*
@@ -3266,10 +3103,13 @@ void idCommonLocal::SingleAsyncTic()
 	switch( com_asyncSound.GetInteger() )
 	{
 		case 1:
-			soundSystem->AsyncUpdate( stat->milliseconds );
-			break;
 		case 3:
+			// DG: these are now used for the new default behavior of "update every async tic (every 16ms)"
 			soundSystem->AsyncUpdateWrite( stat->milliseconds );
+			break;
+		case 2:
+			// DG: use 2 for the old "update only 10x/second" behavior in case anyone likes that..
+			soundSystem->AsyncUpdate( stat->milliseconds );
 			break;
 	}
 
@@ -3392,7 +3232,7 @@ void idCommonLocal::LoadGameDLL()
 	if( !GetGameAPI )
 	{
 		Sys_DLL_Unload( gameDLL );
-		gameDLL = NULL;
+		gameDLL = 0;
 		common->FatalError( "couldn't find game DLL API" );
 		return;
 	}
@@ -3417,7 +3257,7 @@ void idCommonLocal::LoadGameDLL()
 	if( gameExport.version != GAME_API_VERSION )
 	{
 		Sys_DLL_Unload( gameDLL );
-		gameDLL = NULL;
+		gameDLL = 0;
 		common->FatalError( "wrong game DLL API version" );
 		return;
 	}
@@ -3453,7 +3293,7 @@ void idCommonLocal::UnloadGameDLL()
 	if( gameDLL )
 	{
 		Sys_DLL_Unload( gameDLL );
-		gameDLL = NULL;
+		gameDLL = 0;
 	}
 	game = NULL;
 	gameEdit = NULL;
@@ -3480,26 +3320,21 @@ void idCommonLocal::SetMachineSpec()
 {
 	cpuid_t	cpu = Sys_GetProcessorId();
 	double ghz = Sys_ClockTicksPerSecond() * 0.000000001f;
-	int vidRam = Sys_GetVideoRam();
 	int sysRam = Sys_GetSystemRam();
-	bool oldCard = false;
-	bool nv10or20 = false;
 
-	//renderSystem->GetCardCaps( oldCard, nv10or20 );
+	Printf( "Detected\n \t%.2f GHz CPU\n\t%i MB of System memory\n\n", ghz, sysRam );
 
-	Printf( "Detected\n \t%.2f GHz CPU\n\t%i MB of System memory\n\t%i MB of Video memory on %s\n\n", ghz, sysRam, vidRam, ( oldCard ) ? "a less than optimal video architecture" : "an optimal video architecture" );
-
-	if( ghz >= 2.75f && vidRam >= 512 && sysRam >= 1024 && !oldCard )
+	if( ghz >= 2.75f && sysRam >= 1024 )
 	{
 		Printf( "This system qualifies for Ultra quality!\n" );
 		com_machineSpec.SetInteger( 3 );
 	}
-	else if( ghz >= ( ( cpu & CPUID_AMD ) ? 1.9f : 2.19f ) && vidRam >= 256 && sysRam >= 512 && !oldCard )
+	else if( ghz >= ( ( cpu & CPUID_AMD ) ? 1.9f : 2.19f ) && sysRam >= 512 )
 	{
 		Printf( "This system qualifies for High quality!\n" );
 		com_machineSpec.SetInteger( 2 );
 	}
-	else if( ghz >= ( ( cpu & CPUID_AMD ) ? 1.1f : 1.25f ) && vidRam >= 128 && sysRam >= 384 )
+	else if( ghz >= ( ( cpu & CPUID_AMD ) ? 1.1f : 1.25f ) && sysRam >= 384 )
 	{
 		Printf( "This system qualifies for Medium quality.\n" );
 		com_machineSpec.SetInteger( 1 );
@@ -3509,7 +3344,6 @@ void idCommonLocal::SetMachineSpec()
 		Printf( "This system qualifies for Low quality.\n" );
 		com_machineSpec.SetInteger( 0 );
 	}
-	com_videoRam.SetInteger( vidRam );
 }
 
 /*
@@ -3517,15 +3351,11 @@ void idCommonLocal::SetMachineSpec()
 idCommonLocal::Init
 =================
 */
-void idCommonLocal::Init( int argc, const char* const* argv, const char* cmdline )
+void idCommonLocal::Init( int argc, char** argv )
 {
 
-// RB begin
-#if defined(USE_EXCEPTIONS)
 	try
-#endif
 	{
-// RB end
 
 		// set interface pointers used by idLib
 		idLib::sys			= sys;
@@ -3540,13 +3370,6 @@ void idCommonLocal::Init( int argc, const char* const* argv, const char* cmdline
 		ClearWarnings( GAME_NAME " initialization" );
 
 		// parse command line options
-		idCmdArgs args;
-		if( cmdline )
-		{
-			// tokenize if the OS doesn't do it for us
-			args.TokenizeString( cmdline, true );
-			argv = args.GetArgs( &argc );
-		}
 		ParseCommandLine( argc, argv );
 
 		// init console command system
@@ -3579,10 +3402,8 @@ void idCommonLocal::Init( int argc, const char* const* argv, const char* cmdline
 		// override cvars from command line
 		StartupVariable( NULL, false );
 
-		if( !idAsyncNetwork::serverDedicated.GetInteger() && Sys_AlreadyRunning() )
-		{
-			Sys_Quit();
-		}
+		// set fpu double extended precision
+		Sys_FPU_SetPrecision();
 
 		// initialize processor specific SIMD implementation
 		InitSIMD();
@@ -3626,14 +3447,10 @@ void idCommonLocal::Init( int argc, const char* const* argv, const char* cmdline
 		com_fullyInitialized = true;
 	}
 
-// RB begin
-#if defined(USE_EXCEPTIONS)
 	catch( idException& )
 	{
 		Sys_Error( "Error during initialization" );
 	}
-#endif
-// RB end
 
 // RB begin
 #if defined(USE_SDL_ASYNC)
@@ -3724,7 +3541,7 @@ void idCommonLocal::InitGame()
 	// force r_fullscreen 0 if running a tool
 	CheckToolMode();
 
-	idFile* file = fileSystem->OpenExplicitFileRead( fileSystem->RelativePathToOSPath( CONFIG_SPEC, "fs_savepath" ) );
+	idFile* file = fileSystem->OpenExplicitFileRead( fileSystem->RelativePathToOSPath( CONFIG_SPEC, "fs_configpath" ) );
 	bool sysDetect = ( file == NULL );
 	if( file )
 	{
@@ -3732,7 +3549,7 @@ void idCommonLocal::InitGame()
 	}
 	else
 	{
-		file = fileSystem->OpenFileWrite( CONFIG_SPEC );
+		file = fileSystem->OpenFileWrite( CONFIG_SPEC, "fs_configpath" );
 		fileSystem->CloseFile( file );
 	}
 
@@ -3751,13 +3568,7 @@ void idCommonLocal::InitGame()
 	// initialize string database right off so we can use it for loading messages
 	InitLanguageDict();
 
-	/*
-	#if defined(STANDALONE)
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_idCommonLocal_InitGame_Initialising_events" ) );
-	#else
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04344" ) );
-	#endif
-	*/
 
 	// load the font, etc
 	//console->LoadGraphics();
@@ -3765,13 +3576,7 @@ void idCommonLocal::InitGame()
 	// init journalling, etc
 	eventLoop->Init();
 
-	/*
-	#if defined(STANDALONE)
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_idCommonLocal_InitGame_Executing_startup_commands" ) );
-	#else
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04345" ) );
-	#endif
-	*/
 
 	// exec the startup scripts
 	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "exec editor.cfg\n" );
@@ -3796,27 +3601,12 @@ void idCommonLocal::InitGame()
 	// if any archived cvars are modified after this, we will trigger a writing of the config file
 	cvarSystem->ClearModifiedFlags( CVAR_ARCHIVE );
 
-	// cvars are initialized, but not the rendering system. Allow preference startup dialog
-	Sys_DoPreferences();
-
-	/*
-	#if defined(STANDALONE)
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_idCommonLocal_InitGame_Initialising_sound" ) );
-	#else
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04346" ) );
-	#endif
-	*/
 
 	// start the sound system, but don't do any hardware operations yet
 	soundSystem->Init();
 
-	/*
-	#if defined(STANDALONE)
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_idCommonLocal_InitGame_Initialising_network" ) );
-	#else
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04347" ) );
-	#endif
-	*/
 
 	// init async network
 	idAsyncNetwork::Init();
@@ -3832,24 +3622,13 @@ void idCommonLocal::InitGame()
 	}
 	else
 	{
-		/*
 		// init OpenGL, which will open a window and connect sound and input hardware
-#if defined(STANDALONE)
-		PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_idCommonLocal_InitGame_Initialising_render_system" ) );
-#else
 		PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04348" ) );
-#endif
-		*/
-
 		InitRenderSystem();
 	}
 #endif
 
-#if defined(STANDALONE)
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_idCommonLocal_InitGame_Initialising_user_interface" ) );
-#else
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04349" ) );
-#endif
 
 	// RB: moved down here to build rectangles for touch screen interfaces
 	// init the user command input code
@@ -3865,20 +3644,12 @@ void idCommonLocal::InitGame()
 #endif
 	// RB end
 
-#if defined(STANDALONE)
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_idCommonLocal_InitGame_Loading_game" ) );
-#else
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04350" ) );
-#endif
 
 	// load the game dll
 	LoadGameDLL();
 
-#if defined(STANDALONE)
-	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_idCommonLocal_InitGame_Initialising_menus" ) );
-#else
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04351" ) );
-#endif
 
 	// RB: load the console history file
 	consoleHistory.LoadHistoryFile();
@@ -3886,10 +3657,6 @@ void idCommonLocal::InitGame()
 
 	// init the session
 	session->Init();
-
-#if defined(__ANDROID__) && !defined(USE_NATIVE_ACTIVITY)
-	ji.HideProgressDialog();
-#endif
 
 	// have to do this twice.. first one sets the correct r_mode for the renderer init
 	// this time around the backend is all setup correct.. a bit fugly but do not want
@@ -3920,7 +3687,6 @@ void idCommonLocal::ShutdownGame( bool reloading )
 	{
 		sw->StopAllSounds();
 	}
-	soundSystem->ClearBuffer();
 
 	// shutdown the script debugger
 	// RB begin
@@ -3963,7 +3729,7 @@ void idCommonLocal::ShutdownGame( bool reloading )
 	UnloadGameDLL();
 
 	// dump warnings to "warnings.txt"
-#ifdef DEBUG
+#ifdef _DEBUG
 	DumpWarnings();
 #endif
 	// only shut down the log file after all output is done

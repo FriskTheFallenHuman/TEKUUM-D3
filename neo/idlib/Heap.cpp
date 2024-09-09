@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2012-2013 Robert Beckebans
+Copyright (C) 2012 Robert Beckebans
 Copyright (C) 2012 Daniel Gibson
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
@@ -45,7 +45,7 @@ Mem_Alloc16
 ==================
 */
 // RB: 64 bit fixes, changed int to size_t
-void* Mem_Alloc16( const size_t size, const memTag_t tag )
+void* Mem_Alloc16( const size_t size )
 // RB end
 {
 	if( !size )
@@ -53,19 +53,16 @@ void* Mem_Alloc16( const size_t size, const memTag_t tag )
 		return NULL;
 	}
 	const size_t paddedSize = ( size + 15 ) & ~15;
-#if defined(_WIN32)
+#ifdef _WIN32
 	// this should work with MSVC and mingw, as long as __MSVCRT_VERSION__ >= 0x0700
 	return _aligned_malloc( paddedSize, 16 );
-
-#elif defined(__ANDROID__)
-	return memalign( 16, paddedSize );
-#else
+#else // not _WIN32
 	// DG: the POSIX solution for linux etc
 	void* ret;
 	posix_memalign( &ret, 16, paddedSize );
 	return ret;
 	// DG end
-#endif
+#endif // _WIN32
 }
 
 /*
@@ -79,14 +76,14 @@ void Mem_Free16( void* ptr )
 	{
 		return;
 	}
-#if defined(_WIN32)
+#ifdef _WIN32
 	_aligned_free( ptr );
-#else
+#else // not _WIN32
 	// DG: Linux/POSIX compatibility
 	// can use normal free() for aligned memory
 	free( ptr );
 	// DG end
-#endif
+#endif // _WIN32
 }
 
 /*
@@ -94,9 +91,9 @@ void Mem_Free16( void* ptr )
 Mem_ClearedAlloc
 ==================
 */
-void* Mem_ClearedAlloc( const size_t size, const memTag_t tag )
+void* Mem_ClearedAlloc( const size_t size )
 {
-	void* mem = Mem_Alloc( size, tag );
+	void* mem = Mem_Alloc( size );
 	SIMDProcessor->Memset( mem, 0, size );
 	return mem;
 }
@@ -108,7 +105,7 @@ Mem_CopyString
 */
 char* Mem_CopyString( const char* in )
 {
-	char* out = ( char* )Mem_Alloc( strlen( in ) + 1, TAG_STRING );
+	char* out = ( char* )Mem_Alloc( strlen( in ) + 1 );
 	strcpy( out, in );
 	return out;
 }

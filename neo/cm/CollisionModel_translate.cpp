@@ -37,7 +37,6 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-
 #include "CollisionModel_local.h"
 
 /*
@@ -208,12 +207,12 @@ CM_SetVertexSidedness
 */
 ID_INLINE void CM_SetVertexSidedness( cm_vertex_t* v, const idPluecker& vpl, const idPluecker& epl, const int bitNum )
 {
-	if( !( v->sideSet & ( 1 << bitNum ) ) )
+	const int mask = 1 << bitNum;
+	if( ( v->sideSet & mask ) == 0 )
 	{
-		float fl;
-		fl = vpl.PermutedInnerProduct( epl );
-		v->side = ( v->side & ~( 1 << bitNum ) ) | ( IEEE_FLT_SIGNBITSET( fl ) << bitNum );
-		v->sideSet |= ( 1 << bitNum );
+		const float fl = vpl.PermutedInnerProduct( epl );
+		v->side = ( v->side & ~mask ) | ( ( fl < 0.0f ) ? mask : 0 );
+		v->sideSet |= mask;
 	}
 }
 
@@ -226,12 +225,12 @@ CM_SetEdgeSidedness
 */
 ID_INLINE void CM_SetEdgeSidedness( cm_edge_t* edge, const idPluecker& vpl, const idPluecker& epl, const int bitNum )
 {
-	if( !( edge->sideSet & ( 1 << bitNum ) ) )
+	const int mask = 1 << bitNum;
+	if( ( edge->sideSet & mask ) == 0 )
 	{
-		float fl;
-		fl = vpl.PermutedInnerProduct( epl );
-		edge->side = ( edge->side & ~( 1 << bitNum ) ) | ( IEEE_FLT_SIGNBITSET( fl ) << bitNum );
-		edge->sideSet |= ( 1 << bitNum );
+		const float fl = vpl.PermutedInnerProduct( epl );
+		edge->side = ( edge->side & ~mask ) | ( ( fl < 0.0f ) ? mask : 0 );
+		edge->sideSet |= mask;
 	}
 }
 
@@ -358,9 +357,6 @@ void idCollisionModelManagerLocal::TranslateTrmEdgeThroughPolygon( cm_traceWork_
 CM_TranslationPlaneFraction
 ================
 */
-
-#if 0
-
 float CM_TranslationPlaneFraction( const idPlane& plane, const idVec3& start, const idVec3& end )
 {
 	const float d2 = plane.Distance( end );
@@ -377,46 +373,12 @@ float CM_TranslationPlaneFraction( const idPlane& plane, const idVec3& start, co
 		return 1.0f;
 	}
 	// leaves polygon
-	if( ( d1 - d2 )  < idMath::FLT_SMALLEST_NON_DENORMAL )
+	if( d1 - d2 < idMath::FLT_SMALLEST_NON_DENORMAL )
 	{
 		return 1.0f;
 	}
 	return ( d1 - CM_CLIP_EPSILON ) / ( d1 - d2 );
 }
-
-#else
-
-float CM_TranslationPlaneFraction( idPlane& plane, idVec3& start, idVec3& end )
-{
-	float d1, d2, d2eps;
-
-	d2 = plane.Distance( end );
-	// if the end point is closer to the plane than an epsilon we still take it for a collision
-	// if ( d2 >= CM_CLIP_EPSILON ) {
-	d2eps = d2 - CM_CLIP_EPSILON;
-	if( IEEE_FLT_SIGNBITNOTSET( d2eps ) )
-	{
-		return 1.0f;
-	}
-	d1 = plane.Distance( start );
-
-	// if completely behind the polygon
-	if( IEEE_FLT_SIGNBITSET( d1 ) )
-	{
-		return 1.0f;
-	}
-	// if going towards the front of the plane and
-	// the start and end point are not at equal distance from the plane
-	// if ( d1 > d2 )
-	d2 = d1 - d2;
-	if( d2 <= 0.0f )
-	{
-		return 1.0f;
-	}
-	return ( d1 - CM_CLIP_EPSILON ) / d2;
-}
-
-#endif
 
 /*
 ================
@@ -494,7 +456,7 @@ void idCollisionModelManagerLocal::TranslatePointThroughPolygon( cm_traceWork_t*
 				edge->checkcount = idCollisionModelManagerLocal::checkCount;
 				pl.FromLine( tw->model->vertices[edge->vertexNum[0]].p, tw->model->vertices[edge->vertexNum[1]].p );
 				fl = v->pl.PermutedInnerProduct( pl );
-				edge->side = IEEE_FLT_SIGNBITSET( fl );
+				edge->side = ( fl < 0.0f );
 			}
 			// if the point passes the edge at the wrong side
 			//if ( (edgeNum > 0) == edge->side ) {

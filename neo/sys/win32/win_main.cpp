@@ -36,8 +36,8 @@ If you have questions concerning this license or the applicable additional terms
 #include <direct.h>
 #include <io.h>
 #include <conio.h>
-#include <mapi.h>
-#include <ShellAPI.h>
+#include <shellapi.h>
+#include <shlobj.h>
 
 #ifndef __MRC__
 	#include <sys/types.h>
@@ -49,17 +49,14 @@ If you have questions concerning this license or the applicable additional terms
 #include "rc/CreateResourceIDs.h"
 #include "../../renderer/tr_local.h"
 
-idCVar Win32Vars_t::sys_arch( "sys_arch", "", CVAR_SYSTEM | CVAR_INIT, "" );
 idCVar Win32Vars_t::sys_cpustring( "sys_cpustring", "detect", CVAR_SYSTEM | CVAR_INIT, "" );
 idCVar Win32Vars_t::in_mouse( "in_mouse", "1", CVAR_SYSTEM | CVAR_BOOL, "enable mouse input" );
 idCVar Win32Vars_t::win_allowAltTab( "win_allowAltTab", "0", CVAR_SYSTEM | CVAR_BOOL, "allow Alt-Tab when fullscreen" );
 idCVar Win32Vars_t::win_notaskkeys( "win_notaskkeys", "0", CVAR_SYSTEM | CVAR_INTEGER, "disable windows task keys" );
-idCVar Win32Vars_t::win_username( "win_username", "", CVAR_SYSTEM | CVAR_INIT, "windows user name" );
 idCVar Win32Vars_t::win_outputDebugString( "win_outputDebugString", "1", CVAR_SYSTEM | CVAR_BOOL, "" );
 idCVar Win32Vars_t::win_outputEditString( "win_outputEditString", "1", CVAR_SYSTEM | CVAR_BOOL, "" );
 idCVar Win32Vars_t::win_viewlog( "win_viewlog", "0", CVAR_SYSTEM | CVAR_INTEGER, "" );
 idCVar Win32Vars_t::win_timerUpdate( "win_timerUpdate", "0", CVAR_SYSTEM | CVAR_BOOL, "allows the game to be updated while dragging the window" );
-idCVar Win32Vars_t::win_allowMultipleInstances( "win_allowMultipleInstances", "0", CVAR_SYSTEM | CVAR_BOOL, "allow multiple instances running concurrently" );
 
 Win32Vars_t	win32;
 
@@ -70,20 +67,8 @@ xthreadInfo* g_threads[MAX_THREADS];
 
 int g_thread_count = 0;
 
-static sysMemoryStats_t exeLaunchMemoryStats;
-
 static	xthreadInfo	threadInfo;
 static	HANDLE		hTimer;
-
-/*
-================
-Sys_GetExeLaunchMemoryStatus
-================
-*/
-void Sys_GetExeLaunchMemoryStatus( sysMemoryStats_t& stats )
-{
-	stats = exeLaunchMemoryStats;
-}
 
 /*
 ==================
@@ -92,13 +77,16 @@ Sys_Createthread
 */
 void Sys_CreateThread( xthread_t function, void* parms, xthreadPriority priority, xthreadInfo& info, const char* name, xthreadInfo* threads[MAX_THREADS], int* thread_count )
 {
+	DWORD id;
 	HANDLE temp = CreateThread(	NULL,	// LPSECURITY_ATTRIBUTES lpsa,
 								0,		// DWORD cbStack,
 								( LPTHREAD_START_ROUTINE )function,	// LPTHREAD_START_ROUTINE lpStartAddr,
 								parms,	// LPVOID lpvThreadParm,
 								0,		//   DWORD fdwCreate,
-								&info.threadId );
-	info.threadHandle = ( int ) temp;
+								&id );
+
+	info.threadId = id;
+	info.threadHandle = ( intptr_t ) temp;
 	if( priority == THREAD_HIGHEST )
 	{
 		SetThreadPriority( ( HANDLE )info.threadHandle, THREAD_PRIORITY_HIGHEST );		//  we better sleep enough to do this
@@ -128,16 +116,6 @@ void Sys_DestroyThread( xthreadInfo& info )
 	WaitForSingleObject( ( HANDLE )info.threadHandle, INFINITE );
 	CloseHandle( ( HANDLE )info.threadHandle );
 	info.threadHandle = 0;
-}
-
-/*
-==================
-Sys_Sentry
-==================
-*/
-void Sys_Sentry()
-{
-	int j = 0;
 }
 
 /*
@@ -229,136 +207,6 @@ void Sys_TriggerEvent( int index )
 	SetEvent( win32.backgroundDownloadSemaphore );
 }
 
-
-
-#pragma optimize( "", on )
-
-#ifdef DEBUG
-
-
-static unsigned int debug_total_alloc = 0;
-static unsigned int debug_total_alloc_count = 0;
-static unsigned int debug_current_alloc = 0;
-static unsigned int debug_current_alloc_count = 0;
-static unsigned int debug_frame_alloc = 0;
-static unsigned int debug_frame_alloc_count = 0;
-
-idCVar sys_showMallocs( "sys_showMallocs", "0", CVAR_SYSTEM, "" );
-
-// _HOOK_ALLOC, _HOOK_REALLOC, _HOOK_FREE
-
-typedef struct CrtMemBlockHeader
-{
-	struct _CrtMemBlockHeader* pBlockHeaderNext;	// Pointer to the block allocated just before this one:
-	struct _CrtMemBlockHeader* pBlockHeaderPrev;	// Pointer to the block allocated just after this one
-	char* szFileName;    // File name
-	int nLine;           // Line number
-	size_t nDataSize;    // Size of user block
-	int nBlockUse;       // Type of block
-	long lRequest;       // Allocation number
-	byte		gap[4];								// Buffer just before (lower than) the user's memory:
-} CrtMemBlockHeader;
-
-#include <crtdbg.h>
-
-/*
-==================
-Sys_AllocHook
-
-	called for every malloc/new/free/delete
-==================
-*/
-int Sys_AllocHook( int nAllocType, void* pvData, size_t nSize, int nBlockUse, long lRequest, const unsigned char* szFileName, int nLine )
-{
-	CrtMemBlockHeader*	pHead;
-	byte*				temp;
-
-	if( nBlockUse == _CRT_BLOCK )
-	{
-		return( TRUE );
-	}
-
-	// get a pointer to memory block header
-	temp = ( byte* )pvData;
-	temp -= 32;
-	pHead = ( CrtMemBlockHeader* )temp;
-
-	switch( nAllocType )
-	{
-		case	_HOOK_ALLOC:
-			debug_total_alloc += nSize;
-			debug_current_alloc += nSize;
-			debug_frame_alloc += nSize;
-			debug_total_alloc_count++;
-			debug_current_alloc_count++;
-			debug_frame_alloc_count++;
-			break;
-
-		case	_HOOK_FREE:
-			assert( pHead->gap[0] == 0xfd && pHead->gap[1] == 0xfd && pHead->gap[2] == 0xfd && pHead->gap[3] == 0xfd );
-
-			debug_current_alloc -= pHead->nDataSize;
-			debug_current_alloc_count--;
-			debug_total_alloc_count++;
-			debug_frame_alloc_count++;
-			break;
-
-		case	_HOOK_REALLOC:
-			assert( pHead->gap[0] == 0xfd && pHead->gap[1] == 0xfd && pHead->gap[2] == 0xfd && pHead->gap[3] == 0xfd );
-
-			debug_current_alloc -= pHead->nDataSize;
-			debug_total_alloc += nSize;
-			debug_current_alloc += nSize;
-			debug_frame_alloc += nSize;
-			debug_total_alloc_count++;
-			debug_current_alloc_count--;
-			debug_frame_alloc_count++;
-			break;
-	}
-	return( TRUE );
-}
-
-/*
-==================
-Sys_DebugMemory_f
-==================
-*/
-void Sys_DebugMemory_f()
-{
-	common->Printf( "Total allocation %8dk in %d blocks\n", debug_total_alloc / 1024, debug_total_alloc_count );
-	common->Printf( "Current allocation %8dk in %d blocks\n", debug_current_alloc / 1024, debug_current_alloc_count );
-}
-
-/*
-==================
-Sys_MemFrame
-==================
-*/
-void Sys_MemFrame()
-{
-	if( sys_showMallocs.GetInteger() )
-	{
-		common->Printf( "Frame: %8dk in %5d blocks\n", debug_frame_alloc / 1024, debug_frame_alloc_count );
-	}
-
-	debug_frame_alloc = 0;
-	debug_frame_alloc_count = 0;
-}
-
-#endif
-
-/*
-==================
-Sys_FlushCacheMemory
-
-On windows, the vertex buffers are write combined, so they
-don't need to be flushed from the cache
-==================
-*/
-void Sys_FlushCacheMemory( void* base, int bytes )
-{
-}
-
 /*
 =============
 Sys_Error
@@ -376,13 +224,11 @@ void Sys_Error( const char* error, ... )
 	vsprintf( text, error, argptr );
 	va_end( argptr );
 
-#if !defined(USE_QT_WINDOWING)
 	Conbuf_AppendText( text );
 	Conbuf_AppendText( "\n" );
 
 	Win_SetErrorText( text );
 	Sys_ShowConsole( 1, true );
-#endif
 
 	timeEndPeriod( 1 );
 
@@ -401,9 +247,7 @@ void Sys_Error( const char* error, ... )
 		DispatchMessage( &msg );
 	}
 
-#if !defined(USE_QT_WINDOWING)
 	Sys_DestroyConsole();
-#endif
 
 	exit( 1 );
 }
@@ -419,10 +263,7 @@ void Sys_Quit()
 	Sys_ShutdownInput();
 
 	// RB begin
-#if !defined(USE_QT_WINDOWING)
 	Sys_DestroyConsole();
-#endif
-
 
 #if defined(USE_MFC_TOOLS)
 	if( com_editors )
@@ -460,13 +301,11 @@ void Sys_Printf( const char* fmt, ... )
 	{
 		OutputDebugString( msg );
 	}
-#if !defined(USE_QT_WINDOWING)
+
 	if( win32.win_outputEditString.GetBool() && idLib::IsMainThread() )
 	{
 		Conbuf_AppendText( msg );
 	}
-#endif
-	// RB end
 }
 
 /*
@@ -599,69 +438,202 @@ const char* Sys_Cwd()
 	return cwd;
 }
 
-/*
-==============
-Sys_DefaultCDPath
-==============
-*/
-const char* Sys_DefaultCDPath()
+static int WPath2A( char* dst, size_t size, const WCHAR* src )
 {
-	return "";
+	int len;
+	BOOL default_char = FALSE;
+
+	// test if we can convert lossless
+	len = WideCharToMultiByte( CP_ACP, 0, src, -1, dst, size, NULL, &default_char );
+
+	if( default_char )
+	{
+		/* The following lines implement a horrible
+		   hack to connect the UTF-16 WinAPI to the
+		   ASCII doom3 strings. While this should work in
+		   most cases, it'll fail if the "Windows to
+		   DOS filename translation" is switched off.
+		   In that case the function will return NULL
+		   and no homedir is used. */
+		WCHAR w[MAX_OSPATH];
+		len = GetShortPathNameW( src, w, sizeof( w ) );
+
+		if( len == 0 )
+		{
+			return 0;
+		}
+
+		/* Since the DOS path contains no UTF-16 characters, convert it to the system's default code page */
+		len = WideCharToMultiByte( CP_ACP, 0, w, len, dst, size - 1, NULL, NULL );
+	}
+
+	if( len == 0 )
+	{
+		return 0;
+	}
+
+	dst[len] = 0;
+
+	/* Replace backslashes by slashes */
+	for( int i = 0; i < len; ++i )
+		if( dst[i] == '\\' )
+		{
+			dst[i] = '/';
+		}
+
+	// cut trailing slash
+	if( dst[len - 1] == '/' )
+	{
+		dst[len - 1] = 0;
+		len--;
+	}
+
+	return len;
 }
 
 /*
 ==============
-Sys_DefaultBasePath
+Returns "My Documents"/My Games/rbdoom3 directory (or equivalent - "CSIDL_PERSONAL").
+To be used with Sys_GetPath(PATH_SAVE), so savegames, screenshots etc will be
+saved to the users files instead of systemwide.
+
+Based on (with kind permission) Yamagi Quake II's Sys_GetHomeDir()
+
+Returns the number of characters written to dst
 ==============
-*/
-const char* Sys_DefaultBasePath()
-{
+ */
+extern "C" { // DG: I need this in SDL_win32_main.c
+	int Win_GetHomeDir( char* dst, size_t size )
+	{
+		int len;
+		WCHAR profile[MAX_OSPATH];
 
-// RB begin
-	static char basePath[MAX_OSPATH];
-	idStr cwdPath;
+		/* Get the path to "My Documents" directory */
+		SHGetFolderPathW( NULL, CSIDL_PERSONAL, NULL, 0, profile );
 
-	cwdPath = Sys_Cwd();
+		len = WPath2A( dst, size, profile );
+		if( len == 0 )
+		{
+			return 0;
+		}
 
-	cwdPath.Replace( "bin/win32", "" );
-	cwdPath.Replace( "bin\\win32", "" );
+		idStr::Append( dst, size, "/My Games/rbdoom3" );
 
-	cwdPath.Replace( "bin/win64", "" );
-	cwdPath.Replace( "bin\\win64", "" );
-
-	cwdPath.Replace( "/src", "" );
-	cwdPath.Replace( "\\src", "" );
-
-	cwdPath.Replace( "build", "" );
-	cwdPath.Replace( "\\build", "" );
-
-	cwdPath.Copynz( basePath, cwdPath.c_str(), sizeof( basePath ) );
-	return basePath;
-
-	//return Sys_Cwd();
-// RB end
+		return len;
+	}
 }
 
-/*
-==============
-Sys_DefaultSavePath
-==============
-*/
-const char* Sys_DefaultSavePath()
+static int GetRegistryPath( char* dst, size_t size, const WCHAR* subkey, const WCHAR* name )
 {
-	return cvarSystem->GetCVarString( "fs_basepath" );
+	WCHAR w[MAX_OSPATH];
+	DWORD len = sizeof( w );
+	HKEY res;
+	DWORD sam = KEY_QUERY_VALUE
+#ifdef _WIN64
+				| KEY_WOW64_32KEY
+#endif
+				;
+	DWORD type;
+
+	if( RegOpenKeyExW( HKEY_LOCAL_MACHINE, subkey, 0, sam, &res ) != ERROR_SUCCESS )
+	{
+		return 0;
+	}
+
+	if( RegQueryValueExW( res, name, NULL, &type, ( LPBYTE )w, &len ) != ERROR_SUCCESS )
+	{
+		RegCloseKey( res );
+		return 0;
+	}
+
+	RegCloseKey( res );
+
+	if( type != REG_SZ )
+	{
+		return 0;
+	}
+
+	return WPath2A( dst, size, w );
 }
 
-/*
-==============
-Sys_EXEPath
-==============
-*/
-const char* Sys_EXEPath()
+bool Sys_GetPath( sysPath_t type, idStr& path )
 {
-	static char exe[ MAX_OSPATH ];
-	GetModuleFileName( NULL, exe, sizeof( exe ) - 1 );
-	return exe;
+	char buf[MAX_OSPATH];
+	struct _stat st;
+	idStr s;
+
+	switch( type )
+	{
+		case PATH_BASE:
+			// try <path to exe>/base first
+			if( Sys_GetPath( PATH_EXE, path ) )
+			{
+				path.StripFilename();
+
+				s = path;
+				s.AppendPath( BASE_GAMEDIR );
+				if( _stat( s.c_str(), &st ) != -1 && ( st.st_mode & _S_IFDIR ) )
+				{
+					common->Warning( "using path of executable: %s", path.c_str() );
+					return true;
+				}
+				else
+				{
+					s = path + "/demo/demo00.pk4";
+					if( _stat( s.c_str(), &st ) != -1 && ( st.st_mode & _S_IFREG ) )
+					{
+						common->Warning( "using path of executable (seems to contain demo game data): %s ", path.c_str() );
+						return true;
+					}
+				}
+
+				common->Warning( "base path '%s' does not exist", s.c_str() );
+			}
+
+			// Note: apparently there is no registry entry for the Doom 3 Demo
+
+			// fallback to vanilla doom3 cd install
+			if( GetRegistryPath( buf, sizeof( buf ), L"SOFTWARE\\id\\Doom 3", L"InstallPath" ) > 0 )
+			{
+				path = buf;
+				return true;
+			}
+
+			// fallback to steam doom3 install
+			if( GetRegistryPath( buf, sizeof( buf ), L"SOFTWARE\\Valve\\Steam", L"InstallPath" ) > 0 )
+			{
+				path = buf;
+				path.AppendPath( "steamapps\\common\\doom 3" );
+
+				if( _stat( path.c_str(), &st ) != -1 && st.st_mode & _S_IFDIR )
+				{
+					return true;
+				}
+			}
+
+			common->Warning( "vanilla doom3 path not found either" );
+
+			return false;
+
+		case PATH_CONFIG:
+		case PATH_SAVE:
+			if( Win_GetHomeDir( buf, sizeof( buf ) ) < 1 )
+			{
+				Sys_Error( "ERROR: Couldn't get dir to home path" );
+				return false;
+			}
+
+			path = buf;
+			return true;
+
+		case PATH_EXE:
+			GetModuleFileName( NULL, buf, sizeof( buf ) - 1 );
+			path = buf;
+			path.BackSlashesToSlashes();
+			return true;
+	}
+
+	return false;
 }
 
 /*
@@ -673,9 +645,7 @@ int Sys_ListFiles( const char* directory, const char* extension, idStrList& list
 {
 	idStr		search;
 	struct _finddata_t findinfo;
-	// RB: 64 bit fixes, changed int to intptr_t
 	intptr_t	findhandle;
-	// RB end
 	int			flag;
 
 	if( !extension )
@@ -804,23 +774,58 @@ DLL Loading
 Sys_DLL_Load
 =====================
 */
-intptr_t Sys_DLL_Load( const char* dllName )
+uintptr_t Sys_DLL_Load( const char* dllName )
 {
 	HINSTANCE	libHandle;
-	libHandle = LoadLibraryA( dllName );
+	libHandle = LoadLibrary( dllName );
 	if( libHandle )
 	{
 		// since we can't have LoadLibrary load only from the specified path, check it did the right thing
 		char loadedPath[ MAX_OSPATH ];
-		GetModuleFileNameA( libHandle, loadedPath, sizeof( loadedPath ) - 1 );
+		GetModuleFileName( libHandle, loadedPath, sizeof( loadedPath ) - 1 );
 		if( idStr::IcmpPath( dllName, loadedPath ) )
 		{
 			Sys_Printf( "ERROR: LoadLibrary '%s' wants to load '%s'\n", dllName, loadedPath );
-			Sys_DLL_Unload( ( intptr_t )libHandle );
+			Sys_DLL_Unload( ( uintptr_t )libHandle );
 			return 0;
 		}
 	}
-	return ( intptr_t )libHandle;
+	else
+	{
+		DWORD e = GetLastError();
+		LPVOID msgBuf = NULL;
+
+		FormatMessage(
+			FORMAT_MESSAGE_ALLOCATE_BUFFER |
+			FORMAT_MESSAGE_FROM_SYSTEM |
+			FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL,
+			e,
+			MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),
+			( LPTSTR )&msgBuf,
+			0, NULL );
+
+		idStr errorStr = va( "[%i (0x%X)]\t%s", e, e, msgBuf );
+
+		// common, skipped.
+		if( e == 0x7E )  // [126 (0x7E)] The specified module could not be found.
+		{
+			errorStr = "";
+		}
+		// probably going to be common. Lets try to be less cryptic.
+		else if( e == 0xC1 )  // [193 (0xC1)] is not a valid Win32 application.
+		{
+			errorStr = va( "[%i (0x%X)]\t%s", e, e, "probably the DLL is of the wrong architecture, like x64 instead of x86" );
+		}
+
+		if( errorStr.Length() )
+		{
+			common->Warning( "LoadLibrary(%s) Failed ! %s", dllName, errorStr.c_str() );
+		}
+
+		::LocalFree( msgBuf );
+	}
+	return ( uintptr_t )libHandle;
 }
 
 /*
@@ -828,10 +833,34 @@ intptr_t Sys_DLL_Load( const char* dllName )
 Sys_DLL_GetProcAddress
 =====================
 */
-void* Sys_DLL_GetProcAddress( intptr_t dllHandle, const char* procName )
+void* Sys_DLL_GetProcAddress( uintptr_t dllHandle, const char* procName )
 {
-	// RB: added missing cast
-	return ( void* ) GetProcAddress( ( HINSTANCE )dllHandle, procName );
+	void* adr = ( void* )GetProcAddress( ( HINSTANCE )dllHandle, procName );
+	if( !adr )
+	{
+		DWORD e = GetLastError();
+		LPVOID msgBuf = NULL;
+
+		FormatMessage(
+			FORMAT_MESSAGE_ALLOCATE_BUFFER |
+			FORMAT_MESSAGE_FROM_SYSTEM |
+			FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL,
+			e,
+			MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),
+			( LPTSTR )&msgBuf,
+			0, NULL );
+
+		idStr errorStr = va( "[%i (0x%X)]\t%s", e, e, msgBuf );
+
+		if( errorStr.Length() )
+		{
+			common->Warning( "GetProcAddress( %i %s) Failed ! %s", dllHandle, procName, errorStr.c_str() );
+		}
+
+		::LocalFree( msgBuf );
+	}
+	return adr;
 }
 
 /*
@@ -839,13 +868,12 @@ void* Sys_DLL_GetProcAddress( intptr_t dllHandle, const char* procName )
 Sys_DLL_Unload
 =====================
 */
-void Sys_DLL_Unload( intptr_t dllHandle )
+void Sys_DLL_Unload( uintptr_t dllHandle )
 {
 	if( !dllHandle )
 	{
 		return;
 	}
-
 	if( FreeLibrary( ( HINSTANCE )dllHandle ) == 0 )
 	{
 		int lastError = GetLastError();
@@ -859,11 +887,9 @@ void Sys_DLL_Unload( intptr_t dllHandle )
 			0,
 			NULL
 		);
-
 		Sys_Error( "Sys_DLL_Unload: FreeLibrary failed - %s (%d)", lpMsgBuf, lastError );
 	}
 }
-// RB end
 
 /*
 ========================================================================
@@ -872,7 +898,7 @@ EVENT LOOP
 
 ========================================================================
 */
-#if !defined(USE_QT_WINDOWING)
+
 #define	MAX_QUED_EVENTS		256
 #define	MASK_QUED_EVENTS	( MAX_QUED_EVENTS - 1 )
 
@@ -976,7 +1002,7 @@ void Sys_GenerateEvents()
 	// pump the message loop
 	Sys_PumpEvents();
 
-	// make sure mouse and joystick are only called once a frame
+	// grab or release the mouse cursor if necessary
 	IN_Frame();
 
 	// check for console commands
@@ -994,7 +1020,6 @@ void Sys_GenerateEvents()
 
 	entered = false;
 }
-
 
 /*
 ================
@@ -1027,7 +1052,6 @@ sysEvent_t Sys_GetEvent()
 
 	return ev;
 }
-#endif // #if !defined(USE_QT_WINDOWING)
 
 //================================================================
 
@@ -1120,36 +1144,11 @@ void Sys_StartAsyncThread()
 
 /*
 ================
-Sys_AlreadyRunning
-
-returns true if there is a copy of D3 running already
-================
-*/
-bool Sys_AlreadyRunning()
-{
-#ifndef DEBUG
-	if( !win32.win_allowMultipleInstances.GetBool() )
-	{
-		HANDLE hMutexOneInstance = ::CreateMutex( NULL, FALSE, "TEKUUM" );
-		if( ::GetLastError() == ERROR_ALREADY_EXISTS || ::GetLastError() == ERROR_ACCESS_DENIED )
-		{
-			return true;
-		}
-	}
-#endif
-	return false;
-}
-
-/*
-================
 Sys_Init
 
 The cvar system must already be setup
 ================
 */
-#define OSR2_BUILD_NUMBER 1111
-#define WIN98_BUILD_NUMBER 1998
-
 void Sys_Init()
 {
 
@@ -1171,11 +1170,6 @@ void Sys_Init()
 #endif
 
 	//
-	// Windows user name
-	//
-	win32.win_username.SetString( Sys_GetCurrentUser() );
-
-	//
 	// Windows version
 	//
 	win32.osversion.dwOSVersionInfoSize = sizeof( win32.osversion );
@@ -1192,82 +1186,6 @@ void Sys_Init()
 	if( win32.osversion.dwPlatformId == VER_PLATFORM_WIN32s )
 	{
 		Sys_Error( GAME_NAME " doesn't run on Win32s" );
-	}
-
-	if( win32.osversion.dwPlatformId == VER_PLATFORM_WIN32_NT )
-	{
-		if( win32.osversion.dwMajorVersion <= 4 )
-		{
-			win32.sys_arch.SetString( "WinNT (NT)" );
-		}
-		else if( win32.osversion.dwMajorVersion == 5 && win32.osversion.dwMinorVersion == 0 )
-		{
-			win32.sys_arch.SetString( "Win2K (NT)" );
-		}
-		else if( win32.osversion.dwMajorVersion == 5 && win32.osversion.dwMinorVersion == 1 )
-		{
-			win32.sys_arch.SetString( "WinXP (NT)" );
-		}
-		else if( win32.osversion.dwMajorVersion == 6 )
-		{
-			win32.sys_arch.SetString( "Vista" );
-		}
-		else if( win32.osversion.dwMajorVersion == 6 && win32.osversion.dwMinorVersion == 1 )
-		{
-			win32.sys_arch.SetString( "Win7" );
-		}
-		else if( win32.osversion.dwMajorVersion == 6 && win32.osversion.dwMinorVersion == 2 )
-		{
-			win32.sys_arch.SetString( "Win8" );
-		}
-		else if( win32.osversion.dwMajorVersion == 6 && win32.osversion.dwMinorVersion == 3 )
-		{
-			win32.sys_arch.SetString( "Win8.1" );
-		}
-		else
-		{
-			win32.sys_arch.SetString( "Unknown NT variant" );
-		}
-	}
-	else if( win32.osversion.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS )
-	{
-		if( win32.osversion.dwMajorVersion == 4 && win32.osversion.dwMinorVersion == 0 )
-		{
-			// Win95
-			if( win32.osversion.szCSDVersion[1] == 'C' )
-			{
-				win32.sys_arch.SetString( "Win95 OSR2 (95)" );
-			}
-			else
-			{
-				win32.sys_arch.SetString( "Win95 (95)" );
-			}
-		}
-		else if( win32.osversion.dwMajorVersion == 4 && win32.osversion.dwMinorVersion == 10 )
-		{
-			// Win98
-			if( win32.osversion.szCSDVersion[1] == 'A' )
-			{
-				win32.sys_arch.SetString( "Win98SE (95)" );
-			}
-			else
-			{
-				win32.sys_arch.SetString( "Win98 (95)" );
-			}
-		}
-		else if( win32.osversion.dwMajorVersion == 4 && win32.osversion.dwMinorVersion == 90 )
-		{
-			// WinMe
-			win32.sys_arch.SetString( "WinMe (95)" );
-		}
-		else
-		{
-			win32.sys_arch.SetString( "Unknown 95 variant" );
-		}
-	}
-	else
-	{
-		win32.sys_arch.SetString( "unknown Windows variant" );
 	}
 
 	//
@@ -1385,15 +1303,12 @@ void Sys_Init()
 
 	common->Printf( "%s\n", win32.sys_cpustring.GetString() );
 	common->Printf( "%d MB System Memory\n", Sys_GetSystemRam() );
-	common->Printf( "%d MB Video Memory\n", Sys_GetVideoRam() );
 	if( ( win32.cpuid & CPUID_SSE2 ) == 0 )
 	{
 		common->Error( "SSE2 not supported!" );
 	}
 
-#if !defined(USE_QT_WINDOWING)
 	win32.g_Joystick.Init();
-#endif
 }
 
 /*
@@ -1449,224 +1364,70 @@ void Win_Frame()
 	}
 }
 
-/*
-====================
-GetExceptionCodeInfo
-====================
-*/
-const char* GetExceptionCodeInfo( UINT code )
+// code that tells windows we're High DPI aware so it doesn't scale our windows
+// taken from Yamagi Quake II
+
+typedef enum D3_PROCESS_DPI_AWARENESS
 {
-	switch( code )
-	{
-		case EXCEPTION_ACCESS_VIOLATION:
-			return "The thread tried to read from or write to a virtual address for which it does not have the appropriate access.";
-		case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-			return "The thread tried to access an array element that is out of bounds and the underlying hardware supports bounds checking.";
-		case EXCEPTION_BREAKPOINT:
-			return "A breakpoint was encountered.";
-		case EXCEPTION_DATATYPE_MISALIGNMENT:
-			return "The thread tried to read or write data that is misaligned on hardware that does not provide alignment. For example, 16-bit values must be aligned on 2-byte boundaries; 32-bit values on 4-byte boundaries, and so on.";
-		case EXCEPTION_FLT_DENORMAL_OPERAND:
-			return "One of the operands in a floating-point operation is denormal. A denormal value is one that is too small to represent as a standard floating-point value.";
-		case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-			return "The thread tried to divide a floating-point value by a floating-point divisor of zero.";
-		case EXCEPTION_FLT_INEXACT_RESULT:
-			return "The result of a floating-point operation cannot be represented exactly as a decimal fraction.";
-		case EXCEPTION_FLT_INVALID_OPERATION:
-			return "This exception represents any floating-point exception not included in this list.";
-		case EXCEPTION_FLT_OVERFLOW:
-			return "The exponent of a floating-point operation is greater than the magnitude allowed by the corresponding type.";
-		case EXCEPTION_FLT_STACK_CHECK:
-			return "The stack overflowed or underflowed as the result of a floating-point operation.";
-		case EXCEPTION_FLT_UNDERFLOW:
-			return "The exponent of a floating-point operation is less than the magnitude allowed by the corresponding type.";
-		case EXCEPTION_ILLEGAL_INSTRUCTION:
-			return "The thread tried to execute an invalid instruction.";
-		case EXCEPTION_IN_PAGE_ERROR:
-			return "The thread tried to access a page that was not present, and the system was unable to load the page. For example, this exception might occur if a network connection is lost while running a program over the network.";
-		case EXCEPTION_INT_DIVIDE_BY_ZERO:
-			return "The thread tried to divide an integer value by an integer divisor of zero.";
-		case EXCEPTION_INT_OVERFLOW:
-			return "The result of an integer operation caused a carry out of the most significant bit of the result.";
-		case EXCEPTION_INVALID_DISPOSITION:
-			return "An exception handler returned an invalid disposition to the exception dispatcher. Programmers using a high-level language such as C should never encounter this exception.";
-		case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-			return "The thread tried to continue execution after a noncontinuable exception occurred.";
-		case EXCEPTION_PRIV_INSTRUCTION:
-			return "The thread tried to execute an instruction whose operation is not allowed in the current machine mode.";
-		case EXCEPTION_SINGLE_STEP:
-			return "A trace trap or other single-instruction mechanism signaled that one instruction has been executed.";
-		case EXCEPTION_STACK_OVERFLOW:
-			return "The thread used up its stack.";
-		default:
-			return "Unknown exception";
-	}
-}
+	D3_PROCESS_DPI_UNAWARE = 0,
+	D3_PROCESS_SYSTEM_DPI_AWARE = 1,
+	D3_PROCESS_PER_MONITOR_DPI_AWARE = 2
+} YQ2_PROCESS_DPI_AWARENESS;
 
-/*
-====================
-EmailCrashReport
-
-  emailer originally from Raven/Quake 4
-====================
-*/
-void EmailCrashReport( LPSTR messageText )
+static void setHighDPIMode( void )
 {
-	static int lastEmailTime = 0;
+	/* For Vista, Win7 and Win8 */
+	BOOL( WINAPI * SetProcessDPIAware )( void ) = NULL;
 
-	if( Sys_Milliseconds() < lastEmailTime + 10000 )
+	/* Win8.1 and later */
+	HRESULT( WINAPI * SetProcessDpiAwareness )( D3_PROCESS_DPI_AWARENESS dpiAwareness ) = NULL;
+
+
+	HINSTANCE userDLL = LoadLibrary( "USER32.DLL" );
+
+	if( userDLL )
 	{
-		return;
+		SetProcessDPIAware = ( BOOL( WINAPI* )( void ) ) GetProcAddress( userDLL, "SetProcessDPIAware" );
 	}
 
-	lastEmailTime = Sys_Milliseconds();
 
-	HINSTANCE mapi = LoadLibrary( "MAPI32.DLL" );
-	if( mapi )
+	HINSTANCE shcoreDLL = LoadLibrary( "SHCORE.DLL" );
+
+	if( shcoreDLL )
 	{
-		LPMAPISENDMAIL	MAPISendMail = ( LPMAPISENDMAIL )GetProcAddress( mapi, "MAPISendMail" );
-		if( MAPISendMail )
-		{
-			MapiRecipDesc toProgrammers =
-			{
-				0,										// ulReserved
-				MAPI_TO,							// ulRecipClass
-				"DOOM 3 Crash",						// lpszName
-				"SMTP:programmers@idsoftware.com",	// lpszAddress
-				0,									// ulEIDSize
-				0									// lpEntry
-			};
+		SetProcessDpiAwareness = ( HRESULT( WINAPI* )( YQ2_PROCESS_DPI_AWARENESS ) )
+								 GetProcAddress( shcoreDLL, "SetProcessDpiAwareness" );
+	}
 
-			MapiMessage		message = {};
-			message.lpszSubject = "DOOM 3 Fatal Error";
-			message.lpszNoteText = messageText;
-			message.nRecipCount = 1;
-			message.lpRecips = &toProgrammers;
 
-			MAPISendMail(
-				0,									// LHANDLE lhSession
-				0,									// ULONG ulUIParam
-				&message,							// lpMapiMessage lpMessage
-				MAPI_DIALOG,						// FLAGS flFlags
-				0									// ULONG ulReserved
-			);
-		}
-		FreeLibrary( mapi );
+	if( SetProcessDpiAwareness )
+	{
+		SetProcessDpiAwareness( D3_PROCESS_PER_MONITOR_DPI_AWARE );
+	}
+	else if( SetProcessDPIAware )
+	{
+		SetProcessDPIAware();
 	}
 }
-
-// RB: disabled unused FPU exception debugging
-#if !defined(__MINGW32__) && !defined(_WIN64)
-
-int Sys_FPU_PrintStateFlags( char* ptr, int ctrl, int stat, int tags, int inof, int inse, int opof, int opse );
-
-/*
-====================
-_except_handler
-====================
-*/
-EXCEPTION_DISPOSITION __cdecl _except_handler( struct _EXCEPTION_RECORD* ExceptionRecord, void* EstablisherFrame,
-		struct _CONTEXT* ContextRecord, void* DispatcherContext )
-{
-
-	static char msg[ 8192 ];
-	char FPUFlags[2048];
-
-	Sys_FPU_PrintStateFlags( FPUFlags, ContextRecord->FloatSave.ControlWord,
-							 ContextRecord->FloatSave.StatusWord,
-							 ContextRecord->FloatSave.TagWord,
-							 ContextRecord->FloatSave.ErrorOffset,
-							 ContextRecord->FloatSave.ErrorSelector,
-							 ContextRecord->FloatSave.DataOffset,
-							 ContextRecord->FloatSave.DataSelector );
-
-
-	sprintf( msg,
-			 "Please describe what you were doing when DOOM 3 crashed!\n"
-			 "If this text did not pop into your email client please copy and email it to programmers@idsoftware.com\n"
-			 "\n"
-			 "-= FATAL EXCEPTION =-\n"
-			 "\n"
-			 "%s\n"
-			 "\n"
-			 "0x%x at address 0x%08p\n"
-			 "\n"
-			 "%s\n"
-			 "\n"
-			 "EAX = 0x%08x EBX = 0x%08x\n"
-			 "ECX = 0x%08x EDX = 0x%08x\n"
-			 "ESI = 0x%08x EDI = 0x%08x\n"
-			 "EIP = 0x%08x ESP = 0x%08x\n"
-			 "EBP = 0x%08x EFL = 0x%08x\n"
-			 "\n"
-			 "CS = 0x%04x\n"
-			 "SS = 0x%04x\n"
-			 "DS = 0x%04x\n"
-			 "ES = 0x%04x\n"
-			 "FS = 0x%04x\n"
-			 "GS = 0x%04x\n"
-			 "\n"
-			 "%s\n",
-			 com_version.GetString(),
-			 ExceptionRecord->ExceptionCode,
-			 ExceptionRecord->ExceptionAddress,
-			 GetExceptionCodeInfo( ExceptionRecord->ExceptionCode ),
-			 ContextRecord->Eax, ContextRecord->Ebx,
-			 ContextRecord->Ecx, ContextRecord->Edx,
-			 ContextRecord->Esi, ContextRecord->Edi,
-			 ContextRecord->Eip, ContextRecord->Esp,
-			 ContextRecord->Ebp, ContextRecord->EFlags,
-			 ContextRecord->SegCs,
-			 ContextRecord->SegSs,
-			 ContextRecord->SegDs,
-			 ContextRecord->SegEs,
-			 ContextRecord->SegFs,
-			 ContextRecord->SegGs,
-			 FPUFlags
-		   );
-
-	EmailCrashReport( msg );
-	common->FatalError( msg );
-
-	// Tell the OS to restart the faulting instruction
-	return ExceptionContinueExecution;
-}
-#endif
-// RB end
-
-#define TEST_FPU_EXCEPTIONS	/*	FPU_EXCEPTION_INVALID_OPERATION |		*/	\
-							/*	FPU_EXCEPTION_DENORMALIZED_OPERAND |	*/	\
-							/*	FPU_EXCEPTION_DIVIDE_BY_ZERO |			*/	\
-							/*	FPU_EXCEPTION_NUMERIC_OVERFLOW |		*/	\
-							/*	FPU_EXCEPTION_NUMERIC_UNDERFLOW |		*/	\
-							/*	FPU_EXCEPTION_INEXACT_RESULT |			*/	\
-								0
 
 /*
 ==================
 WinMain
 ==================
 */
-#if !defined(USE_QT_WINDOWING)
 int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow )
 {
 
 	const HCURSOR hcurSave = ::SetCursor( LoadCursor( 0, IDC_WAIT ) );
 
-	Sys_SetPhysicalWorkMemory( 192 << 20, 1024 << 20 );
-
-	Sys_GetCurrentMemoryStatus( exeLaunchMemoryStats );
-
-#if 0
-	DWORD handler = ( DWORD )_except_handler;
-	__asm
-	{
-		// Build EXCEPTION_REGISTRATION record:
-		push    handler         // Address of handler function
-		push    FS:[0]          // Address of previous handler
-		mov     FS:[0], ESP     // Install new EXECEPTION_REGISTRATION
-	}
+#ifdef ID_DEDICATED
+	MSG msg;
+#else
+	// tell windows we're high dpi aware, otherwise display scaling screws up the game
+	setHighDPIMode();
 #endif
+
+	Sys_SetPhysicalWorkMemory( 192 << 20, 1024 << 20 );
 
 	win32.hInstance = hInstance;
 	idStr::Copynz( sys_cmdline, lpCmdLine, sizeof( sys_cmdline ) );
@@ -1692,14 +1453,7 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	_CrtSetDbgFlag( 0 );
 #endif
 
-//	Sys_FPU_EnableExceptions( TEST_FPU_EXCEPTIONS );
-	Sys_FPU_SetPrecision( FPU_PRECISION_DOUBLE_EXTENDED );
-
-	common->Init( 0, NULL, lpCmdLine );
-
-#if TEST_FPU_EXCEPTIONS != 0
-	common->Printf( Sys_FPU_GetState() );
-#endif
+	common->Init( 0, NULL );
 
 #ifndef	ID_DEDICATED
 	if( win32.win_notaskkeys.GetInteger() )
@@ -1730,11 +1484,10 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	// Launch the script debugger
 	if( strstr( lpCmdLine, "+debugger" ) )
 	{
-		// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
+
+#ifdef ID_ALLOW_TOOLS
 		DebuggerClientInit( lpCmdLine );
 #endif
-		// RB end
 		return 0;
 	}
 
@@ -1743,25 +1496,28 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	// main game loop
 	while( 1 )
 	{
+#if ID_DEDICATED
+		// Since this is a Dedicated Server, process all Windowing Messages
+		// Now.
+		while( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) )
+		{
+			TranslateMessage( &msg );
+			DispatchMessage( &msg );
+		}
+
+		// Give the OS a little time to recuperate.
+		Sleep( 10 );
+#endif
 
 		Win_Frame();
 
-#ifdef DEBUG
-		Sys_MemFrame();
-#endif
-
-		// set exceptions, even if some crappy syscall changes them!
-		Sys_FPU_EnableExceptions( TEST_FPU_EXCEPTIONS );
-
-#if defined(USE_MFC_TOOLS) || defined(USE_GTK_TOOLS) || defined(USE_QT_TOOLS)
+#ifdef ID_ALLOW_TOOLS
 		if( com_editors )
 		{
-
-#if defined(USE_MFC_TOOLS)
 			if( com_editors & EDITOR_GUI )
 			{
 				// GUI editor
-				//GUIEditorRun();
+				GUIEditorRun();
 			}
 			else if( com_editors & EDITOR_RADIANT )
 			{
@@ -1771,7 +1527,7 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 			else if( com_editors & EDITOR_MATERIAL )
 			{
 				//BSM Nerve: Add support for the material editor
-				//MaterialEditorRun();
+				MaterialEditorRun();
 			}
 			else
 			{
@@ -1811,35 +1567,8 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 					PDAEditorRun();
 				}
 			}
-#endif // #if defined(USE_MFC_TOOLS)
-
-// RB begin
-#if defined(USE_GTK_TOOLS)
-			if( com_editors & EDITOR_GTKTEST )
-			{
-				GtkTestEditorRun();
-			}
-#endif
-
-#if defined(USE_QT_TOOLS)
-			if( com_editors & EDITOR_QTRADIANT )
-			{
-				// Level Editor
-				QtRadiantRun();
-			}
-			else
-			{
-				if( com_editors & EDITOR_QTSTRING )
-				{
-					QtStringEditorRun();
-				}
-			}
-#endif
 		}
-
-#endif // #if defined(USE_MFC_TOOLS) || defined(USE_GTK_TOOLS) || defined(USE_QT_TOOLS)
-// RB end
-
+#endif
 		// run the game
 		common->Frame();
 	}
@@ -1847,9 +1576,6 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	// never gets here
 	return 0;
 }
-#endif // #if !defined(USE_QT_WINDOWING)
-
-
 
 /*
 ==================
@@ -1903,6 +1629,7 @@ void idSysLocal::StartProcess( const char* exePath, bool doexit )
 	si.cb = sizeof( si );
 
 	strncpy( szPathOrig, exePath, _MAX_PATH );
+	szPathOrig[_MAX_PATH - 1] = 0;
 
 	if( !CreateProcess( NULL, szPathOrig, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi ) )
 	{
@@ -1914,22 +1641,4 @@ void idSysLocal::StartProcess( const char* exePath, bool doexit )
 	{
 		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "quit\n" );
 	}
-}
-
-/*
-==================
-Sys_SetFatalError
-==================
-*/
-void Sys_SetFatalError( const char* error )
-{
-}
-
-/*
-==================
-Sys_DoPreferences
-==================
-*/
-void Sys_DoPreferences()
-{
 }

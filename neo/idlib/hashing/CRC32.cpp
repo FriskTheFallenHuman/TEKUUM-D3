@@ -7,14 +7,12 @@
    Copyright (C) 1995-1998 Mark Adler
 */
 
-#define CRC32_INIT_VALUE	0xffffffffL
-#define CRC32_XOR_VALUE		0xffffffffL
+#define CRC32_INIT_VALUE	0xffffffff
+#define CRC32_XOR_VALUE		0xffffffff
 
 #ifdef CREATE_CRC_TABLE
 
-// RB: 64 bit fix, changed long to int
-static unsigned int id_crctable[256];
-// RB end
+static unsigned int crctable[256];
 
 /*
    Generate a table for a byte-wise 32-bit CRC calculation on the polynomial:
@@ -41,13 +39,10 @@ static unsigned int id_crctable[256];
    combinations of CRC register values and incoming bytes.
 */
 
-static void id_make_crc_table()
+void make_crc_table( void )
 {
 	int i, j;
-	// RB: 64 bit fix, changed long to int
 	unsigned int c, poly;
-	// RB end
-
 	/* terms of polynomial defining this crc (except x^32): */
 	static const byte p[] = {0, 1, 2, 4, 5, 7, 8, 10, 11, 12, 16, 22, 23, 26};
 
@@ -60,9 +55,7 @@ static void id_make_crc_table()
 
 	for( i = 0; i < 256; i++ )
 	{
-		// RB: 64 bit fix, changed long to int
 		c = ( unsigned int )i;
-		// RB end
 		for( j = 0; j < 8; j++ )
 		{
 			c = ( c & 1 ) ? poly ^ ( c >> 1 ) : ( c >> 1 );
@@ -76,10 +69,8 @@ static void id_make_crc_table()
 /*
   Table of CRC-32's of all single-byte values (made by make_crc_table)
 */
-// RB: 64 bit fix, changed long to int
-static unsigned int id_crctable[256] =
+static unsigned int crctable[256] =
 {
-// RB end
 	0x00000000L, 0x77073096L, 0xee0e612cL, 0x990951baL,
 	0x076dc419L, 0x706af48fL, 0xe963a535L, 0x9e6495a3L,
 	0x0edb8832L, 0x79dcb8a4L, 0xe0d5e91eL, 0x97d2d988L,
@@ -148,7 +139,6 @@ static unsigned int id_crctable[256] =
 
 #endif
 
-// RB: 64 bit fixes, changed long to int
 void CRC32_InitChecksum( unsigned int& crcvalue )
 {
 	crcvalue = CRC32_INIT_VALUE;
@@ -156,7 +146,7 @@ void CRC32_InitChecksum( unsigned int& crcvalue )
 
 void CRC32_Update( unsigned int& crcvalue, const byte data )
 {
-	crcvalue = id_crctable[( crcvalue ^ data ) & 0xff ] ^ ( crcvalue >> 8 );
+	crcvalue = crctable[( crcvalue ^ data ) & 0xff ] ^ ( crcvalue >> 8 );
 }
 
 void CRC32_UpdateChecksum( unsigned int& crcvalue, const void* data, int length )
@@ -167,7 +157,7 @@ void CRC32_UpdateChecksum( unsigned int& crcvalue, const void* data, int length 
 	crc = crcvalue;
 	while( length-- )
 	{
-		crc = id_crctable[( crc ^ ( *buf++ ) ) & 0xff ] ^ ( crc >> 8 );
+		crc = crctable[( crc ^ ( *buf++ ) ) & 0xff ] ^ ( crc >> 8 );
 	}
 	crcvalue = crc;
 }
@@ -186,4 +176,3 @@ unsigned int CRC32_BlockChecksum( const void* data, int length )
 	CRC32_FinishChecksum( crc );
 	return crc;
 }
-// RB end

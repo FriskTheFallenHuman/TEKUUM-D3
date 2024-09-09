@@ -29,38 +29,57 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __SND_LOCAL_H__
 #define __SND_LOCAL_H__
 
-// you need the OpenAL headers for build, even if AL is not enabled - http://www.openal.org/
+#ifdef ID_DEDICATED
+	// stub-only mode: AL_API and ALC_API shouldn't refer to any dll-stuff
+	// because the implemenations are in openal_stub.cpp
+	// this is ensured by defining AL_LIBTYPE_STATIC before including the AL headers
+	#define AL_LIBTYPE_STATIC
+#endif
 
-// RB begin
-#if defined(USE_OPENAL)
+#include <AL/al.h>
+#include <AL/alc.h>
+#include <AL/alext.h>
 
-	#ifdef _WIN32
-		#include "../libs/openal/include/al.h"
-		#include "../libs/openal/include/alc.h"
-		// RB begin
-		//#include "../openal/idal.h"
-		// RB end
-		// broken OpenAL SDK ?
-		#define ID_ALCHAR (ALubyte *)
-	#elif defined( MACOS_X )
-		#include <OpenAL/al.h>
-		#include <OpenAL/alc.h>
-		#define ID_ALCHAR
-		// RB begin
-	#elif defined(__ANDROID__)
-		// don't include OpenAL on Android
-		//#include <al.h>
-		//#include <alc.h>
-		// RB end
-	#else
-		#include <AL/al.h>
-		#include <AL/alc.h>
-		#define ID_ALCHAR
-	#endif
+// DG: make this code build with older OpenAL headers that don't know about ALC_SOFT_HRTF
+//     which provides LPALCRESETDEVICESOFT for idSoundSystemLocal::alcResetDeviceSOFT()
+#ifndef ALC_SOFT_HRTF
+	typedef ALCboolean( ALC_APIENTRY* LPALCRESETDEVICESOFT )( ALCdevice* device, const ALCint* attribs );
+#endif
 
-	#include "../libs/openal/include/efxlib.h"
-#endif // #if defined(USE_OPENAL)
-// RB end
+// DG: ALC_SOFT_output_mode is pretty new, provide compatibility..
+#ifndef ALC_SOFT_output_mode
+	#define ALC_SOFT_output_mode
+	#define ALC_OUTPUT_MODE_SOFT                     0x19AC
+	#define ALC_ANY_SOFT                             0x19AD
+
+	#define ALC_STEREO_BASIC_SOFT                    0x19AE
+	#define ALC_STEREO_UHJ_SOFT                      0x19AF
+	#define ALC_STEREO_HRTF_SOFT                     0x19B2
+
+	#define ALC_SURROUND_5_1_SOFT                    0x1504
+	#define ALC_SURROUND_6_1_SOFT                    0x1505
+	#define ALC_SURROUND_7_1_SOFT                    0x1506
+#endif
+// the following formats are defined in https://openal-soft.org/openal-extensions/SOFT_output_mode.txt
+// but commented out in OpenAL Softs current AL/alext.h
+#ifndef ALC_MONO_SOFT
+	#define ALC_MONO_SOFT                            0x1500
+#endif
+#ifndef ALC_STEREO_SOFT
+	#define ALC_STEREO_SOFT                          0x1501
+#endif
+#ifndef ALC_QUAD_SOFT
+	#define ALC_QUAD_SOFT                            0x1503
+#endif
+
+// DG: in case ALC_SOFT_output_limiter is not available in some headers..
+#ifndef ALC_SOFT_output_limiter
+	#define ALC_SOFT_output_limiter
+	#define ALC_OUTPUT_LIMITER_SOFT                  0x199A
+#endif
+
+#include "efxlib.h"
+#include "sound.h"
 
 // demo sound commands
 typedef enum
@@ -85,7 +104,6 @@ const float SND_EPSILON				= 1.0f / 32768.0f;	// if volume is below this, it wil
 
 const int ROOM_SLICES_IN_BUFFER		= 10;
 
-class idAudioHardware;
 class idAudioBuffer;
 class idWaveFile;
 class idSoundCache;
@@ -106,9 +124,6 @@ class idSoundWorldLocal;
 #ifdef WIN32
 	#pragma pack(1)
 #endif
-#ifdef __MWERKS__
-	#pragma pack (push, 1)
-#endif
 struct waveformatex_s
 {
 	word    wFormatTag;        /* format type */
@@ -118,7 +133,7 @@ struct waveformatex_s
 	word    nBlockAlign;       /* block size of data */
 	word    wBitsPerSample;    /* Number of bits per sample of mono data */
 	word    cbSize;            /* The count in bytes of the size of
-                                    extra information (after cbSize) */
+									extra information (after cbSize) */
 } PACKED;
 
 typedef waveformatex_s waveformatex_t;
@@ -191,9 +206,6 @@ typedef mminfo_s mminfo_t;
 #ifdef WIN32
 	#pragma pack()
 #endif
-#ifdef __MWERKS__
-	#pragma pack (pop)
-#endif
 
 /*
 ===================================================================================
@@ -242,6 +254,7 @@ private:
 	dword			mulDataSize;
 
 	void* 			ogg;			// only !NULL when !s_realTimeDecoding
+	byte*			oggData; // the contents of the .ogg for stbi_vorbis (it doesn't support custom reading callbacks)
 	bool			isOgg;
 
 private:
@@ -250,39 +263,6 @@ private:
 	int				OpenOGG( const char* strFileName, waveformatex_t* pwfx = NULL );
 	int				ReadOGG( byte* pBuffer, int dwSizeToRead, int* pdwSizeRead );
 	int				CloseOGG();
-};
-
-
-/*
-===================================================================================
-
-idAudioHardware
-
-===================================================================================
-*/
-
-class idAudioHardware
-{
-public:
-	static idAudioHardware* Alloc();
-
-	virtual					~idAudioHardware();
-
-	virtual bool			Initialize( ) = 0;
-
-	virtual bool			Lock( void** pDSLockedBuffer, uint32* dwDSLockedBufferSize ) = 0;
-	virtual bool			Unlock( void* pDSLockedBuffer, dword dwDSLockedBufferSize ) = 0;
-	virtual bool			GetCurrentPosition( uint32* pdwCurrentWriteCursor ) = 0;
-
-	// try to write as many sound samples to the device as possible without blocking and prepare for a possible new mixing call
-	// returns wether there is *some* space for writing available
-	virtual bool			Flush() = 0;
-
-	virtual void			Write( bool flushing ) = 0;
-
-	virtual int				GetNumberOfSpeakers() = 0;
-	virtual int				GetMixBufferSize() = 0;
-	virtual short*			GetMixBuffer() = 0;
 };
 
 
@@ -516,14 +496,13 @@ public:
 	float				lastV[6];				// last calculated volume for each speaker, so we can smoothly fade
 	idSoundFade			channelFade;
 	bool				triggered;
-// RB begin
-#if defined(USE_OPENAL)
 	ALuint				openalSource;
 	ALuint				openalStreamingOffset;
 	ALuint				openalStreamingBuffer[3];
 	ALuint				lastopenalStreamingBuffer[3];
-#endif
-// RB end
+	bool				stopped;
+
+	bool				paused;					// DG: currently paused, but generally still playing - for when menu is open etc
 
 	bool				disallowSlow;
 
@@ -567,6 +546,9 @@ public:
 	//----------------------------------------------
 
 	void				Clear();
+
+	void				PauseAll();   // DG: to pause active OpenAL sources when entering menu etc
+	void				UnPauseAll(); // DG: to resume active OpenAL sources when leaving menu etc
 
 	void				OverrideParms( const soundShaderParms_t* base, const soundShaderParms_t* over, soundShaderParms_t* out );
 	void				CheckForCompletion( int current44kHzTime );
@@ -710,7 +692,6 @@ public:
 
 	void					Shutdown();
 	void					Init( idRenderWorld* rw );
-	void					ClearBuffer();
 
 	// update
 	void					ForegroundUpdate( int currentTime );
@@ -736,7 +717,11 @@ public:
 	idVec3					listenerQU;			// position in "quake units"
 	int						listenerArea;
 	idStr					listenerAreaName;
-	int						listenerEnvironmentID;
+	ALuint					listenerEffect;
+	ALuint					listenerSlot;
+	bool					listenerAreFiltersInitialized;
+	ALuint					listenerFilters[2]; // 0 - direct; 1 - send.
+	float					listenerSlotReverbGain;
 
 	int						gameMsec;
 	int						game44kHz;
@@ -769,11 +754,7 @@ idSoundSystemLocal
 
 typedef struct
 {
-	// RB begin
-#if defined(USE_OPENAL)
 	ALuint			handle;
-#endif
-	// RB end
 	int				startTime;
 	idSoundChannel*	chan;
 	bool			inUse;
@@ -794,7 +775,6 @@ public:
 
 	// shutdown routine
 	virtual	void			Shutdown();
-	virtual void			ClearBuffer();
 
 	// sound is attached to the window, and must be recreated when the window is changed
 	virtual bool			ShutdownHW();
@@ -828,7 +808,7 @@ public:
 
 	virtual void			PrintMemInfo( MemInfo_t* mi );
 
-	virtual int				IsEAXAvailable();
+	virtual int				IsEFXAvailable();
 
 	//-------------------------
 
@@ -839,14 +819,17 @@ public:
 
 	void					DoEnviroSuit( float* samples, int numSamples, int numSpeakers );
 
-	// RB begin
-#if defined(USE_OPENAL)
 	ALuint					AllocOpenALSource( idSoundChannel* chan, bool looping, bool stereo );
 	void					FreeOpenALSource( ALuint handle );
-#endif
-	// RB end
 
-	idAudioHardware* 		snd_audio_hw;
+	// returns true if openalDevice is still available,
+	// otherwise it will try to recover the device and return false while it's gone
+	// (display audio sound devices sometimes disappear for a few seconds when switching resolution)
+	bool					CheckDeviceAndRecoverIfNeeded();
+	// resets the OpenAL device, applying the settings of s_alHRTF and s_alOutputLimiter
+	// returns false if that failed, or the necessary OpenAL extension isn't available
+	bool					ResetALDevice();
+
 	idSoundCache* 			soundCache;
 
 	idSoundWorldLocal* 		currentSoundWorld;	// the one to mix each async tic
@@ -857,7 +840,7 @@ public:
 
 	unsigned int			nextWriteBlock;
 
-	float 					realAccum[6 * MIXBUFFER_SAMPLES + 16];
+	float					realAccum[6 * MIXBUFFER_SAMPLES + 16];
 	float* 					finalMixBuffer;			// points inside realAccum at a 16 byte aligned boundary
 
 	bool					isInitialized;
@@ -875,27 +858,48 @@ public:
 
 	idList<SoundFX*>		fxList;
 
-	// RB begin
-#if defined(USE_OPENAL)
 	ALCdevice*				openalDevice;
 	ALCcontext*				openalContext;
 	ALsizei					openalSourceCount;
 	openalSource_t			openalSources[256];
-	EAXSet					alEAXSet;
-	EAXGet					alEAXGet;
-	EAXSetBufferMode		alEAXSetBufferMode;
-	EAXGetBufferMode		alEAXGetBufferMode;
+
+	LPALGENEFFECTS			alGenEffects;
+	LPALDELETEEFFECTS		alDeleteEffects;
+	LPALISEFFECT			alIsEffect;
+	LPALEFFECTI				alEffecti;
+	LPALEFFECTF				alEffectf;
+	LPALEFFECTFV			alEffectfv;
+	LPALGENFILTERS			alGenFilters;
+	LPALDELETEFILTERS		alDeleteFilters;
+	LPALISFILTER			alIsFilter;
+	LPALFILTERI				alFilteri;
+	LPALFILTERF				alFilterf;
+	LPALGENAUXILIARYEFFECTSLOTS		alGenAuxiliaryEffectSlots;
+	LPALDELETEAUXILIARYEFFECTSLOTS	alDeleteAuxiliaryEffectSlots;
+	LPALISAUXILIARYEFFECTSLOT		alIsAuxiliaryEffectSlot;
+	LPALAUXILIARYEFFECTSLOTI		alAuxiliaryEffectSloti;
+	LPALAUXILIARYEFFECTSLOTF		alAuxiliaryEffectSlotf;
+
 	idEFXFile				EFXDatabase;
 	bool					efxloaded;
 	// latches
-	static bool				useOpenAL;
-	static bool				useEAXReverb;
+	static bool				useEFXReverb;
 	// mark available during initialization, or through an explicit test
-	static int				EAXAvailable;
-#endif
-	// RB end
+	static int				EFXAvailable;
+
+	static bool				alHRTFavailable; // needs ALC_SOFT_HRTF extension
+	static bool				alOutputLimiterAvailable; // needs ALC_SOFT_output_limiter extension (+ HRTF extension)
+	static bool				alEnumerateAllAvailable;  // needs ALC_ENUMERATE_ALL_EXT
+	static bool				alIsDisconnectAvailable;  // needs ALC_EXT_disconnect
+	static bool				alOutputModeAvailable;    // needs ALC_SOFT_output_mode
+
+	// DG: for CheckDeviceAndRecoverIfNeeded()
+	LPALCRESETDEVICESOFT	alcResetDeviceSOFT; // needs ALC_SOFT_HRTF extension
+	int						resetRetryCount;
+	unsigned int			lastCheckTime;
 
 	static idCVar			s_noSound;
+	static idCVar			s_device;
 	static idCVar			s_quadraticFalloff;
 	static idCVar			s_drawSounds;
 	static idCVar			s_minVolume6;
@@ -920,11 +924,14 @@ public:
 	static idCVar			s_force22kHz;
 	static idCVar			s_clipVolumes;
 	static idCVar			s_realTimeDecoding;
-	static idCVar			s_libOpenAL;
-	static idCVar			s_useOpenAL;
 	static idCVar			s_useEAXReverb;
-	static idCVar			s_muteEAXReverb;
 	static idCVar			s_decompressionLimit;
+
+	static idCVar			s_alReverbGain;
+
+	static idCVar			s_scaleDownAndClamp;
+	static idCVar			s_alOutputLimiter;
+	static idCVar			s_alHRTF;
 
 	static idCVar			s_slowAttenuate;
 
@@ -959,18 +966,14 @@ public:
 	~idSoundSample();
 
 	idStr					name;						// name of the sample file
-	ID_TIME_T		 			timestamp;					// the most recent of all images used in creation, for reloadImages command
+	ID_TIME_T					timestamp;					// the most recent of all images used in creation, for reloadImages command
 
 	waveformatex_t			objectInfo;					// what are we caching
 	int						objectSize;					// size of waveform in samples, excludes the header
 	int						objectMemSize;				// object size in memory
 	byte* 					nonCacheData;				// if it's not cached
 	byte* 					amplitudeData;				// precomputed min,max amplitude pairs
-	// RB begin
-#if defined(USE_OPENAL)
 	ALuint					openalBuffer;				// openal buffer
-#endif
-	// RB end
 	bool					hardwareBuffer;
 	bool					defaultSound;
 	bool					onDemand;
@@ -978,7 +981,7 @@ public:
 	bool					levelLoadReferenced;		// so we can tell which samples aren't needed any more
 
 	int						LengthIn44kHzSamples() const;
-	ID_TIME_T		 			GetNewTimeStamp() const;
+	ID_TIME_T					GetNewTimeStamp() const;
 	void					MakeDefault();				// turns it into a beep
 	void					Load();						// loads the current sound based on name
 	void					Reload( bool force );		// reloads if timestamp has changed, or always if force

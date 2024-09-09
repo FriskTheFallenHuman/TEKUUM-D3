@@ -41,8 +41,8 @@ If you have questions concerning this license or the applicable additional terms
 ** Note that the GLW_xxx functions are Windows specific GL-subsystem
 ** related functions that are relevant ONLY to win_glimp.c
 */
-#pragma hdrstop
 #include "precompiled.h"
+#pragma hdrstop
 
 #include "win_local.h"
 #include "rc/AFEditor_resource.h"
@@ -406,7 +406,6 @@ static int GLW_ChoosePixelFormat( const HDC hdc, const int multisamples, const b
 	return pixelFormat;
 }
 
-
 /*
 ====================
 GLW_InitDriver
@@ -510,7 +509,6 @@ static bool GLW_InitDriver( glimpParms_t parms )
 	// startup the OpenGL subsystem by creating a context and making it current
 	//
 	common->Printf( "...creating GL context: " );
-
 	win32.hGLRC = CreateOpenGLContextOnDC( win32.hDC, r_debugContext.GetBool() );
 	if( win32.hGLRC == 0 )
 	{
@@ -1014,7 +1012,6 @@ static bool GLW_GetWindowDimensions( const glimpParms_t parms, int& x, int& y, i
 
 	return true;
 }
-
 
 /*
 =======================

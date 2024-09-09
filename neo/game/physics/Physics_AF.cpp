@@ -3440,7 +3440,7 @@ void idAFConstraint_Contact::Setup( idAFBody* b1, idAFBody* b2, contactInfo_t& c
 
 	e[0] = CONTACT_LCP_EPSILON;
 	lo[0] = 0.0f;
-	hi[0] = idMath::INFINITY;
+	hi[0] = idMath::INFINITUM;
 	boxConstraint = NULL;
 	boxIndex[0] = -1;
 }
@@ -9030,7 +9030,7 @@ idPhysics_AF::ReadFromSnapshot
 */
 void idPhysics_AF::ReadFromSnapshot( const idBitMsgDelta& msg )
 {
-	int i, num id_attribute( ( unused ) );
+	int i, num;
 	idCQuat quat;
 
 	current.atRest = msg.ReadInt();

@@ -365,7 +365,3 @@ int idDemoFile::Write( const void* buffer, int len )
 {
 	return compressor->Write( buffer, len );
 }
-
-
-
-

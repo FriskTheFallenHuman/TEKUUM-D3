@@ -28,6 +28,10 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
+#ifndef _WIN32
+	#include <signal.h> // for raise()
+#endif
+
 /*
 ================================================================================================
 Contains the AssertMacro implementation.
@@ -36,7 +40,6 @@ Contains the AssertMacro implementation.
 
 idCVar com_assertOutOfDebugger( "com_assertOutOfDebugger", "0", CVAR_BOOL, "by default, do not assert while not running under the debugger" );
 
-/*
 struct skippedAssertion_t
 {
 	skippedAssertion_t() :
@@ -48,7 +51,6 @@ struct skippedAssertion_t
 	int				line;
 };
 static idStaticList< skippedAssertion_t, 20 > skippedAssertions;
-*/
 
 /*
 ========================
@@ -57,7 +59,6 @@ AssertFailed
 */
 bool AssertFailed( const char* file, int line, const char* expression )
 {
-	/*
 	// Set this to true to skip ALL assertions, including ones YOU CAUSE!
 	static volatile bool skipAllAssertions = false;
 	if( skipAllAssertions )
@@ -82,7 +83,6 @@ bool AssertFailed( const char* file, int line, const char* expression )
 			return false;
 		}
 	}
-	*/
 
 	idLib::Warning( "ASSERTION FAILED! %s(%d): '%s'", file, line, expression );
 
@@ -108,14 +108,12 @@ bool AssertFailed( const char* file, int line, const char* expression )
 #endif // _WIN32
 	}
 
-	/*
 	if( skipThisAssertion )
 	{
 		skippedAssertion_t* skipped = skippedAssertions.Alloc();
 		skipped->file = file;
 		skipped->line = line;
 	}
-	*/
 
 	return true;
 }

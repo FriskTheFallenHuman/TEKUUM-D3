@@ -279,94 +279,6 @@ void Script_Transition( idWindow* window, idList<idGSWinVar>* src )
 	}
 }
 
-// RB: added "namedEvent" keyword
-/*
-=========================
-Script_NamedEvent
-=========================
-*/
-void Script_NamedEvent( idWindow* window, idList<idGSWinVar>* src )
-{
-	idWinStr* parm = dynamic_cast<idWinStr*>( ( *src )[0].var );
-	if( parm )
-	{
-		idStr key = *parm;
-		int n = key.Find( "::" );
-		if( n > 0 )
-		{
-			idStr winName = key.Left( n );
-			idStr eventName = key.Right( key.Length() - n - 2 );
-			drawWin_t* win = window->GetGui()->GetDesktop()->FindChildByName( winName );
-			if( win != NULL && win->win != NULL )
-			{
-				win->win->RunNamedEvent( eventName, false );
-			}
-			else
-			{
-				window->GetGui()->HandleNamedEvent( *parm );
-			}
-		}
-		else
-		{
-			window->GetGui()->HandleNamedEvent( *parm );
-		}
-	}
-}
-
-/*
-=========================
-Script_Print
-=========================
-*/
-void Script_Print( idWindow* window, idList<idGSWinVar>* src )
-{
-	idWinStr* parm = dynamic_cast<idWinStr*>( ( *src )[0].var );
-	if( parm )
-	{
-		idLib::Printf( "%s: %s\n", window->GetGui()->GetSourceFile(), parm->c_str() );
-	}
-}
-
-/*
-=========================
-Script_Open
-=========================
-*/
-void Script_Open( idWindow* window, idList<idGSWinVar>* src )
-{
-	idWinStr* parm = dynamic_cast<idWinStr*>( ( *src )[0].var );
-	if( parm )
-	{
-		drawWin_t* win = window->GetGui()->GetDesktop()->FindChildByName( *parm );
-		if( win != NULL && win->win != NULL )
-		{
-			win->win->Open();
-		}
-	}
-}
-
-/*
-=========================
-Script_Close
-=========================
-*/
-void Script_Close( idWindow* window, idList<idGSWinVar>* src )
-{
-	idWinStr* parm = dynamic_cast<idWinStr*>( ( *src )[0].var );
-	if( parm )
-	{
-		drawWin_t* win = window->GetGui()->GetDesktop()->FindChildByName( *parm );
-		if( win != NULL && win->win != NULL )
-		{
-			win->win->Close();
-		}
-	}
-}
-
-
-
-// RB end
-
 typedef struct
 {
 	const char* name;
@@ -386,13 +298,7 @@ guiCommandDef_t commandList[] =
 	{ "transition", Script_Transition, 4, 6 },
 	{ "localSound", Script_LocalSound, 1, 1 },
 	{ "runScript", Script_RunScript, 1, 1 },
-	{ "evalRegs", Script_EvalRegs, 0, 0 },
-// RB: added new keywords
-	{ "namedEvent", Script_NamedEvent, 1, 1 },
-	{ "print", Script_Print, 1, 1  },
-	{ "open", Script_Open, 1, 1  },
-	{ "close", Script_Close, 1, 1  }
-// RB end
+	{ "evalRegs", Script_EvalRegs, 0, 0 }
 };
 
 int	scriptCommandCount = sizeof( commandList ) / sizeof( guiCommandDef_t );

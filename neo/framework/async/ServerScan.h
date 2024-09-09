@@ -137,8 +137,8 @@ public:
 	int					GetChallenge( );
 
 private:
-	static const int	MAX_PINGREQUESTS 	= 32;		// how many servers to query at once
-	static const int	REPLY_TIMEOUT 		= 999;		// how long should we wait for a reply from a game server
+	static const int	MAX_PINGREQUESTS	= 32;		// how many servers to query at once
+	static const int	REPLY_TIMEOUT		= 999;		// how long should we wait for a reply from a game server
 	static const int	INCOMING_TIMEOUT	= 1500;		// when we got an incoming server list, how long till we decide the list is done
 	static const int	REFRESH_START		= 10000;	// how long to wait when sending the initial refresh request
 

@@ -70,7 +70,7 @@ public:
 	virtual void			BufferCommandText( cmdExecution_t exec, const char* text );
 	virtual void			ExecuteCommandBuffer();
 
-	virtual void			ArgCompletion_FolderExtension( const idCmdArgs& args, void( *callback )( const char* s ), const char* folder, bool stripFolder, ... );
+	virtual void			ArgCompletion_FolderExtension( const idCmdArgs& args, void( *callback )( const char* s ), const char* folder, int stripFolder, ... );
 	virtual void			ArgCompletion_DeclName( const idCmdArgs& args, void( *callback )( const char* s ), int type );
 
 	virtual void			BufferCommandArgs( cmdExecution_t exec, const idCmdArgs& args );
@@ -257,7 +257,6 @@ idCmdSystemLocal::Exec_f
 void idCmdSystemLocal::Exec_f( const idCmdArgs& args )
 {
 	char* 	f;
-	int		len;
 	idStr	filename;
 
 	if( args.Argc() != 2 )
@@ -268,7 +267,7 @@ void idCmdSystemLocal::Exec_f( const idCmdArgs& args )
 
 	filename = args.Argv( 1 );
 	filename.DefaultFileExtension( ".cfg" );
-	len = fileSystem->ReadFile( filename, reinterpret_cast<void**>( &f ), NULL );
+	fileSystem->ReadFile( filename, reinterpret_cast<void**>( &f ), NULL );
 	if( !f )
 	{
 		common->Printf( "couldn't exec %s\n", args.Argv( 1 ) );
@@ -790,7 +789,8 @@ void idCmdSystemLocal::ExecuteCommandBuffer()
 idCmdSystemLocal::ArgCompletion_FolderExtension
 ============
 */
-void idCmdSystemLocal::ArgCompletion_FolderExtension( const idCmdArgs& args, void( *callback )( const char* s ), const char* folder, bool stripFolder, ... )
+// SRS - Changed stripFolder type from bool to int for compatibility with va_start()
+void idCmdSystemLocal::ArgCompletion_FolderExtension( const idCmdArgs& args, void( *callback )( const char* s ), const char* folder, int stripFolder, ... )
 {
 	int i;
 	idStr string;

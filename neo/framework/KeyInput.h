@@ -36,6 +36,8 @@ struct keyBindings_t
 	idStr gamepad;
 };
 
+class idSerializer;
+
 // Converts from a USB HID code to a K_ code
 int Key_CovertHIDCode( int hid );
 

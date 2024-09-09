@@ -29,7 +29,6 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-
 //===============================================================
 //
 //	idWinding
@@ -105,7 +104,13 @@ int idWinding::Split( const idPlane& plane, const float epsilon, idWinding** fro
 	idWinding* 		f, *b;
 	int				maxpts;
 
-	assert( this );
+	assert( this && numPoints > 0 );
+
+	// DG: unlikely, but makes sure we don't use uninitialized memory below
+	if( numPoints == 0 )
+	{
+		return 0; // it's not like the callers check the return value anyway..
+	}
 
 	dists = ( float* ) _alloca( ( numPoints + 4 ) * sizeof( float ) );
 	sides = ( byte* ) _alloca( ( numPoints + 4 ) * sizeof( byte ) );
@@ -282,7 +287,14 @@ idWinding* idWinding::Clip( const idPlane& plane, const float epsilon, const boo
 	idVec5		mid;
 	int			maxpts;
 
-	assert( this );
+	assert( this && numPoints > 0 );
+
+	// DG: this shouldn't happen, probably, but if it does we'd use uninitialized memory below
+	if( numPoints == 0 )
+	{
+		delete this;
+		return NULL;
+	}
 
 	dists = ( float* ) _alloca( ( numPoints + 4 ) * sizeof( float ) );
 	sides = ( byte* ) _alloca( ( numPoints + 4 ) * sizeof( byte ) );
@@ -1313,7 +1325,7 @@ void idWinding::RemovePoint( int point )
 idWinding::InsertPoint
 =============
 */
-void idWinding::InsertPoint( const idVec3& point, int spot )
+void idWinding::InsertPoint( const idVec5& point, int spot )
 {
 	int i;
 
@@ -1334,6 +1346,69 @@ void idWinding::InsertPoint( const idVec3& point, int spot )
 	}
 	p[spot] = point;
 	numPoints++;
+}
+
+/*
+=============
+idWinding::InsertPointIfOnEdge
+=============
+*/
+bool idWinding::InsertPointIfOnEdge( const idVec5& point, const idPlane& plane, const float epsilon )
+{
+	int i;
+	float dist, dot;
+	idVec3 normal;
+
+	// point may not be too far from the winding plane
+	if( idMath::Fabs( plane.Distance( point.ToVec3() ) ) > epsilon )
+	{
+		return false;
+	}
+
+	for( i = 0; i < numPoints; i++ )
+	{
+
+		// create plane through edge orthogonal to winding plane
+		normal = ( p[( i + 1 ) % numPoints].ToVec3() - p[i].ToVec3() ).Cross( plane.Normal() );
+		normal.Normalize();
+		dist = normal * p[i].ToVec3();
+
+		if( idMath::Fabs( normal * point.ToVec3() - dist ) > epsilon )
+		{
+			continue;
+		}
+
+		normal = plane.Normal().Cross( normal );
+		dot = normal * point.ToVec3();
+
+		dist = dot - normal * p[i].ToVec3();
+
+		if( dist < epsilon )
+		{
+			// if the winding already has the point
+			if( dist > -epsilon )
+			{
+				return false;
+			}
+			continue;
+		}
+
+		dist = dot - normal * p[( i + 1 ) % numPoints].ToVec3();
+
+		if( dist > -epsilon )
+		{
+			// if the winding already has the point
+			if( dist < epsilon )
+			{
+				return false;
+			}
+			continue;
+		}
+
+		InsertPoint( point, i + 1 );
+		return true;
+	}
+	return false;
 }
 
 /*
@@ -1393,7 +1468,7 @@ bool idWinding::InsertPointIfOnEdge( const idVec3& point, const idPlane& plane, 
 			continue;
 		}
 
-		InsertPoint( point, i + 1 );
+		InsertPoint( idVec5( point.x, point.y, point.z, 0, 0 ), i + 1 );
 		return true;
 	}
 	return false;
@@ -1476,7 +1551,7 @@ float idWinding::PlaneDistance( const idPlane& plane ) const
 	int		i;
 	float	d, min, max;
 
-	min = idMath::INFINITY;
+	min = idMath::INFINITUM;
 	max = -min;
 	for( i = 0; i < numPoints; i++ )
 	{

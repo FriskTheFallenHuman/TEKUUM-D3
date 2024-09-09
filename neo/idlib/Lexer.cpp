@@ -32,7 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 #define PUNCTABLE
 
 //longer punctuations first
-punctuation_t default_punctuations[] =
+static const punctuation_t default_punctuations[] =
 {
 	//binary operators
 	{">>=", P_RSHIFT_ASSIGN},
@@ -207,7 +207,7 @@ const char* idLexer::GetPunctuationFromId( int id )
 			return idLexer::punctuations[i].p;
 		}
 	}
-	return "unkown punctuation";
+	return "unknown punctuation";
 }
 
 /*
@@ -2342,4 +2342,3 @@ bool idLexer::HadError() const
 {
 	return hadError;
 }
-

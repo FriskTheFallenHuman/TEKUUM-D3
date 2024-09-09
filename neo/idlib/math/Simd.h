@@ -58,11 +58,13 @@ public:
 ===============================================================================
 */
 
+// RB begin
 #ifdef _WIN32
 	#define VPCALL __fastcall
 #else
 	#define VPCALL
 #endif
+// RB end
 
 class idVec2;
 class idVec3;
@@ -104,6 +106,8 @@ public:
 	}
 
 	cpuid_t							cpuid;
+
+	virtual ~idSIMDProcessor() {}                   // SRS - Added virtual destructor
 
 	virtual const char* VPCALL		GetName() const = 0;
 

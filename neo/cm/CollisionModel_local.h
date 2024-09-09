@@ -59,9 +59,6 @@ If you have questions concerning this license or the applicable additional terms
 #define VERTEX_EPSILON						0.1f
 #define CHOP_EPSILON						0.1f
 
-static const byte BCM_VERSION = 103;
-static const unsigned int BCM_MAGIC = ( 'B' << 24 ) | ( 'C' << 16 ) | ( 'M' << 16 ) | BCM_VERSION;
-
 
 typedef struct cm_windingList_s
 {
@@ -334,7 +331,7 @@ public:
 	void			FreeMap();
 
 	// get clip handle for model
-	cmHandle_t		LoadModel( const char* modelName, const bool precache );
+	cmHandle_t		LoadModel( const char* modelName );
 	// sets up a trace model for collision with other trace models
 	cmHandle_t		SetupTrmModel( const idTraceModel& trm, const idMaterial* material );
 	// create trace model from a collision model, returns true if succesfull

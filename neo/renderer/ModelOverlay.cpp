@@ -498,10 +498,10 @@ void idRenderModelOverlay::CreateOverlay( const idRenderModel* model, const idPl
 		overlay.surfaceNum = surfNum;
 		overlay.surfaceId = surf->id;
 		overlay.numIndexes = numIndexes;
-		overlay.indexes = ( triIndex_t* )Mem_Alloc( numIndexes * sizeof( overlay.indexes[0] ), TAG_MODEL );
+		overlay.indexes = ( triIndex_t* )Mem_Alloc( numIndexes * sizeof( overlay.indexes[0] ) );
 		memcpy( overlay.indexes, overlayIndexes.Ptr(), numIndexes * sizeof( overlay.indexes[0] ) );
 		overlay.numVerts = numVerts;
-		overlay.verts = ( overlayVertex_t* )Mem_Alloc( numVerts * sizeof( overlay.verts[0] ), TAG_MODEL );
+		overlay.verts = ( overlayVertex_t* )Mem_Alloc( numVerts * sizeof( overlay.verts[0] ) );
 		memcpy( overlay.verts, overlayVerts.Ptr(), numVerts * sizeof( overlay.verts[0] ) );
 		overlay.maxReferencedVertex = maxReferencedVertex;
 

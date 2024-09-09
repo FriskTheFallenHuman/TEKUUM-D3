@@ -196,4 +196,3 @@ ID_INLINE bool idTraceModel::operator!=( const idTraceModel& trm ) const
 }
 
 #endif /* !__TRACEMODEL_H__ */
-

@@ -109,15 +109,12 @@ bool idLangDict::Load( const char* fileName, bool clear /* _D3XP */ )
 			idLangKeyValue kv;
 			kv.key = tok;
 			kv.value = tok2;
-
-			// RB: development HACK until we replace the BFG fonts
+			// DG: D3LE has #font_ entries in english.lang, maybe from D3BFG? not supported here, just skip them
 			if( kv.key.Cmpn( "#font_", 6 ) != 0 )
 			{
 				assert( kv.key.Cmpn( STRTABLE_ID, STRTABLE_ID_LENGTH ) == 0 );
+				hash.Add( GetHashKey( kv.key ), args.Append( kv ) );
 			}
-			// RB
-
-			hash.Add( GetHashKey( kv.key ), args.Append( kv ) );
 		}
 	}
 	idLib::common->Printf( "%i strings read from %s\n", args.Num(), fileName );
@@ -179,13 +176,9 @@ const char* idLangDict::GetString( const char* str ) const
 		return "";
 	}
 
-	// RB: development HACK until we replace the BFG fonts
-	if( idStr::Cmpn( str, "#font_", 6 ) != 0 )
+	if( idStr::Cmpn( str, STRTABLE_ID, STRTABLE_ID_LENGTH ) != 0 )
 	{
-		if( idStr::Cmpn( str, STRTABLE_ID, STRTABLE_ID_LENGTH ) != 0 )
-		{
-			return str;
-		}
+		return str;
 	}
 
 	int hashKey = GetHashKey( str );
@@ -356,19 +349,24 @@ idLangDict::GetHashKey
 */
 int idLangDict::GetHashKey( const char* str ) const
 {
-// RB: use the complete hash key generator so we can use labels which are more common like with .NET WPF programming
-// e.g. #str_GUI_MainMenu_CreditsBtnText_Text instead of #str_02218
-#if 0
 	int hashKey = 0;
+	// DG: Replace assertion for invalid entries with a warning that's shown only once
+	//     (for D3LE mod that seems to have lots of entries like #str_adil_exis_pda_01_audio_info)
+	const char* strbk = str;
+	static bool warnedAboutInvalidKey = false;
 	for( str += STRTABLE_ID_LENGTH; str[0] != '\0'; str++ )
 	{
-		assert( str[0] >= '0' && str[0] <= '9' );
+		// assert( str[0] >= '0' && str[0] <= '9' );
+		if( !warnedAboutInvalidKey && ( str[0] < '0' || str[0] > '9' ) )
+		{
+			// The "hash" code here very obviously expects numbers, but apparently it still somehow works,
+			// so just warn about it and otherwise accept those entries, seems to work for D3LE?
+			idLib::common->Warning( "We have at least one invalid key in a language dict: %s\n"
+									" (might still work, but Doom3 really wants #str_01234, i.e. only a number after '#str_')\n", strbk );
+			warnedAboutInvalidKey = true;
+		}
+		// DG end
 		hashKey = hashKey * 10 + str[0] - '0';
 	}
 	return hashKey;
-#else
-	int hashKey = hash.GenerateKey( str, false );
-	return hashKey;
-#endif
-// RB end
 }

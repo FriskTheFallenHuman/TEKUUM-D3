@@ -29,10 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-
 #include "AASFile.h"
 #include "AASFile_local.h"
-
 
 /*
 ===============================================================================
@@ -1328,7 +1326,7 @@ bool idAASFileLocal::Load( const idStr& fileName, unsigned int mapFileCRC )
 		return false;
 	}
 
-	c = token.GetUnsignedLongValue();
+	c = token.GetUnsignedIntValue();
 	if( mapFileCRC && c != mapFileCRC )
 	{
 		common->Warning( "AAS file '%s' is out of date", name.c_str() );
@@ -1444,6 +1442,8 @@ bool idAASFileLocal::Load( const idStr& fileName, unsigned int mapFileCRC )
 	{
 		src.Error( "idAASFileLocal::Load: tree depth = %d", depth );
 	}
+
+	session->PacifierUpdate();
 
 	common->Printf( "done.\n" );
 

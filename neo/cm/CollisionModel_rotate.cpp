@@ -37,7 +37,6 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-
 #include "CollisionModel_local.h"
 
 /*
@@ -1260,7 +1259,7 @@ bool idCollisionModelManagerLocal::RotateTrmThroughPolygon( cm_traceWork_t* tw, 
 		bv = tw->vertices + i;
 		// calculate polygon side this vertex is on
 		d = p->plane.Distance( bv->p );
-		bv->polygonSide = IEEE_FLT_SIGNBITSET( d );
+		bv->polygonSide = ( d < 0.0f );
 	}
 
 	for( i = 0; i < p->numEdges; i++ )
@@ -1769,7 +1768,7 @@ void idCollisionModelManagerLocal::Rotation180( trace_t* results, const idVec3& 
 					if( ( edge->bitNum & 2 ) == 0 )
 					{
 						d = plaxis.PermutedInnerProduct( edge->pl );
-						edge->bitNum = IEEE_FLT_SIGNBITSET( d ) | 2;
+						edge->bitNum = ( ( d < 0.0f ) ? 1 : 0 ) | 2;
 					}
 					if( ( edge->bitNum ^ INT32_SIGNBITSET( edgeNum ) ) & 1 )
 					{

@@ -371,7 +371,7 @@ void idParser::Error( const char* str, ... ) const
 	va_end( ap );
 	if( idParser::scriptstack )
 	{
-		idParser::scriptstack->Error( text );
+		idParser::scriptstack->Error( "%s", text );
 	}
 }
 
@@ -390,7 +390,7 @@ void idParser::Warning( const char* str, ... ) const
 	va_end( ap );
 	if( idParser::scriptstack )
 	{
-		idParser::scriptstack->Warning( text );
+		idParser::scriptstack->Warning( "%s", text );
 	}
 }
 
@@ -774,55 +774,33 @@ define_t* idParser::CopyFirstDefine()
 	return NULL;
 }
 
-static idStr PreProcessorDate()
+// simple abstraction around localtime()/localtime_r() or whatever
+static bool my_localtime( const time_t* t, struct tm* ts )
 {
-	time_t t = time( NULL );
-	char* curtime = ctime( &t );
-	if( idStr::Length( curtime ) < 24 )
-	{
-		return idStr( "*** BAD CURTIME ***" );
-	}
-	idStr	str = "\"";
-	// skip DAY, extract MMM DD
-	for( int i = 4 ; i < 10 ; i++ )
-	{
-		str.Append( curtime[i] );
-	}
-	// skip time, extract space+YYYY
-	for( int i = 19 ; i < 24 ; i++ )
-	{
-		str.Append( curtime[i] );
-	}
-	str.Append( "\"" );
-	return str;
-}
+	// TODO: does any non-windows platform not support localtime_r()?
+	//       then add them here (or handle them specially with their own #elif)
+#ifdef _WIN32
+	// localtime() is C89 so it should be available everywhere, but it *may* not be threadsafe.
+	// It *is* threadsafe on Windows though (there it returns a thread-local variable).
+	// (yes, Windows has localtime_s(), but it's unclear if MinGW supports that
+	//  or localtime_r() and in the end, *on Windows* localtime() is safe so use it)
 
-static idStr PreProcessorTime()
-{
-	time_t t = time( NULL );
-	char* curtime = ctime( &t );
-	if( idStr::Length( curtime ) < 24 )
+	struct tm* tmp = localtime( t );
+	if( tmp != NULL )
 	{
-		return idStr( "*** BAD CURTIME ***" );
+		*ts = *tmp;
+		return true;
 	}
-
-	idStr	str = "\"";
-	for( int i = 11 ; i < 19 ; i++ )
+#else // localtime_r() assumed available, use it (all Unix-likes incl. macOS support it, AROS as well)
+	if( localtime_r( t, ts ) != NULL )
 	{
-		str.Append( curtime[i] );
+		return true;
 	}
-	str.Append( "\"" );
-	return str;
+#endif
+	// if we get here, the localtime() (or localtime_r() or whatever) call failed
+	memset( ts, 0, sizeof( *ts ) ); // make sure ts has deterministic content
+	return false;
 }
-
-/*
-RB: TODO
-CONSOLE_COMMAND( TestPreprocessorMacros, "check analyze warning", 0 )
-{
-	idLib::Printf( "%s : %s\n", __DATE__, PreProcessorDate().c_str() );
-	idLib::Printf( "%s : %s\n", __TIME__, PreProcessorTime().c_str() );
-}
-*/
 
 /*
 ================
@@ -832,6 +810,7 @@ idParser::ExpandBuiltinDefine
 int idParser::ExpandBuiltinDefine( idToken* deftoken, define_t* define, idToken** firsttoken, idToken** lasttoken )
 {
 	idToken* token;
+	ID_TIME_T t;
 	char buf[MAX_STRING_CHARS];
 
 	token = new idToken( deftoken );
@@ -866,7 +845,16 @@ int idParser::ExpandBuiltinDefine( idToken* deftoken, define_t* define, idToken*
 		}
 		case BUILTIN_DATE:
 		{
-			*token = PreProcessorDate();
+			t = time( NULL );
+			// DG: apparently this was supposed to extract the date part of "Wed Jun 30 21:49:08 1993\n"
+			// (like "Jun 30 1993") - it was both ugly and broken before I changed it, though
+			// Originally it copied stuff out of ctime(), which is ugly but ok, but also
+			// free'd the returned value (wrong) and tried to modify token in ways that should've crashed
+			// (like token[7] = NULL; which should've been (*token)[7] = '\0';)
+			struct tm ts;
+			my_localtime( &t, &ts );
+			strftime( buf, sizeof( buf ), "\"%b %d %Y\"", &ts );
+			( *token ) = buf;
 			token->type = TT_STRING;
 			token->subtype = token->Length();
 			token->line = deftoken->line;
@@ -878,7 +866,14 @@ int idParser::ExpandBuiltinDefine( idToken* deftoken, define_t* define, idToken*
 		}
 		case BUILTIN_TIME:
 		{
-			*token = PreProcessorTime();
+			t = time( NULL );
+			// DG: apparently this was supposed to extract the time part of "Wed Jun 30 21:49:08 1993\n"
+			// (like "21:49:08") - it was both ugly and broken before I changed it, though
+			// (had basicaly the same problems as BUILTIN_DATE)
+			struct tm ts;
+			my_localtime( &t, &ts );
+			strftime( buf, sizeof( buf ), "\"%H:%M:%S\"", &ts );
+			( *token ) = buf;
 			token->type = TT_STRING;
 			token->subtype = token->Length();
 			token->line = deftoken->line;
@@ -891,12 +886,14 @@ int idParser::ExpandBuiltinDefine( idToken* deftoken, define_t* define, idToken*
 		case BUILTIN_STDC:
 		{
 			idParser::Warning( "__STDC__ not supported\n" );
+			delete token; // DG: we probably shouldn't leak it, right?
 			*firsttoken = NULL;
 			*lasttoken = NULL;
 			break;
 		}
 		default:
 		{
+			delete token; // DG: we probably shouldn't leak it, right?
 			*firsttoken = NULL;
 			*lasttoken = NULL;
 			break;
@@ -1149,7 +1146,7 @@ int idParser::Directive_include( idToken* token, bool supressWarning )
 	}
 	if( token->type == TT_STRING )
 	{
-		script = new( TAG_IDLIB_PARSER ) idLexer;
+		script = new idLexer;
 		// try relative to the current file
 		path = scriptstack->GetFileName();
 		path.StripFilename();
@@ -1200,7 +1197,7 @@ int idParser::Directive_include( idToken* token, bool supressWarning )
 		{
 			return true;
 		}
-		script = new( TAG_IDLIB_PARSER ) idLexer;
+		script = new idLexer;
 		if( !script->LoadFile( includepath + path, OSPath ) )
 		{
 			delete script;
@@ -1212,7 +1209,6 @@ int idParser::Directive_include( idToken* token, bool supressWarning )
 		idParser::Error( "#include without file name" );
 		return false;
 	}
-
 	if( !script )
 	{
 		if( !supressWarning )
@@ -1570,7 +1566,7 @@ typedef struct operator_s
 
 typedef struct value_s
 {
-	signed int intvalue; // DG: use int instead of long for 64bit compatibility
+	int intvalue;
 	double floatvalue;
 	int parentheses;
 	struct value_s* prev, *next;
@@ -1665,7 +1661,7 @@ int PC_OperatorPriority( int op )
 
 #define FreeOperator(op)
 
-int idParser::EvaluateTokens( idToken* tokens, signed int* intvalue, double* floatvalue, int integer )
+int idParser::EvaluateTokens( idToken* tokens, int* intvalue, double* floatvalue, int integer )
 {
 	operator_t* o, *firstoperator, *lastoperator;
 	value_t* v, *firstvalue, *lastvalue, *v1, *v2;
@@ -1678,7 +1674,6 @@ int idParser::EvaluateTokens( idToken* tokens, signed int* intvalue, double* flo
 	int questmarkintvalue = 0;
 	double questmarkfloatvalue = 0;
 	int gotquestmarkvalue = false;
-	int lastoperatortype = 0;
 	//
 	operator_t operator_heap[MAX_OPERATORS];
 	int numoperators = 0;
@@ -2156,7 +2151,6 @@ int idParser::EvaluateTokens( idToken* tokens, signed int* intvalue, double* flo
 		{
 			break;
 		}
-		lastoperatortype = o->op;
 		//if not an operator with arity 1
 		if( o->op != P_LOGIC_NOT && o->op != P_BIN_NOT )
 		{
@@ -2248,7 +2242,7 @@ int idParser::EvaluateTokens( idToken* tokens, signed int* intvalue, double* flo
 idParser::Evaluate
 ================
 */
-int idParser::Evaluate( signed int* intvalue, double* floatvalue, int integer )
+int idParser::Evaluate( int* intvalue, double* floatvalue, int integer )
 {
 	idToken token, *firsttoken, *lasttoken;
 	idToken* t, *nexttoken;
@@ -2379,7 +2373,7 @@ int idParser::Evaluate( signed int* intvalue, double* floatvalue, int integer )
 idParser::DollarEvaluate
 ================
 */
-int idParser::DollarEvaluate( signed int* intvalue, double* floatvalue, int integer )
+int idParser::DollarEvaluate( int* intvalue, double* floatvalue, int integer )
 {
 	int indent, defined = false;
 	idToken token, *firsttoken, *lasttoken;
@@ -2530,7 +2524,7 @@ idParser::Directive_elif
 */
 int idParser::Directive_elif()
 {
-	signed int value; // DG: use int instead of long for 64bit compatibility
+	int value;
 	int type, skip;
 
 	idParser::PopIndent( &type, &skip );
@@ -2555,7 +2549,7 @@ idParser::Directive_if
 */
 int idParser::Directive_if()
 {
-	signed int value; // DG: use int instead of long for 64bit compatibility
+	int value;
 	int skip;
 
 	if( !idParser::Evaluate( &value, NULL, true ) )
@@ -2662,7 +2656,7 @@ idParser::Directive_eval
 */
 int idParser::Directive_eval()
 {
-	signed int value; // DG: use int instead of long for 64bit compatibility
+	int value;
 	idToken token;
 	char buf[128];
 
@@ -2736,7 +2730,6 @@ int idParser::ReadDirective()
 		idParser::Error( "found '#' without name" );
 		return false;
 	}
-
 	//directive name must be on the same line
 	if( token.linesCrossed > 0 )
 	{
@@ -2744,7 +2737,6 @@ int idParser::ReadDirective()
 		idParser::Error( "found '#' at end of line" );
 		return false;
 	}
-
 	//if if is a name
 	if( token.type == TT_NAME )
 	{
@@ -2834,7 +2826,7 @@ idParser::DollarDirective_evalint
 */
 int idParser::DollarDirective_evalint()
 {
-	signed int value; // DG: use int instead of long for 64bit compatibility
+	int value;
 	idToken token;
 	char buf[128];
 
@@ -2887,7 +2879,7 @@ int idParser::DollarDirective_evalfloat()
 	token = buf;
 	token.type = TT_NUMBER;
 	token.subtype = TT_FLOAT | TT_LONG | TT_DECIMAL | TT_VALUESVALID;
-	token.intvalue = ( unsigned int ) fabs( value ); // DG: use int instead of long for 64bit compatibility
+	token.intvalue = ( unsigned int ) fabs( value );
 	token.floatvalue = fabs( value );
 	idParser::UnreadSourceToken( &token );
 	if( value < 0 )

@@ -46,9 +46,4 @@ sysFolder_t		Sys_IsFolder( const char* path );
 // returns -1 if directory was not found (the list is cleared)
 int				Sys_ListFiles( const char* directory, const char* extension, idList<class idStr>& list );
 
-const char* 	Sys_EXEPath();
-const char* 	Sys_CWD();
-
-const char* 	Sys_LaunchPath();
-
 #endif

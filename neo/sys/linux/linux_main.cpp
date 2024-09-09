@@ -45,15 +45,6 @@ static const char** cmdargv = NULL;
 static int cmdargc = 0;
 // DG end
 
-#ifdef ID_MCHECK
-	#include <mcheck.h>
-#endif
-
-static idStr	basepath;
-static idStr	savepath;
-
-
-
 /*
 =================
 Sys_AsyncThread
@@ -186,93 +177,123 @@ void Sys_AsyncThread()
 
 /*
  ==============
- Sys_DefaultSavePath
+ Sys_GetPath
  ==============
- */
-const char* Sys_DefaultSavePath()
-{
-#if defined( ID_DEMO_BUILD )
-	sprintf( savepath, "%s/.tekuum-demo", getenv( "HOME" ) );
-#else
-	sprintf( savepath, "%s/.tekuum", getenv( "HOME" ) );
-#endif
-	return savepath.c_str();
-}
-/*
-==============
-Sys_EXEPath
-==============
 */
-const char* Sys_EXEPath()
+bool Sys_GetPath( sysPath_t type, idStr& path )
 {
-	static char	buf[ 1024 ];
-	idStr		linkpath;
-	int			len;
-
-	buf[ 0 ] = '\0';
-	sprintf( linkpath, "/proc/%d/exe", getpid() );
-	len = readlink( linkpath.c_str(), buf, sizeof( buf ) );
-	if( len == -1 )
-	{
-		Sys_Printf( "couldn't stat exe path link %s\n", linkpath.c_str() );
-		// RB: fixed array subscript is below array bounds
-		buf[ 0 ] = '\0';
-		// RB end
-	}
-	return buf;
-}
-
-/*
-================
-Sys_DefaultBasePath
-
-Get the default base path
-- binary image path
-- current directory
-- hardcoded
-Try to be intelligent: if there is no BASE_GAMEDIR, try the next path
-================
-*/
-const char* Sys_DefaultBasePath()
-{
+	const char* s;
+	char buf[MAX_OSPATH];
+	char buf2[MAX_OSPATH];
 	struct stat st;
-	idStr testbase;
-	basepath = Sys_EXEPath();
-	if( basepath.Length() )
+	size_t len;
+
+	path.Clear();
+
+	switch( type )
 	{
-		basepath.StripFilename();
-		testbase = basepath;
-		testbase += "/";
-		testbase += BASE_GAMEDIR;
-		if( stat( testbase.c_str(), &st ) != -1 && S_ISDIR( st.st_mode ) )
-		{
-			return basepath.c_str();
-		}
-		else
-		{
-			common->Printf( "no '%s' directory in exe path %s, skipping\n", BASE_GAMEDIR, basepath.c_str() );
-		}
+		case PATH_BASE:
+			if( stat( BUILD_DATADIR, &st ) != -1 && S_ISDIR( st.st_mode ) )
+			{
+				path = BUILD_DATADIR;
+				return true;
+			}
+
+			common->Warning( "base path '" BUILD_DATADIR "' does not exist" );
+
+			// try next to the executable..
+			if( Sys_GetPath( PATH_EXE, path ) )
+			{
+				path = path.StripFilename();
+				// the path should have a base dir in it, otherwise it probably just contains the executable
+				idStr testPath = path + "/" BASE_GAMEDIR;
+				if( stat( testPath.c_str(), &st ) != -1 && S_ISDIR( st.st_mode ) )
+				{
+					common->Warning( "using path of executable: %s", path.c_str() );
+					return true;
+				}
+				else
+				{
+					idStr testPath = path + "/demo/demo00.pk4";
+					if( stat( testPath.c_str(), &st ) != -1 && S_ISREG( st.st_mode ) )
+					{
+						common->Warning( "using path of executable (seems to contain demo game data): %s", path.c_str() );
+						return true;
+					}
+					else
+					{
+						path.Clear();
+					}
+				}
+			}
+
+			// fallback to vanilla doom3 install
+			if( stat( LINUX_DEFAULT_PATH, &st ) != -1 && S_ISDIR( st.st_mode ) )
+			{
+				common->Warning( "using hardcoded default base path: " LINUX_DEFAULT_PATH );
+
+				path = LINUX_DEFAULT_PATH;
+				return true;
+			}
+
+			return false;
+
+		case PATH_CONFIG:
+			s = getenv( "XDG_CONFIG_HOME" );
+			if( s )
+			{
+				idStr::snPrintf( buf, sizeof( buf ), "%s/dhewm3", s );
+			}
+			else
+			{
+				idStr::snPrintf( buf, sizeof( buf ), "%s/.config/dhewm3", getenv( "HOME" ) );
+			}
+
+			path = buf;
+			return true;
+
+		case PATH_SAVE:
+			s = getenv( "XDG_DATA_HOME" );
+			if( s )
+			{
+				idStr::snPrintf( buf, sizeof( buf ), "%s/dhewm3", s );
+			}
+			else
+			{
+				idStr::snPrintf( buf, sizeof( buf ), "%s/.local/share/dhewm3", getenv( "HOME" ) );
+			}
+
+			path = buf;
+			return true;
+
+		case PATH_EXE:
+			idStr::snPrintf( buf, sizeof( buf ), "/proc/%d/exe", getpid() );
+			len = readlink( buf, buf2, sizeof( buf2 ) );
+			if( len != -1 )
+			{
+				if( len < MAX_OSPATH )
+				{
+					buf2[len] = '\0';
+				}
+				else
+				{
+					buf2[MAX_OSPATH - 1] = '\0';
+				}
+				path = buf2;
+				return true;
+			}
+
+			if( path_argv[0] != 0 )
+			{
+				path = path_argv;
+				return true;
+			}
+
+			return false;
 	}
-	if( basepath != Posix_Cwd() )
-	{
-		basepath = Posix_Cwd();
-		testbase = basepath;
-		testbase += "/";
-		testbase += BASE_GAMEDIR;
-		if( stat( testbase.c_str(), &st ) != -1 && S_ISDIR( st.st_mode ) )
-		{
-			return basepath.c_str();
-		}
-		else
-		{
-			common->Printf( "no '%s' directory in cwd path %s, skipping\n", BASE_GAMEDIR, basepath.c_str() );
-		}
-	}
-	common->Printf( "WARNING: using hardcoded default base path\n" );
-	return LINUX_DEFAULT_PATH;
+
+	return false;
 }
-
-
 
 /*
 ===============
@@ -281,8 +302,6 @@ Sys_Shutdown
 */
 void Sys_Shutdown()
 {
-	basepath.Clear();
-	savepath.Clear();
 	Posix_Shutdown();
 }
 
@@ -294,25 +313,6 @@ Sys_GetProcessorId
 cpuid_t Sys_GetProcessorId()
 {
 	return CPUID_GENERIC;
-}
-
-/*
-===============
-Sys_GetProcessorString
-===============
-*/
-const char* Sys_GetProcessorString()
-{
-	return "generic";
-}
-
-/*
-===============
-Sys_FPU_EnableExceptions
-===============
-*/
-void Sys_FPU_EnableExceptions( int exceptions )
-{
 }
 
 /*
@@ -695,13 +695,6 @@ void idSysLocal::OpenURL( const char* url, bool quit )
 }
 
 /*
- ==================
- Sys_DoPreferences
- ==================
- */
-void Sys_DoPreferences() { }
-
-/*
 ================
 Sys_FPU_SetDAZ
 ================
@@ -748,33 +741,6 @@ void Sys_FPU_SetFTZ( bool enable )
 	}
 	*/
 }
-
-/*
-===============
-mem consistency stuff
-===============
-*/
-
-#ifdef ID_MCHECK
-
-const char* mcheckstrings[] =
-{
-	"MCHECK_DISABLED",
-	"MCHECK_OK",
-	"MCHECK_FREE",	// block freed twice
-	"MCHECK_HEAD",	// memory before the block was clobbered
-	"MCHECK_TAIL"	// memory after the block was clobbered
-};
-
-void abrt_func( mcheck_status status )
-{
-	Sys_Printf( "memory consistency failure: %s\n", mcheckstrings[ status + 1 ] );
-	Posix_SetExit( EXIT_FAILURE );
-	common->Quit();
-}
-
-#endif
-
 
 /*
 ========================
@@ -887,11 +853,6 @@ int main( int argc, const char** argv )
 	cmdargc = argc;
 	cmdargv = argv;
 	// DG end
-#ifdef ID_MCHECK
-	// must have -lmcheck linkage
-	mcheck( abrt_func );
-	Sys_Printf( "memory consistency checking enabled\n" );
-#endif
 
 	Posix_EarlyInit( );
 

@@ -68,9 +68,7 @@ public:
 	virtual void		Activate( bool activate, idStr& act );
 	virtual void		SetBuddy( idWindow* buddy );
 
-	// RB: added parm recurseChildren
-	void				RunNamedEvent( const char* eventName, bool recurseChildren = true );
-	// RB end
+	void				RunNamedEvent( const char* eventName );
 
 private:
 	virtual bool		ParseInternalVar( const char* name, idTokenParser* src );

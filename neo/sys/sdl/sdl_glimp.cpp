@@ -43,9 +43,6 @@ If you have questions concerning this license or the applicable additional terms
 #include <fcntl.h>
 #include <unistd.h>
 
-idCVar sys_videoRam( "sys_videoRam", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "Texture memory on the video card (in megabytes) - 0: autodetect", 0, 512 );
-
-
 idCVar in_nograb( "in_nograb", "0", CVAR_SYSTEM | CVAR_NOCHEAT, "prevents input grabbing" );
 
 // RB: FIXME this shit. We need the OpenGL alpha channel for advanced rendering effects
@@ -653,108 +650,6 @@ void GLimp_GrabInput( int flags )
 	SDL_WM_GrabInput( grab ? SDL_GRAB_ON : SDL_GRAB_OFF );
 #endif
 }
-
-/*
-================
-Sys_GetVideoRam
-returns in megabytes
-open your own display connection for the query and close it
-using the one shared with GLimp_Init is not stable
-================
-*/
-int Sys_GetVideoRam()
-{
-	static int run_once = 0;
-	int major, minor, value;
-
-	if( run_once )
-	{
-		return run_once;
-	}
-
-	if( sys_videoRam.GetInteger() )
-	{
-		run_once = sys_videoRam.GetInteger();
-		return sys_videoRam.GetInteger();
-	}
-
-	// try a few strategies to guess the amount of video ram
-	common->Printf( "guessing video ram ( use +set sys_videoRam to force ) ..\n" );
-
-	if( GLEW_NVX_gpu_memory_info != 0 )
-	{
-		GLint total;
-
-		glGetIntegerv( GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX , ( GLint* )&total );
-
-		run_once = total / 1024;
-
-		// round to the lower 16Mb
-		run_once &= ~15;
-		return run_once;
-	}
-
-	if( GLEW_ATI_meminfo != 0 )
-	{
-		GLint total;
-
-		glGetIntegerv( GL_TEXTURE_FREE_MEMORY_ATI , ( GLint* )&total );
-
-		run_once = total / 1024;
-
-		// round to the lower 16Mb
-		run_once &= ~15;
-		return run_once;
-	}
-
-	// try ATI /proc read ( for the lack of a better option )
-	int fd;
-	if( ( fd = open( "/proc/dri/0/umm", O_RDONLY ) ) != -1 )
-	{
-		int len;
-		char umm_buf[ 1024 ];
-		char* line;
-		if( ( len = read( fd, umm_buf, 1024 ) ) != -1 )
-		{
-			// should be way enough to get the full file
-			// grab "free  LFB = " line and "free  Inv = " lines
-			umm_buf[ len - 1 ] = '\0';
-			line = umm_buf;
-			line = strtok( umm_buf, "\n" );
-			int total = 0;
-			while( line )
-			{
-				if( strlen( line ) >= 13 && strstr( line, "max   LFB =" ) == line )
-				{
-					total += atoi( line + 12 );
-				}
-				else if( strlen( line ) >= 13 && strstr( line, "max   Inv =" ) == line )
-				{
-					total += atoi( line + 12 );
-				}
-				line = strtok( NULL, "\n" );
-			}
-			if( total )
-			{
-				run_once = total / 1048576;
-				// round to the lower 16Mb
-				run_once &= ~15;
-				return run_once;
-			}
-		}
-		else
-		{
-			common->Printf( "read /proc/dri/0/umm failed: %s\n", strerror( errno ) );
-		}
-	}
-
-	common->Printf( "guess failed, return default mid-range VRAM setting ( 256MB VRAM )\n" );
-	run_once = 256;
-
-	return run_once;
-}
-
-
 
 /*
 ====================

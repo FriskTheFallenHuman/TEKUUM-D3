@@ -70,6 +70,11 @@ enum jobListParallelism_t
 #define assert_spu_local_store( ptr )
 #define assert_not_spu_local_store( ptr )
 
+// Admer: prevent Visual Studio from incorrectly highlighting AddJob, as the same is defined in winspool.h
+#ifdef AddJob
+	#undef AddJob
+#endif
+
 /*
 ================================================
 idParallelJobList
@@ -85,9 +90,8 @@ class idParallelJobList
 {
 	friend class idParallelJobManagerLocal;
 public:
-	// RB: renamed to AddParallelJob to solve MFC conflicts
-	void					AddParallelJob( jobRun_t function, void* data );
-	// RB end
+
+	void					AddJob( jobRun_t function, void* data );
 	void					InsertSyncPoint( jobSyncType_t syncType );
 
 	// Submit the jobs in this list.

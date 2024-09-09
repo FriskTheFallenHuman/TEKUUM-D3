@@ -34,16 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 
 idCVar	idSessionLocal::gui_configServerRate( "gui_configServerRate", "0", CVAR_GUI | CVAR_ARCHIVE | CVAR_ROM | CVAR_INTEGER, "" );
 
-
-// RB begin
 extern idCVar in_useJoystick;
-
-bool idSessionLocal::IsMenuActive()
-{
-	return ( guiActive != NULL ); //&& ( guiActive == guiMainMenu ) );
-}
-// RB end
-
 
 // implements the setup for, and commands from, the main menu
 
@@ -94,11 +85,7 @@ void idSessionLocal::StartMenu( bool playIntro )
 	}
 	else
 	{
-#if defined(STANDALONE)
-		guiMainMenu->SetStateString( "game_list", common->GetLanguageDict()->GetString( "#str_idSessionLocal_StartMenu_GameTitle" ) );
-#else
 		guiMainMenu->SetStateString( "game_list", common->GetLanguageDict()->GetString( "#str_07212" ) );
-#endif
 	}
 
 	console->Close();
@@ -112,8 +99,6 @@ idSessionLocal::SetGUI
 */
 void idSessionLocal::SetGUI( idUserInterface* gui, HandleGuiCommand_t handle )
 {
-	const char*	cmd;
-
 	guiActive = gui;
 	guiHandle = handle;
 	if( guiMsgRestore )
@@ -121,12 +106,8 @@ void idSessionLocal::SetGUI( idUserInterface* gui, HandleGuiCommand_t handle )
 		common->DPrintf( "idSessionLocal::SetGUI: cleared an active message box\n" );
 		guiMsgRestore = NULL;
 	}
-
 	if( !guiActive )
 	{
-#if defined(__ANDROID__)
-		//ji.HideProgressDialog();
-#endif
 		return;
 	}
 
@@ -144,7 +125,7 @@ void idSessionLocal::SetGUI( idUserInterface* gui, HandleGuiCommand_t handle )
 	memset( &ev, 0, sizeof( ev ) );
 	ev.evType = SE_NONE;
 
-	cmd = guiActive->HandleEvent( &ev, com_frameTime );
+	guiActive->HandleEvent( &ev, com_frameTime );
 	guiActive->Activate( true, com_frameTime );
 }
 
@@ -371,15 +352,8 @@ void idSessionLocal::SetMainMenuGuiVars()
 		guiMainMenu->SetStateString( "inGame", "0" );
 	}
 
-#if defined(USE_CDKEY)
 	SetCDKeyGuiVars( );
-#endif
-
-#ifdef ID_DEMO_BUILD
-	guiMainMenu->SetStateString( "nightmare", "0" );
-#else
 	guiMainMenu->SetStateString( "nightmare", cvarSystem->GetCVarBool( "g_nightmare" ) ? "1" : "0" );
-#endif
 	guiMainMenu->SetStateString( "browser_levelshot", "guis/assets/splash/pdtempa" );
 
 	SetMainMenuSkin();
@@ -388,18 +362,9 @@ void idSessionLocal::SetMainMenuGuiVars()
 
 	guiMsg->SetStateString( "visible_hasxp", fileSystem->HasD3XP() ? "1" : "0" );
 
-#if defined( __linux__ )
-	guiMainMenu->SetStateString( "driver_prompt", "1" );
-#else
 	guiMainMenu->SetStateString( "driver_prompt", "0" );
-#endif
 
 	SetPbMenuGuiVars();
-
-	// RB begin
-
-	//guiMainMenu->SetStateString( "gamepad", Sys_IsXbox360ControllerAvailable() ? "1" : "0" );
-	// RB end
 }
 
 /*
@@ -474,6 +439,8 @@ bool idSessionLocal::HandleSaveGameMenuCommand( idCmdArgs& args, int& icmd )
 
 			sessLocal.SaveGame( saveGameName );
 			SetSaveGameGuiVars( );
+			// DG: select item 0 => select savegame just created (should be on top as it's newest)
+			guiActive->SetStateInt( "loadgame_sel_0", 0 );
 			guiActive->StateChanged( com_frameTime );
 		}
 		return true;
@@ -660,6 +627,38 @@ void idSessionLocal::UpdateMPLevelShot()
 	guiMainMenu->SetStateString( "current_levelshot", screenshot );
 }
 
+// helper function to load a mod (from mods menu)
+static void loadMod( const idStr& modName )
+{
+	// add special case for mods known to need fs_game_base d3xp
+	static const char* d3xpMods[] =
+	{
+		// TODO: if there are more mods that need d3xp as base
+		// (and that are supported by dhewm3), add them here
+		"d3le", // The Lost Mission
+		"librecoopd3xp",
+		"perfected_roe",
+		"sikkmodd3xp",
+		// Doom 3: Phobos (they haven't released source yet, so it won't work yet,
+		//                 but ain't I ever the optimist..)
+		"tfphobos"
+	};
+	const char* baseMod = "";
+	for( int i = 0; i < sizeof( d3xpMods ) / sizeof( d3xpMods[0] ); ++i )
+	{
+		if( modName.Icmp( d3xpMods[i] ) == 0 )
+		{
+			baseMod = "d3xp";
+			break;
+		}
+	}
+
+	cvarSystem->SetCVarString( "fs_game", modName );
+	cvarSystem->SetCVarString( "fs_game_base", baseMod );
+
+	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "reloadEngine menu\n" );
+}
+
 /*
 ==============
 idSessionLocal::HandleMainMenuCommands
@@ -699,11 +698,7 @@ void idSessionLocal::HandleMainMenuCommands( const char* menuCommand )
 			}
 			else
 			{
-#ifndef ID_DEMO_BUILD
 				StartNewGame( "game/mars_city1" );
-#else
-				StartNewGame( "game/demo_mars_city1" );
-#endif
 			}
 			// need to do this here to make sure com_frameTime is correct or the gui activates with a time that
 			// is "however long map load took" time in the past
@@ -728,8 +723,7 @@ void idSessionLocal::HandleMainMenuCommands( const char* menuCommand )
 			int choice = guiActive->State().GetInt( "modsList_sel_0" );
 			if( choice >= 0 && choice < modsList.Num() )
 			{
-				cvarSystem->SetCVarString( "fs_game", modsList[ choice ] );
-				cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "reloadEngine menu\n" );
+				loadMod( modsList[ choice ] );
 			}
 		}
 
@@ -1068,13 +1062,9 @@ void idSessionLocal::HandleMainMenuCommands( const char* menuCommand )
 			{
 				if( cvarSystem->GetCVarBool( "s_useEAXReverb" ) )
 				{
-					int eax = soundSystem->IsEAXAvailable();
-					switch( eax )
+					int efx = soundSystem->IsEFXAvailable();
+					switch( efx )
 					{
-						case 2:
-							// OpenAL subsystem load failed
-							MessageBox( MSG_OK, common->GetLanguageDict()->GetString( "#str_07238" ), common->GetLanguageDict()->GetString( "#str_07231" ), true );
-							break;
 						case 1:
 							// when you restart
 							MessageBox( MSG_OK, common->GetLanguageDict()->GetString( "#str_04137" ), common->GetLanguageDict()->GetString( "#str_07231" ), true );
@@ -1093,8 +1083,6 @@ void idSessionLocal::HandleMainMenuCommands( const char* menuCommand )
 				}
 				else
 				{
-					// also turn off OpenAL so we fully go back to legacy mixer
-					cvarSystem->SetCVarBool( "s_useOpenAL", false );
 					// when you restart
 					MessageBox( MSG_OK, common->GetLanguageDict()->GetString( "#str_04137" ), common->GetLanguageDict()->GetString( "#str_07231" ), true );
 				}
@@ -1326,8 +1314,7 @@ void idSessionLocal::HandleInGameCommands( const char* menuCommand )
 		{
 			sysEvent_t  ev;
 			ev.evType = SE_NONE;
-			const char*	cmd;
-			cmd = guiActive->HandleEvent( &ev, com_frameTime );
+			guiActive->HandleEvent( &ev, com_frameTime );
 			guiActive->Activate( false, com_frameTime );
 			guiActive = NULL;
 		}
@@ -1590,7 +1577,6 @@ const char* idSessionLocal::MessageBox( msgBoxType_t type, const char* message, 
 			guiMsg->SetStateString( "visible_hasxp", fileSystem->HasD3XP() ? "1" : "0" );
 			// the current cdkey / xpkey values may have bad/random data in them
 			// it's best to avoid printing them completely, unless the key is good
-#if defined(USE_CDKEY)
 			if( cdkey_state == CDKEY_OK )
 			{
 				guiMsg->SetStateString( "str_cdkey", cdkey );
@@ -1601,7 +1587,7 @@ const char* idSessionLocal::MessageBox( msgBoxType_t type, const char* message, 
 				guiMsg->SetStateString( "str_cdkey", "" );
 				guiMsg->SetStateString( "visible_cdchk", "1" );
 			}
-
+			guiMsg->SetStateString( "str_cdchk", "" );
 			if( xpkey_state == CDKEY_OK )
 			{
 				guiMsg->SetStateString( "str_xpkey", xpkey );
@@ -1612,13 +1598,6 @@ const char* idSessionLocal::MessageBox( msgBoxType_t type, const char* message, 
 				guiMsg->SetStateString( "str_xpkey", "" );
 				guiMsg->SetStateString( "visible_xpchk", "1" );
 			}
-#else
-			guiMsg->SetStateString( "str_cdkey", "" );
-			guiMsg->SetStateString( "visible_cdchk", "0" );
-			guiMsg->SetStateString( "str_xpkey", "" );
-			guiMsg->SetStateString( "visible_xpchk", "0" );
-#endif
-			guiMsg->SetStateString( "str_cdchk", "" );
 			guiMsg->SetStateString( "str_xpchk", "" );
 			guiMsg->HandleNamedEvent( "CDKey" );
 			break;
@@ -2000,7 +1979,6 @@ void idSessionLocal::HandleNoteCommands( const char* menuCommand )
 idSessionLocal::SetCDKeyGuiVars
 ===============
 */
-#if defined(USE_CDKEY)
 void idSessionLocal::SetCDKeyGuiVars()
 {
 	if( !guiMainMenu )
@@ -2010,4 +1988,3 @@ void idSessionLocal::SetCDKeyGuiVars()
 	guiMainMenu->SetStateString( "str_d3key_state", common->GetLanguageDict()->GetString( va( "#str_071%d", 86 + cdkey_state ) ) );
 	guiMainMenu->SetStateString( "str_xpkey_state", common->GetLanguageDict()->GetString( va( "#str_071%d", 86 + xpkey_state ) ) );
 }
-#endif

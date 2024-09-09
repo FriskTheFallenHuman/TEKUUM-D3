@@ -184,7 +184,7 @@ void GetPointOutsideObstacles( const obstacle_t* obstacles, const int numObstacl
 	}
 
 	const idWinding2D& w = obstacles[bestObstacle].winding;
-	bestd = idMath::INFINITY;
+	bestd = idMath::INFINITUM;
 	bestEdgeNum = 0;
 	for( i = 0; i < w.GetNumPoints(); i++ )
 	{
@@ -233,7 +233,7 @@ void GetPointOutsideObstacles( const obstacle_t* obstacles, const int numObstacl
 	memset( obstacleVisited, 0, numObstacles * sizeof( obstacleVisited[0] ) );
 	obstacleVisited[bestObstacle] = true;
 
-	bestd = idMath::INFINITY;
+	bestd = idMath::INFINITUM;
 	for( i = queue[0]; queueStart < queueEnd; i = queue[++queueStart] )
 	{
 		w1 = obstacles[i].winding;
@@ -284,7 +284,7 @@ void GetPointOutsideObstacles( const obstacle_t* obstacles, const int numObstacl
 			}
 		}
 
-		if( bestd < idMath::INFINITY )
+		if( bestd < idMath::INFINITUM )
 		{
 			point = bestPoint;
 			if( obstacle )
@@ -319,7 +319,7 @@ bool GetFirstBlockingObstacle( const obstacle_t* obstacles, int numObstacles, in
 	bounds[IEEE_FLT_SIGNBITNOTSET( delta.y )].y += delta.y;
 
 	// test for obstacles blocking the path
-	blockingScale = idMath::INFINITY;
+	blockingScale = idMath::INFINITUM;
 	dist = delta.Length();
 	for( i = 0; i < numObstacles; i++ )
 	{
@@ -832,7 +832,7 @@ void PrunePathTree( pathNode_t* root, const idVec2& seekPos )
 		{
 
 			// find the node closest to the goal along this path
-			bestDist = idMath::INFINITY;
+			bestDist = idMath::INFINITUM;
 			bestNode = node;
 			for( n = node; n; n = n->parent )
 			{
@@ -987,7 +987,7 @@ bool FindOptimalPath( const pathNode_t* root, const obstacle_t* obstacles, int n
 
 	bestNode = root;
 	bestNumPathPoints = 0;
-	bestPathLength = idMath::INFINITY;
+	bestPathLength = idMath::INFINITUM;
 
 	node = root;
 	while( node )

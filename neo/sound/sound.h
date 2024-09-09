@@ -40,15 +40,7 @@ If you have questions concerning this license or the applicable additional terms
 
 // unfortunately, our minDistance / maxDistance is specified in meters, and
 // we have far too many of them to change at this time.
-
-// RB: changed inches to centimeter
-#if defined(STANDALONE)
-	const float DOOM_TO_METERS = 0.01f;						// doom to meters
-#else
-	const float DOOM_TO_METERS = 0.0254f;					// doom to meters
-#endif
-// RB end
-
+const float DOOM_TO_METERS = 0.0254f;					// doom to meters
 const float METERS_TO_DOOM = ( 1.0f / DOOM_TO_METERS );	// meters to doom
 
 class idSoundSample;
@@ -305,11 +297,6 @@ public:
 	// shutdown routine
 	virtual	void			Shutdown() = 0;
 
-	// call ClearBuffer if there is a chance that the AsyncUpdate won't get called
-	// for 20+ msec, which would cause a stuttering repeat of the current
-	// buffer contents
-	virtual void			ClearBuffer() = 0;
-
 	// sound is attached to the window, and must be recreated when the window is changed
 	virtual bool			InitHW() = 0;
 	virtual bool			ShutdownHW() = 0;
@@ -356,8 +343,8 @@ public:
 	// prints memory info
 	virtual void			PrintMemInfo( MemInfo_t* mi ) = 0;
 
-	// is EAX support present - -1: disabled at compile time, 0: no suitable hardware, 1: ok, 2: failed to load OpenAL DLL
-	virtual int				IsEAXAvailable() = 0;
+	// is EFX support present - -1: disabled at compile time, 0: no suitable hardware, 1: ok
+	virtual int				IsEFXAvailable() = 0;
 };
 
 extern idSoundSystem*	soundSystem;

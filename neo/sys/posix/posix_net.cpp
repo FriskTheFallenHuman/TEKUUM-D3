@@ -40,9 +40,7 @@ If you have questions concerning this license or the applicable additional terms
 #include <errno.h>
 #include <sys/select.h>
 #include <net/if.h>
-#if MACOS_X
-	#include <ifaddrs.h>
-#endif
+#include <ifaddrs.h>
 
 #include "precompiled.h"
 
@@ -53,13 +51,11 @@ idCVar net_port( "net_port", "", CVAR_SYSTEM | CVAR_INTEGER, "local IP port numb
 
 typedef struct
 {
-	// RB: 64 bit fixes, changed long to int
 	unsigned int ip;
 	unsigned int mask;
-	// RB end
 } net_interface;
 
-#define 		MAX_INTERFACES	32
+#define			MAX_INTERFACES	32
 int				num_interfaces = 0;
 net_interface	netint[MAX_INTERFACES];
 
@@ -118,10 +114,7 @@ ExtractPort
 static bool ExtractPort( const char* src, char* buf, int bufsize, int* port )
 {
 	char* p;
-	strncpy( buf, src, bufsize );
-	p = buf;
-	p += Min( bufsize - 1, ( int )strlen( src ) );
-	*p = '\0';
+	idStr::Copynz( buf, src, bufsize );
 	p = strchr( buf, ':' );
 	if( !p )
 	{
@@ -130,10 +123,8 @@ static bool ExtractPort( const char* src, char* buf, int bufsize, int* port )
 	*p = '\0';
 	*port = strtol( p + 1, NULL, 10 );
 	if( ( *port == 0 && errno == EINVAL ) ||
-			// RB: 64 bit fixes, changed LONG_ to INT_
 			( ( *port == INT_MIN || *port == INT_MAX ) && errno == ERANGE ) )
 	{
-		// RB end
 		return false;
 	}
 	return true;
@@ -244,10 +235,7 @@ Sys_IsLANAddress
 bool Sys_IsLANAddress( const netadr_t adr )
 {
 	int i;
-	// RB: 64 bit fixes, changed long to int
-	unsigned int* p_ip;
 	unsigned int ip;
-	// RB end
 
 #if ID_NOLANADDRESS
 	common->Printf( "Sys_IsLANAddress: ID_NOLANADDRESS\n" );
@@ -271,10 +259,7 @@ bool Sys_IsLANAddress( const netadr_t adr )
 
 	for( i = 0; i < num_interfaces; i++ )
 	{
-		// RB: 64 bit fixes, changed long to int
-		p_ip = ( unsigned int* )&adr.ip[0];
-		// RB end
-		ip = ntohl( *p_ip );
+		ip = ntohl( *( unsigned int* )&adr.ip );
 		if( ( netint[i].ip & netint[i].mask ) == ( ip & netint[i].mask ) )
 		{
 			return true;
@@ -323,10 +308,6 @@ NET_InitNetworking
 */
 void Sys_InitNetworking()
 {
-	// haven't been able to clearly pinpoint which standards or RFCs define SIOCGIFCONF, SIOCGIFADDR, SIOCGIFNETMASK ioctls
-	// it seems fairly widespread, in Linux kernel ioctl, and in BSD .. so let's assume it's always available on our targets
-
-#if MACOS_X
 	unsigned int ip, mask;
 	struct ifaddrs* ifap, *ifp;
 
@@ -340,6 +321,11 @@ void Sys_InitNetworking()
 
 	for( ifp = ifap; ifp; ifp = ifp->ifa_next )
 	{
+		if( !ifp->ifa_addr )
+		{
+			continue;
+		}
+
 		if( ifp->ifa_addr->sa_family != AF_INET )
 		{
 			continue;
@@ -350,20 +336,15 @@ void Sys_InitNetworking()
 			continue;
 		}
 
-		if( !ifp->ifa_addr )
-		{
-			continue;
-		}
-
 		if( !ifp->ifa_netmask )
 		{
 			continue;
 		}
 
-		// RB: 64 bit fixes, changed long to int
+		common->Printf( "found interface %s - ", ifp->ifa_name );
+
 		ip = ntohl( *( unsigned int* )&ifp->ifa_addr->sa_data[2] );
 		mask = ntohl( *( unsigned int* )&ifp->ifa_netmask->sa_data[2] );
-		// RB end
 
 		if( ip == INADDR_LOOPBACK )
 		{
@@ -371,98 +352,23 @@ void Sys_InitNetworking()
 		}
 		else
 		{
-			common->Printf( "IP: %d.%d.%d.%d\n",
-							( unsigned char )ifp->ifa_addr->sa_data[2],
-							( unsigned char )ifp->ifa_addr->sa_data[3],
-							( unsigned char )ifp->ifa_addr->sa_data[4],
-							( unsigned char )ifp->ifa_addr->sa_data[5] );
-			common->Printf( "NetMask: %d.%d.%d.%d\n",
-							( unsigned char )ifp->ifa_netmask->sa_data[2],
-							( unsigned char )ifp->ifa_netmask->sa_data[3],
-							( unsigned char )ifp->ifa_netmask->sa_data[4],
-							( unsigned char )ifp->ifa_netmask->sa_data[5] );
+			common->Printf( "%u.%u.%u.%u/%u.%u.%u.%u\n",
+							( ip >> 24 ) & 0xff, ( ip >> 16 ) & 0xff,
+							( ip >> 8 ) & 0xff, ip & 0xff,
+							( mask >> 24 ) & 0xff, ( mask >> 16 ) & 0xff,
+							( mask >> 8 ) & 0xff, mask & 0xff );
 		}
+
 		netint[ num_interfaces ].ip = ip;
 		netint[ num_interfaces ].mask = mask;
 		num_interfaces++;
-	}
-#else
-	int		s;
-	char	buf[ MAX_INTERFACES * sizeof( ifreq ) ];
-	ifconf	ifc;
-	ifreq*	ifr;
-	int		ifindex;
-	unsigned int ip, mask;
 
-	num_interfaces = 0;
-
-	s = socket( AF_INET, SOCK_DGRAM, 0 );
-	ifc.ifc_len = MAX_INTERFACES * sizeof( ifreq );
-	ifc.ifc_buf = buf;
-	if( ioctl( s, SIOCGIFCONF, &ifc ) < 0 )
-	{
-		common->FatalError( "InitNetworking: SIOCGIFCONF error - %s\n", strerror( errno ) );
-		return;
-	}
-	ifindex = 0;
-	while( ifindex < ifc.ifc_len )
-	{
-		common->Printf( "found interface %s - ", ifc.ifc_buf + ifindex );
-		// find the type - ignore interfaces for which we can find we can't get IP and mask ( not configured )
-		ifr = ( ifreq* )( ifc.ifc_buf + ifindex );
-		if( ioctl( s, SIOCGIFADDR, ifr ) < 0 )
+		if( num_interfaces >= MAX_INTERFACES )
 		{
-			common->Printf( "SIOCGIFADDR failed: %s\n", strerror( errno ) );
+			break;
 		}
-		else
-		{
-			if( ifr->ifr_addr.sa_family != AF_INET )
-			{
-				common->Printf( "not AF_INET\n" );
-			}
-			else
-			{
-				// RB: 64 bit fixes, changed long to int
-				ip = ntohl( *( unsigned int* )&ifr->ifr_addr.sa_data[2] );
-				// RB end
-				if( ip == INADDR_LOOPBACK )
-				{
-					common->Printf( "loopback\n" );
-				}
-				else
-				{
-					common->Printf( "%d.%d.%d.%d",
-									( unsigned char )ifr->ifr_addr.sa_data[2],
-									( unsigned char )ifr->ifr_addr.sa_data[3],
-									( unsigned char )ifr->ifr_addr.sa_data[4],
-									( unsigned char )ifr->ifr_addr.sa_data[5] );
-				}
-				if( ioctl( s, SIOCGIFNETMASK, ifr ) < 0 )
-				{
-					common->Printf( " SIOCGIFNETMASK failed: %s\n", strerror( errno ) );
-				}
-				else
-				{
-					// RB: 64 bit fixes, changed long to int
-					mask = ntohl( *( unsigned int* )&ifr->ifr_addr.sa_data[2] );
-					// RB end
-					if( ip != INADDR_LOOPBACK )
-					{
-						common->Printf( "/%d.%d.%d.%d\n",
-										( unsigned char )ifr->ifr_addr.sa_data[2],
-										( unsigned char )ifr->ifr_addr.sa_data[3],
-										( unsigned char )ifr->ifr_addr.sa_data[4],
-										( unsigned char )ifr->ifr_addr.sa_data[5] );
-					}
-					netint[ num_interfaces ].ip = ip;
-					netint[ num_interfaces ].mask = mask;
-					num_interfaces++;
-				}
-			}
-		}
-		ifindex += sizeof( ifreq );
 	}
-#endif
+	freeifaddrs( ifap );
 }
 
 /*
@@ -841,7 +747,7 @@ int idTCP::Read( void* data, int size )
 		return -1;
 	}
 
-#if defined(_GNU_SOURCE)
+#if defined(_GNU_SOURCE) && defined(TEMP_FAILURE_RETRY)
 	// handle EINTR interrupted system call with TEMP_FAILURE_RETRY -  this is probably GNU libc specific
 	if( ( nbytes = TEMP_FAILURE_RETRY( read( fd, data, size ) ) ) == -1 )
 	{
@@ -908,7 +814,7 @@ int	idTCP::Write( void* data, int size )
 		return -1;
 	}
 
-#if defined(_GNU_SOURCE)
+#if defined(_GNU_SOURCE) && defined(TEMP_FAILURE_RETRY)
 	// handle EINTR interrupted system call with TEMP_FAILURE_RETRY -  this is probably GNU libc specific
 	if( ( nbytes = TEMP_FAILURE_RETRY( write( fd, data, size ) ) ) == -1 )
 	{

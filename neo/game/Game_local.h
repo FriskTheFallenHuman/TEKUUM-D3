@@ -350,11 +350,11 @@ public:
 
 	// ---------------------- Public idGameLocal Interface -------------------
 
-	void					Printf( const char* fmt, ... ) const id_attribute( ( format( printf, 2, 3 ) ) );
-	void					DPrintf( const char* fmt, ... ) const id_attribute( ( format( printf, 2, 3 ) ) );
-	void					Warning( const char* fmt, ... ) const id_attribute( ( format( printf, 2, 3 ) ) );
-	void					DWarning( const char* fmt, ... ) const id_attribute( ( format( printf, 2, 3 ) ) );
-	void					Error( const char* fmt, ... ) const id_attribute( ( format( printf, 2, 3 ) ) );
+	void					Printf( VERIFY_FORMAT_STRING const char* fmt, ... ) const;
+	void					DPrintf( VERIFY_FORMAT_STRING const char* fmt, ... ) const;
+	void					Warning( VERIFY_FORMAT_STRING const char* fmt, ... ) const;
+	void					DWarning( VERIFY_FORMAT_STRING const char* fmt, ... ) const;
+	void					Error( VERIFY_FORMAT_STRING const char* fmt, ... ) const;
 
 	// Initializes all map variables common to both save games and spawned games
 	void					LoadMap( const char* mapName, int randseed );
@@ -556,7 +556,7 @@ private:
 	bool					ApplySnapshot( int clientNum, int sequence );
 	void					WriteGameStateToSnapshot( idBitMsgDelta& msg ) const;
 	void					ReadGameStateFromSnapshot( const idBitMsgDelta& msg );
-	void					NetworkEventWarning( const entityNetEvent_t* event, const char* fmt, ... ) id_attribute( ( format( printf, 3, 4 ) ) );
+	void					NetworkEventWarning( const entityNetEvent_t* event, VERIFY_FORMAT_STRING const char* fmt, ... );
 	void					ServerProcessEntityNetworkEventQueue();
 	void					ClientProcessEntityNetworkEventQueue();
 	void					ClientShowSnapshot( int clientNum ) const;

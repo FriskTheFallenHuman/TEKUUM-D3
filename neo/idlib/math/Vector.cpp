@@ -34,7 +34,7 @@ idVec3 vec3_origin( 0.0f, 0.0f, 0.0f );
 idVec4 vec4_origin( 0.0f, 0.0f, 0.0f, 0.0f );
 idVec5 vec5_origin( 0.0f, 0.0f, 0.0f, 0.0f, 0.0f );
 idVec6 vec6_origin( 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f );
-idVec6 vec6_infinity( idMath::INFINITY, idMath::INFINITY, idMath::INFINITY, idMath::INFINITY, idMath::INFINITY, idMath::INFINITY );
+idVec6 vec6_infinity( idMath::INFINITUM, idMath::INFINITUM, idMath::INFINITUM, idMath::INFINITUM, idMath::INFINITUM, idMath::INFINITUM );
 
 
 //===============================================================
@@ -351,6 +351,52 @@ void idVec3::ProjectSelfOntoSphere( const float radius )
 	}
 }
 
+
+// RB: more about this
+// Cigolle, Donow, Evangelakos, Mara, McGuire, Meyer,
+// A Survey of Efficient Representations for Independent Unit Vectors, Journal of Computer Graphics Techniques (JCGT), vol. 3, no. 2, 1-30, 2014
+// Available online http://jcgt.org/published/0003/02/01/
+
+inline float signNotZero( float k )
+{
+	return ( k >= 0.0f ) ? 1.0f : -1.0f;
+}
+
+idVec2 idVec3::ToOctahedral() const
+{
+	const float L1norm = idMath::Fabs( x ) + idMath::Fabs( x ) + idMath::Fabs( x );
+
+	idVec2 result;
+	if( z < 0.0f )
+	{
+		result.x = ( 1.0f - idMath::Fabs( y ) ) * signNotZero( x );
+		result.y = ( 1.0f - idMath::Fabs( x ) ) * signNotZero( y );
+	}
+	else
+	{
+		result.x = x * ( 1.0f / L1norm );
+		result.y = y * ( 1.0f / L1norm );
+	}
+
+	return result;
+}
+
+void idVec3::FromOctahedral( const idVec2& o )
+{
+	x = o.x;
+	y = o.y;
+	z = 1.0f - ( idMath::Fabs( o.x ) + idMath::Fabs( o.y ) );
+
+	if( z < 0.0f )
+	{
+		float oldX = x;
+		x = ( 1.0f - idMath::Fabs( y ) ) * signNotZero( oldX );
+		y = ( 1.0f - idMath::Fabs( oldX ) ) * signNotZero( y );
+	}
+
+	Normalize();
+}
+// RB end
 
 
 //===============================================================

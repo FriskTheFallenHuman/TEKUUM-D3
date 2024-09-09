@@ -1040,7 +1040,7 @@ bool idDeclAF::ParseBody( idLexer& src )
 			}
 			else
 			{
-				src.Error( "unkown model type %s", token.c_str() );
+				src.Error( "unknown model type %s", token.c_str() );
 				return false;
 			}
 		}
@@ -1099,6 +1099,7 @@ bool idDeclAF::ParseBody( idLexer& src )
 		else if( !token.Icmp( "clipMask" ) )
 		{
 			ParseContents( src, body->clipMask );
+			body->clipMask &= ~CONTENTS_CORPSE;		// never allow collisions against corpses
 		}
 		else if( !token.Icmp( "selfCollision" ) )
 		{
@@ -1769,6 +1770,7 @@ bool idDeclAF::ParseSettings( idLexer& src )
 		else if( !token.Icmp( "clipMask" ) )
 		{
 			ParseContents( src, clipMask );
+			clipMask &= ~CONTENTS_CORPSE;	// never allow collisions against corpses
 		}
 		else if( !token.Icmp( "selfCollision" ) )
 		{
@@ -1985,7 +1987,7 @@ void idDeclAF::FreeData()
 	maxMoveTime = -1.0f;
 	selfCollision = true;
 	contents = CONTENTS_CORPSE;
-	clipMask = CONTENTS_SOLID | CONTENTS_CORPSE;
+	clipMask = CONTENTS_SOLID;
 	bodies.DeleteContents( true );
 	constraints.DeleteContents( true );
 }

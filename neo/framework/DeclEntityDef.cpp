@@ -137,7 +137,8 @@ bool idDeclEntityDef::Parse( const char* text, const int textLength, bool allowB
 
 	// precache all referenced media
 	// do this as long as we arent in modview
-	if( !( com_editors & ( EDITOR_RADIANT | EDITOR_AAS ) ) )
+	// DG: ... and only if we currently have a loaded/loading map
+	if( !( com_editors & ( EDITOR_RADIANT | EDITOR_AAS ) ) && session->GetCurrentMapName()[0] )
 	{
 		game->CacheDictionaryMedia( &dict );
 	}

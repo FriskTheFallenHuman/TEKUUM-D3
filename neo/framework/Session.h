@@ -105,10 +105,6 @@ public:
 	// Activates the main menu
 	virtual void	StartMenu( bool playIntro = false ) = 0;
 
-	// RB: Give touchscreen devices the information if to process the touchscreen ingame buttons
-	virtual bool	IsMenuActive() = 0;
-	// RB end
-
 	virtual void	SetGUI( idUserInterface* gui, HandleGuiCommand_t handle ) = 0;
 
 	// Updates gui and dispatched events to it
@@ -130,7 +126,6 @@ public:
 	// doesn't advance and get things out of sync
 	virtual void	TimeHitch( int msec ) = 0;
 
-#if defined(USE_CDKEY)
 	// read and write the cd key data to files
 	// doesn't perform any validity checks
 	virtual void	ReadCDKey() = 0;
@@ -152,11 +147,10 @@ public:
 	// configure gui variables for mainmenu.gui and cd key state
 	virtual void	SetCDKeyGuiVars() = 0;
 
+	virtual bool	WaitingForGameAuth() = 0;
+
 	// got reply from master about the keys. if !valid, auth_msg given
 	virtual void	CDKeysAuthReply( bool valid, const char* auth_msg ) = 0;
-#endif
-
-	virtual bool	WaitingForGameAuth() = 0;
 
 	virtual const char* GetCurrentMapName() = 0;
 

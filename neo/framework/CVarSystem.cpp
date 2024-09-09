@@ -267,7 +267,7 @@ void idInternalCVar::UpdateValue()
 				clamped = true;
 			}
 		}
-		if( clamped || !idStr::IsNumeric( value ) || idStr::FindChar( value, '.' ) )
+		if( clamped || !idStr::IsNumeric( value ) || ( idStr::FindChar( value, '.' ) != -1 ) )
 		{
 			valueString = idStr( integerValue );
 			value = valueString.c_str();

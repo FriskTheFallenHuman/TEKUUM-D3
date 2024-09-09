@@ -32,19 +32,19 @@ If you have questions concerning this license or the applicable additional terms
 idBox box_zero( vec3_zero, vec3_zero, mat3_identity );
 
 /*
-            4---{4}---5
+			4---{4}---5
  +         /|        /|
  Z      {7} {8}   {5} |
  -     /    |    /    {9}
-      7--{6}----6     |
-      |     |   |     |
-    {11}    0---|-{0}-1
-      |    /    |    /       -
-      | {3}  {10} {1}       Y
-      |/        |/         +
-      3---{2}---2
+	  7--{6}----6     |
+	  |     |   |     |
+	{11}    0---|-{0}-1
+	  |    /    |    /       -
+	  | {3}  {10} {1}       Y
+	  |/        |/         +
+	  3---{2}---2
 
-	    - X +
+		- X +
 
   plane bits:
   0 = min x
@@ -317,7 +317,7 @@ bool idBox::AddBox( const idBox& a )
 	}
 
 	// get the bounds with the smallest volume
-	bestv = idMath::INFINITY;
+	bestv = idMath::INFINITUM;
 	besti = 0;
 	for( i = 0; i < 4; i++ )
 	{
@@ -669,8 +669,8 @@ bool idBox::RayIntersection( const idVec3& start, const idVec3& dir, float& scal
 	localStart = ( start - center ) * axis.Transpose();
 	localDir = dir * axis.Transpose();
 
-	scale1 = -idMath::INFINITY;
-	scale2 = idMath::INFINITY;
+	scale1 = -idMath::INFINITUM;
+	scale2 = idMath::INFINITUM;
 	return	BoxPlaneClip( localDir.x, -localStart.x - extents[0], scale1, scale2 ) &&
 			BoxPlaneClip( -localDir.x,  localStart.x - extents[0], scale1, scale2 ) &&
 			BoxPlaneClip( localDir.y, -localStart.y - extents[1], scale1, scale2 ) &&

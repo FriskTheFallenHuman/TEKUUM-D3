@@ -40,7 +40,6 @@ FS_WriteFloatString
 */
 int FS_WriteFloatString( char* buf, const char* fmt, va_list argPtr )
 {
-	// DG: replaced long with int for 64bit compatibility in the whole function
 	int i;
 	unsigned int u;
 	double f;
@@ -152,7 +151,6 @@ int FS_WriteFloatString( char* buf, const char* fmt, va_list argPtr )
 	}
 
 	return index;
-	// DG end
 }
 
 /*
@@ -281,11 +279,10 @@ idFile::Printf
 int idFile::Printf( const char* fmt, ... )
 {
 	char buf[MAX_PRINT_MSG];
-	int length;
 	va_list argptr;
 
 	va_start( argptr, fmt );
-	length = idStr::vsnPrintf( buf, MAX_PRINT_MSG - 1, fmt, argptr );
+	idStr::vsnPrintf( buf, MAX_PRINT_MSG - 1, fmt, argptr );
 	va_end( argptr );
 
 	// so notepad formats the lines correctly
@@ -335,7 +332,7 @@ int idFile::WriteFloatString( const char* fmt, ... )
 int idFile::ReadInt( int& value )
 {
 	int result = Read( &value, sizeof( value ) );
-	value = LittleLong( value );
+	value = LittleInt( value );
 	return result;
 }
 
@@ -347,7 +344,7 @@ int idFile::ReadInt( int& value )
 int idFile::ReadUnsignedInt( unsigned int& value )
 {
 	int result = Read( &value, sizeof( value ) );
-	value = LittleLong( value );
+	value = LittleInt( value );
 	return result;
 }
 
@@ -506,7 +503,7 @@ int idFile::ReadMat3( idMat3& mat )
  */
 int idFile::WriteInt( const int value )
 {
-	int v = LittleLong( value );
+	int v = LittleInt( value );
 	return Write( &v, sizeof( v ) );
 }
 
@@ -517,7 +514,7 @@ int idFile::WriteInt( const int value )
  */
 int idFile::WriteUnsignedInt( const unsigned int value )
 {
-	unsigned int v = LittleLong( value );
+	unsigned int v = LittleInt( value );
 	return Write( &v, sizeof( v ) );
 }
 
@@ -791,6 +788,18 @@ int idFile_Memory::Read( void* buffer, int len )
 	return len;
 }
 
+idCVar memcpyImpl( "memcpyImpl", "0", 0, "Which implementation of memcpy to use for idFile_Memory::Write() [0/1 - standard (1 eliminates branch misprediction), 2 - auto-vectorized]" );
+void* memcpy2( void* __restrict b, const void* __restrict a, size_t n )
+{
+	char* s1 = ( char* )b;
+	const char* s2 = ( const char* )a;
+	for( ; 0 < n; --n )
+	{
+		*s1++ = *s2++;
+	}
+	return b;
+}
+
 /*
 =================
 idFile_Memory::Write
@@ -851,8 +860,8 @@ int idFile_Memory::Write( const void* buffer, int len )
 		filePtr = newPtr;
 	}
 
-	memcpy( curPtr, buffer, len );
-	//memcpy2( curPtr, buffer, len );
+	//memcpy( curPtr, buffer, len );
+	memcpy2( curPtr, buffer, len );
 
 #if 0
 	if( memcpyImpl.GetInteger() == 0 )
@@ -1509,8 +1518,7 @@ idFile_Permanent::Timestamp
 */
 ID_TIME_T idFile_Permanent::Timestamp() const
 {
-	ID_TIME_T ts = Sys_FileTimeStamp( o );
-	return ts;
+	return Sys_FileTimeStamp( o );
 }
 
 /*
@@ -1699,18 +1707,16 @@ int idFile_InZip::Seek( long offset, fsOrigin_t origin )
 		{
 			offset = fileSize - offset;
 		}
-		// FALLTHROUGH
 		case FS_SEEK_SET:
 		{
 			// set the file position in the zip file (also sets the current file info)
-			unzSetCurrentFileInfoPosition( z, zipFilePos );
+			unzSetOffset64( z, zipFilePos );
 			unzOpenCurrentFile( z );
 			if( offset <= 0 )
 			{
 				return 0;
 			}
 		}
-		// FALLTHROUGH
 		case FS_SEEK_CUR:
 		{
 			buf = ( char* ) _alloca16( ZIP_SEEK_BUF_SIZE );

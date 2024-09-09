@@ -1,0 +1,10 @@
+{
+	"name": "rbdoom3",
+	"version": "0.4.0",
+	"dependencies": [
+		"stb",
+		"openal-soft",
+		"freetype",
+		"glew"
+	]
+}

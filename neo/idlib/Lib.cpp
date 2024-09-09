@@ -29,12 +29,6 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#if defined( MACOS_X )
-	#include <signal.h>
-	#include <sys/types.h>
-	#include <unistd.h>
-#endif
-
 /*
 ===============================================================================
 
@@ -63,14 +57,15 @@ void idLib::Init()
 
 	assert( sizeof( bool ) == 1 );
 
+	// assumptions from the scripting compiler/interpreter
+	assert( sizeof( float ) == sizeof( int ) );
+	assert( sizeof( idVec3 ) == sizeof( float ) * 3 );
+
 	isMainThread = 1;
 	mainThreadInitialized = 1;	// note that the thread-local isMainThread is now valid
 
 	// initialize little/big endian conversion
 	Swap_Init();
-
-	// initialize memory manager
-//	Mem_Init();
 
 	// init string memory allocator
 	idStr::InitMemory();
@@ -109,9 +104,6 @@ void idLib::ShutDown()
 
 	// shut down the SIMD engine
 	idSIMD::Shutdown();
-
-	// shut down the memory manager
-//	Mem_Shutdown();
 }
 
 
@@ -138,6 +130,9 @@ idVec4	colorBrown	= idVec4( 0.40f, 0.35f, 0.08f, 1.00f );
 idVec4	colorLtGrey	= idVec4( 0.75f, 0.75f, 0.75f, 1.00f );
 idVec4	colorMdGrey	= idVec4( 0.50f, 0.50f, 0.50f, 1.00f );
 idVec4	colorDkGrey	= idVec4( 0.25f, 0.25f, 0.25f, 1.00f );
+// jmarshall
+idVec4  colorGold	= idVec4( 0.68f, 0.63f, 0.36f, 1.00f );
+// jmarshall end
 
 /*
 ================
@@ -150,14 +145,7 @@ dword PackColor( const idVec4& color )
 	byte dy = idMath::Ftob( color.y * 255.0f );
 	byte dz = idMath::Ftob( color.z * 255.0f );
 	byte dw = idMath::Ftob( color.w * 255.0f );
-
-#if defined(_WIN32) || defined(__linux__) || (defined(MACOS_X) && defined(__i386__))
 	return ( dx << 0 ) | ( dy << 8 ) | ( dz << 16 ) | ( dw << 24 );
-#elif (defined(MACOS_X) && defined(__ppc__))
-	return ( dx << 24 ) | ( dy << 16 ) | ( dz << 8 ) | ( dw << 0 );
-#else
-#error OS define is required!
-#endif
 }
 
 /*
@@ -167,19 +155,10 @@ UnpackColor
 */
 void UnpackColor( const dword color, idVec4& unpackedColor )
 {
-#if defined(_WIN32) || defined(__linux__) || (defined(MACOS_X) && defined(__i386__))
 	unpackedColor.Set( ( ( color >> 0 ) & 255 ) * ( 1.0f / 255.0f ),
 					   ( ( color >> 8 ) & 255 ) * ( 1.0f / 255.0f ),
 					   ( ( color >> 16 ) & 255 ) * ( 1.0f / 255.0f ),
 					   ( ( color >> 24 ) & 255 ) * ( 1.0f / 255.0f ) );
-#elif (defined(MACOS_X) && defined(__ppc__))
-	unpackedColor.Set( ( ( color >> 24 ) & 255 ) * ( 1.0f / 255.0f ),
-					   ( ( color >> 16 ) & 255 ) * ( 1.0f / 255.0f ),
-					   ( ( color >> 8 ) & 255 ) * ( 1.0f / 255.0f ),
-					   ( ( color >> 0 ) & 255 ) * ( 1.0f / 255.0f ) );
-#else
-#error OS define is required!
-#endif
 }
 
 /*
@@ -192,14 +171,7 @@ dword PackColor( const idVec3& color )
 	byte dx = idMath::Ftob( color.x * 255.0f );
 	byte dy = idMath::Ftob( color.y * 255.0f );
 	byte dz = idMath::Ftob( color.z * 255.0f );
-
-#if defined(_WIN32) || defined(__linux__) || (defined(MACOS_X) && defined(__i386__))
 	return ( dx << 0 ) | ( dy << 8 ) | ( dz << 16 );
-#elif (defined(MACOS_X) && defined(__ppc__))
-	return ( dy << 16 ) | ( dz << 8 ) | ( dx << 0 );
-#else
-#error OS define is required!
-#endif
 }
 
 /*
@@ -209,17 +181,9 @@ UnpackColor
 */
 void UnpackColor( const dword color, idVec3& unpackedColor )
 {
-#if defined(_WIN32) || defined(__linux__) || (defined(MACOS_X) && defined(__i386__))
 	unpackedColor.Set( ( ( color >> 0 ) & 255 ) * ( 1.0f / 255.0f ),
 					   ( ( color >> 8 ) & 255 ) * ( 1.0f / 255.0f ),
 					   ( ( color >> 16 ) & 255 ) * ( 1.0f / 255.0f ) );
-#elif (defined(MACOS_X) && defined(__ppc__))
-	unpackedColor.Set( ( ( color >> 16 ) & 255 ) * ( 1.0f / 255.0f ),
-					   ( ( color >> 8 ) & 255 ) * ( 1.0f / 255.0f ),
-					   ( ( color >> 0 ) & 255 ) * ( 1.0f / 255.0f ) );
-#else
-#error OS define is required!
-#endif
 }
 
 /*
@@ -237,6 +201,11 @@ void idLib::FatalError( const char* fmt, ... )
 	va_end( argptr );
 
 	common->FatalError( "%s", text );
+
+#if !defined(_WIN32)
+	// SRS - Added exit to silence build warning since FatalError has attribute noreturn
+	exit( EXIT_FAILURE );
+#endif
 }
 
 /*
@@ -254,6 +223,11 @@ void idLib::Error( const char* fmt, ... )
 	va_end( argptr );
 
 	common->Error( "%s", text );
+
+#if !defined(_WIN32)
+	// SRS - Added exit to silence build warning since FatalError has attribute noreturn
+	exit( EXIT_FAILURE );
+#endif
 }
 
 /*
@@ -341,7 +315,7 @@ void idLib::PrintfIf( const bool test, const char* fmt, ... )
 static short( *_BigShort )( short l );
 static short( *_LittleShort )( short l );
 static int	( *_BigLong )( int l );
-static int	( *_LittleLong )( int l );
+static int	( *_LittleInt )( int l );
 static float( *_BigFloat )( float l );
 static float( *_LittleFloat )( float l );
 static void	( *_BigRevBytes )( void* bp, int elsize, int elcount );
@@ -362,9 +336,9 @@ int		BigLong( int l )
 {
 	return _BigLong( l );
 }
-int		LittleLong( int l )
+int		LittleInt( int l )
 {
-	return _LittleLong( l );
+	return _LittleInt( l );
 }
 float	BigFloat( float l )
 {
@@ -494,9 +468,9 @@ INPUTS
 RESULTS
    Reverses the byte order in each of elcount elements.
 ===================================================================== */
-void RevBytesSwap( void* bp, int elsize, int elcount )
+ID_INLINE static void RevBytesSwap( void* bp, int elsize, int elcount )
 {
-	register unsigned char* p, *q;
+	unsigned char* p, *q;
 
 	p = ( unsigned char* ) bp;
 
@@ -663,7 +637,7 @@ void Swap_Init()
 		_BigShort = ShortSwap;
 		_LittleShort = ShortNoSwap;
 		_BigLong = LongSwap;
-		_LittleLong = LongNoSwap;
+		_LittleInt = LongNoSwap;
 		_BigFloat = FloatSwap;
 		_LittleFloat = FloatNoSwap;
 		_BigRevBytes = RevBytesSwap;
@@ -678,7 +652,7 @@ void Swap_Init()
 		_BigShort = ShortNoSwap;
 		_LittleShort = ShortSwap;
 		_BigLong = LongNoSwap;
-		_LittleLong = LongSwap;
+		_LittleInt = LongSwap;
 		_BigFloat = FloatNoSwap;
 		_LittleFloat = FloatSwap;
 		_BigRevBytes = RevBytesNoSwap;

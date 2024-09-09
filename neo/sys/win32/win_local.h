@@ -29,45 +29,29 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __WIN_LOCAL_H__
 #define __WIN_LOCAL_H__
 
-#include "precompiled.h"
-#pragma hdrstop
-
 #include <windows.h>
-#include "win_input.h"
-// RB begin
-#if defined(USE_ANGLE)
-	#include <EGL/egl.h>
-	#include <EGL/eglext.h>
-#else
-	#include "../../libs/glew/include/GL/wglew.h"
-	//#include "../../renderer/wglext.h"		// windows OpenGL extensions
+
+// RB: replaced QGL with GLEW
+#if !defined(USE_VULKAN)
+	#include <GL/wglew.h> // windows OpenGL extensions
 #endif
 // RB end
 
-
-#define	MAX_OSPATH			256
+#include "win_input.h"
 
 #define	WINDOW_STYLE	(WS_OVERLAPPED|WS_BORDER|WS_CAPTION|WS_VISIBLE | WS_THICKFRAME)
 
 void	Sys_QueEvent( sysEventType_t type, int value, int value2, int ptrLength, void* ptr, int inputDeviceNum );
 
-#if !defined(USE_QT_WINDOWING)
-	void	Sys_CreateConsole();
-	void	Sys_DestroyConsole();
+void	Sys_CreateConsole();
+void	Sys_DestroyConsole();
 
-	char*	Sys_ConsoleInput();
-#endif
-
-char*	Sys_GetCurrentUser();
+char*	Sys_ConsoleInput();
 
 void	Win_SetErrorText( const char* text );
 
 cpuid_t	Sys_GetCPUId();
 
-// Input subsystem
-
-void	IN_Init();
-void	IN_Shutdown();
 // add additional non keyboard / non mouse movement on top of the keyboard move cmd
 
 void	IN_DeactivateMouseIfWindowed();
@@ -78,15 +62,13 @@ void	IN_Frame();
 
 void	DisableTaskKeys( BOOL bDisable, BOOL bBeep, BOOL bTaskMgr );
 
+void Conbuf_AppendText( const char* msg );
 
 // window procedure
 LONG WINAPI MainWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam );
 
-#if !defined(USE_QT_WINDOWING)
-	void Conbuf_AppendText( const char* msg );
-#endif
 
-typedef struct
+struct Win32Vars_t
 {
 	HWND			hWnd;
 	HINSTANCE		hInstance;
@@ -130,17 +112,14 @@ typedef struct
 	unsigned short	oldHardwareGamma[3][256];
 	// desktop gamma is saved here for restoration at exit
 
-	static idCVar	sys_arch;
 	static idCVar	sys_cpustring;
 	static idCVar	in_mouse;
 	static idCVar	win_allowAltTab;
 	static idCVar	win_notaskkeys;
-	static idCVar	win_username;
 	static idCVar	win_outputDebugString;
 	static idCVar	win_outputEditString;
 	static idCVar	win_viewlog;
 	static idCVar	win_timerUpdate;
-	static idCVar	win_allowMultipleInstances;
 
 	CRITICAL_SECTION criticalSections[MAX_CRITICAL_SECTIONS];
 	HANDLE			backgroundDownloadSemaphore;
@@ -150,11 +129,9 @@ typedef struct
 	LPDIRECTINPUT8			g_pdi;
 	LPDIRECTINPUTDEVICE8	g_pMouse;
 	LPDIRECTINPUTDEVICE8	g_pKeyboard;
-#if !defined(USE_QT_WINDOWING)
-	idJoystickWin32			g_Joystick;
-#endif
 
-} Win32Vars_t;
+	idJoystickWin32			g_Joystick;
+};
 
 extern Win32Vars_t	win32;
 

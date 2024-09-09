@@ -70,21 +70,6 @@ cpuid_t idSysLocal::GetProcessorId()
 	return Sys_GetProcessorId();
 }
 
-const char* idSysLocal::GetProcessorString()
-{
-	return Sys_GetProcessorString();
-}
-
-const char* idSysLocal::FPU_GetState()
-{
-	return Sys_FPU_GetState();
-}
-
-bool idSysLocal::FPU_StackIsEmpty()
-{
-	return Sys_FPU_StackIsEmpty();
-}
-
 void idSysLocal::FPU_SetFTZ( bool enable )
 {
 	Sys_FPU_SetFTZ( enable );
@@ -105,22 +90,20 @@ bool idSysLocal::UnlockMemory( void* ptr, int bytes )
 	return Sys_UnlockMemory( ptr, bytes );
 }
 
-// RB: 64 bit fixes, changed int to intptr_t
-intptr_t idSysLocal::DLL_Load( const char* dllName )
+uintptr_t idSysLocal::DLL_Load( const char* dllName )
 {
 	return Sys_DLL_Load( dllName );
 }
 
-void* idSysLocal::DLL_GetProcAddress( intptr_t dllHandle, const char* procName )
+void* idSysLocal::DLL_GetProcAddress( uintptr_t dllHandle, const char* procName )
 {
 	return Sys_DLL_GetProcAddress( dllHandle, procName );
 }
 
-void idSysLocal::DLL_Unload( intptr_t dllHandle )
+void idSysLocal::DLL_Unload( uintptr_t dllHandle )
 {
 	Sys_DLL_Unload( dllHandle );
 }
-// RB end
 
 void idSysLocal::DLL_GetFileName( const char* baseName, char* dllName, int maxLength )
 {
@@ -149,11 +132,6 @@ sysEvent_t idSysLocal::GenerateMouseMoveEvent( int deltax, int deltay )
 	return ev;
 }
 
-void idSysLocal::FPU_EnableExceptions( int exceptions )
-{
-	Sys_FPU_EnableExceptions( exceptions );
-}
-
 /*
 =================
 Sys_TimeStampToStr
@@ -164,8 +142,7 @@ const char* Sys_TimeStampToStr( ID_TIME_T timeStamp )
 	static char timeString[MAX_STRING_CHARS];
 	timeString[0] = '\0';
 
-	time_t ts = ( time_t )timeStamp;
-	tm*	time = localtime( &ts );
+	tm*	time = localtime( &timeStamp );
 	idStr out;
 
 	idStr lang = cvarSystem->GetCVarString( "sys_lang" );
@@ -218,4 +195,3 @@ const char* Sys_TimeStampToStr( ID_TIME_T timeStamp )
 
 	return timeString;
 }
-

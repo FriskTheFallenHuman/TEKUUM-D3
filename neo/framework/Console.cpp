@@ -1047,12 +1047,6 @@ void idConsoleLocal::Print( const char* txt )
 	//{
 	//	MaterialEditorPrintConsole( txt );
 	//}
-
-#elif defined(USE_QT_TOOLS)
-	if( com_editors & EDITOR_QTRADIANT )
-	{
-		QtRadiantPrint( txt );
-	}
 #endif
 
 // RB end

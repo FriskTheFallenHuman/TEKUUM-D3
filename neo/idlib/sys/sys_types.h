@@ -40,7 +40,7 @@ typedef unsigned char		byte;		// 8 bits
 typedef unsigned short		word;		// 16 bits
 typedef unsigned int		dword;		// 32 bits
 typedef unsigned int		uint;
-// typedef unsigned long		ulong; // DG: long should be avoided.
+typedef unsigned long		ulong;
 
 typedef signed char			int8;
 typedef unsigned char		uint8;
@@ -73,12 +73,14 @@ assert_sizeof( uint64,	8 );
 #define MAX_UNSIGNED_TYPE( x )	( ( ( ( 1U << ( ( sizeof( x ) - 1 ) * 8 ) ) - 1 ) << 8 ) | 255U )
 #define MIN_UNSIGNED_TYPE( x )	0
 
+
 template< typename _type_ >
 bool IsSignedType( const _type_ t )
 {
 	return _type_( -1 ) < 0;
 }
 
+#if !defined(USE_AMD_ALLOCATOR)
 template<class T> T	Max( T x, T y )
 {
 	return ( x > y ) ? x : y;
@@ -87,7 +89,7 @@ template<class T> T	Min( T x, T y )
 {
 	return ( x < y ) ? x : y;
 }
-
+#endif // USE_AMD_ALLOCATOR
 
 class idFile;
 
@@ -95,16 +97,16 @@ struct idNullPtr
 {
 	// one pointer member initialized to zero so you can pass NULL as a vararg
 	void* value;
-	idNullPtr() : value( 0 ) { }
+	constexpr idNullPtr() : value( 0 ) { }
 
 	// implicit conversion to all pointer types
-	template<typename T1> operator T1* () const
+	template<typename T1> constexpr operator T1* () const
 	{
 		return 0;
 	}
 
 	// implicit conversion to all pointer to member types
-	template<typename T1, typename T2> operator T1 T2::* () const
+	template<typename T1, typename T2> constexpr operator T1 T2::* () const
 	{
 		return 0;
 	}
@@ -118,9 +120,9 @@ struct idNullPtr
 //#endif
 
 // C99 Standard
-#ifndef nullptr
-	#define nullptr	idNullPtr()
-#endif
+//#ifndef nullptr
+//#define nullptr	idNullPtr()
+//#endif
 
 #ifndef BIT
 	#define BIT( num )				( 1ULL << ( num ) )
@@ -134,39 +136,25 @@ struct idNullPtr
 #define MAX_PRINT_MSG			16384		// buffer size for our various printf routines
 
 // maximum world size
-// RB begin
-#if defined(STANDALONE)
-	#define MAX_WORLD_COORD			( 100 * 1000 * 2 )
-	#define MIN_WORLD_COORD			( -100 * 1000 * 2 )
-#else
-	#define MAX_WORLD_COORD			( 128 * 1024 )
-	#define MIN_WORLD_COORD			( -128 * 1024 )
-#endif
-// RB end
+#define MAX_WORLD_COORD			( 128 * 1024 )
+#define MIN_WORLD_COORD			( -128 * 1024 )
 #define MAX_WORLD_SIZE			( MAX_WORLD_COORD - MIN_WORLD_COORD )
 
 const float	MAX_ENTITY_COORDINATE = 64000.0f;
 
+#if 1
 
-// using shorts for triangle indexes can save a significant amount of traffic, but
-// to support the large models that renderBump loads, they need to be 32 bits
-
-// RB: changing this breaks generated rendermodels and we don't need the renderbump tool anymore
-#if 1 //defined(USE_GLES1)
-
+	typedef unsigned short triIndex_t;
 	#define GL_INDEX_TYPE		GL_UNSIGNED_SHORT
-	typedef short triIndex_t;
-	//typedef unsigned short triIndex_t;
 
 #else
 
+	typedef unsigned int triIndex_t;
 	#define GL_INDEX_TYPE		GL_UNSIGNED_INT
-	typedef int triIndex_t;
-	//typedef unsigned int triIndex_t;
 
 #endif
 
-// if writing to write-combined memroy, always write indexes as pairs for 32 bit writes
+// if writing to write-combined memory, always write indexes as pairs for 32 bit writes
 ID_INLINE void WriteIndexPair( triIndex_t* dest, const triIndex_t a, const triIndex_t b )
 {
 	*( unsigned* )dest = ( unsigned )a | ( ( unsigned )b << 16 );
@@ -177,8 +165,11 @@ ID_INLINE void WriteIndexPair( triIndex_t* dest, const triIndex_t a, const triIn
 #else
 	#ifdef _MSVC
 		#define NODEFAULT	default: __assume( 0 )
-	#else // not _MSVC
+	#elif defined(__GNUC__)
 		// TODO: is that __assume an important optimization? if so, is there a gcc equivalent?
+		// SRS - The gcc equivalent is __builtin_unreachable()
+		#define NODEFAULT	default: __builtin_unreachable()
+	#else // not _MSVC and not __GNUC__
 		#define NODEFAULT
 	#endif
 #endif

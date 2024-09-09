@@ -42,15 +42,7 @@ If you have questions concerning this license or the applicable additional terms
 // if enabled, the console won't toggle upon ~, unless you start the binary with +set com_allowConsole 1
 // Ctrl+Alt+~ will always toggle the console no matter what
 #ifndef ID_CONSOLE_LOCK
-	#if defined(_WIN32) || defined(MACOS_X)
-		#ifdef _DEBUG
-			#define ID_CONSOLE_LOCK 0
-		#else
-			#define ID_CONSOLE_LOCK 1
-		#endif
-	#else
-		#define ID_CONSOLE_LOCK 0
-	#endif
+	#define ID_CONSOLE_LOCK 0
 #endif
 
 // useful for network debugging, turns off 'LAN' checks, all IPs are classified 'internet'
@@ -68,14 +60,6 @@ If you have questions concerning this license or the applicable additional terms
 	#define ID_ALLOW_CHEATS 0
 #endif
 
-// RB begin
-#if 0 //!defined(__ANDROID__)
-	#ifndef ID_ENABLE_CURL
-		#define ID_ENABLE_CURL 1
-	#endif
-#endif
-// RB end
-
 // fake a pure client. useful to connect an all-debug client to a server
 #ifndef ID_FAKE_PURE
 	#define ID_FAKE_PURE 0
@@ -91,56 +75,59 @@ If you have questions concerning this license or the applicable additional terms
 // compiled out.
 //#define ID_DEDICATED
 
-// if this is defined, the executable positively won't work with any paks other
-// than the demo pak, even if productid is present.
-//#define ID_DEMO_BUILD
+// don't define ID_ALLOW_TOOLS when we don't want tool code in the executable. - DG: defined in cmake now
+#if 0 // defined( _WIN32 ) && defined(_MFC_VER) && !defined( ID_DEDICATED )
+	#define	ID_ALLOW_TOOLS
+#endif
 
-// don't define ID_ALLOW_TOOLS when we don't want tool code in the executable.
+#define ID_ENFORCE_KEY 0
 
-// RB begin
-//#if defined( _WIN32 ) && !defined( ID_DEDICATED ) && !defined( ID_DEMO_BUILD )
-//	#define	ID_ALLOW_TOOLS
-//#endif
-// RB end
-
-// don't do backtraces in release builds.
-// atm, we have no useful way to reconstruct the trace, so let's leave it off
-#define ID_BT_STUB
-#ifndef ID_BT_STUB
-	#if defined( __linux__ )
-		#if defined( _DEBUG )
-			#define ID_BT_STUB
-		#endif
+#ifndef ID_ENFORCE_KEY
+	#if !defined( ID_DEDICATED )
+		#define ID_ENFORCE_KEY 1
 	#else
-		#define ID_BT_STUB
+		#define ID_ENFORCE_KEY 0
 	#endif
 #endif
 
-// RB begin
-#if defined(USE_CDKEY)
-	#ifndef ID_ENFORCE_KEY
-		#if !defined( ID_DEDICATED ) && !defined( ID_DEMO_BUILD )
-			#define ID_ENFORCE_KEY 1
-		#else
-			#define ID_ENFORCE_KEY 0
-		#endif
-	#endif
-#endif // #if defined(USE_CDKEY)
-// RB end
-
-#ifndef ID_OPENAL
-	#if ( defined(_WIN32) || defined(MACOS_X) ) && !defined( ID_DEDICATED ) && defined(USE_OPENAL)
-		#define ID_OPENAL 1
+#ifndef ID_ENFORCE_KEY_CLIENT
+	#if ID_ENFORCE_KEY
+		#define ID_ENFORCE_KEY_CLIENT 1
 	#else
-		#define ID_OPENAL 0
+		#define ID_ENFORCE_KEY_CLIENT 0
 	#endif
 #endif
 
-#ifndef ID_ALLOW_D3XP
-	#if defined( MACOS_X )
-		#define ID_ALLOW_D3XP 0
-	#else
-		#define ID_ALLOW_D3XP 1
-	#endif
-#endif
+// async network
 
+/*
+DOOM III gold:	33
+1.1 beta patch:	34
+1.1 patch:		35
+1.2 XP:			36-39
+1.3 patch:		40
+1.3.1:			41
+
+dhewm WIP		42
+*/
+#define ASYNC_PROTOCOL_MINOR	(42)
+#define ASYNC_PROTOCOL_VERSION	(( ASYNC_PROTOCOL_MAJOR << 16 ) + ASYNC_PROTOCOL_MINOR)
+
+#define MAX_ASYNC_CLIENTS		(32)
+
+#define MAX_USERCMD_BACKUP		(256)
+#define MAX_USERCMD_DUPLICATION	(25)
+#define MAX_USERCMD_RELAY		(10)
+
+// index 0 is hardcoded to be the idnet master
+// which leaves 4 to user customization
+#define MAX_MASTER_SERVERS		(5)
+
+#define MAX_NICKLEN				(32)
+
+// max number of servers that will be scanned for at a single IP address
+#define MAX_SERVER_PORTS		(8)
+
+// special game init ids
+#define GAME_INIT_ID_INVALID	(-1)
+#define GAME_INIT_ID_MAP_LOAD	(-2)

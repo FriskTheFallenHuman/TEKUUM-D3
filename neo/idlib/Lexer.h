@@ -52,7 +52,7 @@ typedef enum
 	LEXFL_NOERRORS						= BIT( 0 ),	// don't print any errors
 	LEXFL_NOWARNINGS					= BIT( 1 ),	// don't print any warnings
 	LEXFL_NOFATALERRORS					= BIT( 2 ),	// errors aren't fatal
-	LEXFL_NOSTRINGCONCAT				= BIT( 3 ),	// multiple strings seperated by whitespaces are not concatenated
+	LEXFL_NOSTRINGCONCAT				= BIT( 3 ),	// multiple strings separated by whitespaces are not concatenated
 	LEXFL_NOSTRINGESCAPECHARS			= BIT( 4 ),	// no escape characters inside strings
 	LEXFL_NODOLLARPRECOMPILE			= BIT( 5 ),	// don't use the $ sign for precompilation
 	LEXFL_NOBASEINCLUDES				= BIT( 6 ),	// don't include files embraced with < >
@@ -61,7 +61,7 @@ typedef enum
 	LEXFL_ALLOWIPADDRESSES				= BIT( 9 ),	// allow ip addresses to be parsed as numbers
 	LEXFL_ALLOWFLOATEXCEPTIONS			= BIT( 10 ),	// allow float exceptions like 1.#INF or 1.#IND to be parsed
 	LEXFL_ALLOWMULTICHARLITERALS		= BIT( 11 ),	// allow multi character literals
-	LEXFL_ALLOWBACKSLASHSTRINGCONCAT	= BIT( 12 ),	// allow multiple strings seperated by '\' to be concatenated
+	LEXFL_ALLOWBACKSLASHSTRINGCONCAT	= BIT( 12 ),	// allow multiple strings separated by '\' to be concatenated
 	LEXFL_ONLYSTRINGS					= BIT( 13 )	// parse as whitespace deliminated strings (quoted strings keep quotes)
 } lexerFlags_t;
 
@@ -245,9 +245,9 @@ public:
 	// returns the current line number
 	const int		GetLineNum();
 	// print an error message
-	void			Error( const char* str, ... ) id_attribute( ( format( printf, 2, 3 ) ) );
+	void			Error( VERIFY_FORMAT_STRING const char* str, ... );
 	// print a warning message
-	void			Warning( const char* str, ... ) id_attribute( ( format( printf, 2, 3 ) ) );
+	void			Warning( VERIFY_FORMAT_STRING const char* str, ... );
 	// returns true if Error() was called with LEXFL_NOFATALERRORS or LEXFL_NOERRORS set
 	bool			HadError() const;
 
@@ -323,4 +323,3 @@ ID_INLINE int idLexer::GetFlags()
 }
 
 #endif /* !__LEXER_H__ */
-

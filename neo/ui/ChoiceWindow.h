@@ -48,9 +48,7 @@ public:
 
 	virtual idWinVar*	GetWinVarByName( const char* _name, bool winLookup = false, drawWin_t** owner = NULL );
 
-	// RB: added parm recurseChildren
-	void				RunNamedEvent( const char* eventName, bool recurseChildren = true );
-	// RB end
+	void				RunNamedEvent( const char* eventName );
 
 private:
 	virtual bool		ParseInternalVar( const char* name, idTokenParser* src );

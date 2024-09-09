@@ -749,4 +749,3 @@ void idServerScan::SetSorting( serverSort_t sort )
 	// trigger a redraw
 	ApplyFilter();
 }
-

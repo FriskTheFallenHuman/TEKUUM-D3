@@ -170,7 +170,7 @@ public:
 	virtual void		ExecuteCommandBuffer() = 0;
 
 	// Base for path/file auto-completion.
-	virtual void		ArgCompletion_FolderExtension( const idCmdArgs& args, void( *callback )( const char* s ), const char* folder, bool stripFolder, ... ) = 0;
+	virtual void		ArgCompletion_FolderExtension( const idCmdArgs& args, void( *callback )( const char* s ), const char* folder, int stripFolder, ... ) = 0;
 	// Base for decl name auto-completion.
 	virtual void		ArgCompletion_DeclName( const idCmdArgs& args, void( *callback )( const char* s ), int type ) = 0;
 
@@ -182,6 +182,7 @@ public:
 	virtual bool		PostReloadEngine() = 0;
 
 	// Default argument completion functions.
+	static void			ArgCompletion_DefFile( const idCmdArgs& args, void( *callback )( const char* s ) );
 	static void			ArgCompletion_Boolean( const idCmdArgs& args, void( *callback )( const char* s ) );
 	template<int min, int max>
 	static void			ArgCompletion_Integer( const idCmdArgs& args, void( *callback )( const char* s ) );
@@ -202,6 +203,10 @@ public:
 
 extern idCmdSystem* 	cmdSystem;
 
+ID_INLINE void idCmdSystem::ArgCompletion_DefFile( const idCmdArgs& args, void( *callback )( const char* s ) )
+{
+	cmdSystem->ArgCompletion_FolderExtension( args, callback, "def/", true, ".def", NULL );
+}
 
 ID_INLINE void idCmdSystem::ArgCompletion_Boolean( const idCmdArgs& args, void( *callback )( const char* s ) )
 {

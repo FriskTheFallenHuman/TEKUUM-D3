@@ -123,7 +123,7 @@ public:
 	// updates frag counts and potentially ends the match in sudden death
 	void			PlayerDeath( idPlayer* dead, idPlayer* killer, bool telefrag );
 
-	void			AddChatLine( const char* fmt, ... ) id_attribute( ( format( printf, 2, 3 ) ) );
+	void			AddChatLine( VERIFY_FORMAT_STRING const char* fmt, ... );
 
 	void			UpdateMainGui();
 	idUserInterface* StartMenu();

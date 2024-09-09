@@ -47,7 +47,63 @@ void idSoundWorldLocal::Init( idRenderWorld* renderWorld )
 	listenerQU.Zero();
 	listenerArea = 0;
 	listenerAreaName = "Undefined";
-	listenerEnvironmentID = -2;
+
+	if( idSoundSystemLocal::useEFXReverb )
+	{
+		if( !soundSystemLocal.alIsAuxiliaryEffectSlot( listenerSlot ) )
+		{
+			alGetError();
+
+			soundSystemLocal.alGenAuxiliaryEffectSlots( 1, &listenerSlot );
+			ALuint e = alGetError();
+			if( e != AL_NO_ERROR )
+			{
+				common->Warning( "idSoundWorldLocal::Init: alGenAuxiliaryEffectSlots failed: 0x%x", e );
+				listenerSlot = AL_EFFECTSLOT_NULL;
+			}
+		}
+
+		if( !listenerAreFiltersInitialized )
+		{
+			listenerAreFiltersInitialized = true;
+
+			alGetError();
+			soundSystemLocal.alGenFilters( 2, listenerFilters );
+			ALuint e = alGetError();
+			if( e != AL_NO_ERROR )
+			{
+				common->Warning( "idSoundWorldLocal::Init: alGenFilters failed: 0x%x", e );
+				listenerFilters[0] = AL_FILTER_NULL;
+				listenerFilters[1] = AL_FILTER_NULL;
+			}
+			else
+			{
+				soundSystemLocal.alFilteri( listenerFilters[0], AL_FILTER_TYPE, AL_FILTER_LOWPASS );
+				// original EAX occusion value was -1150
+				// default OCCLUSIONLFRATIO is 0.25
+				// default OCCLUSIONDIRECTRATIO is 1.0
+
+				// pow(10.0, (-1150*0.25*1.0)/2000.0)
+				soundSystemLocal.alFilterf( listenerFilters[0], AL_LOWPASS_GAIN, 0.718208f );
+				// pow(10.0, (-1150*1.0)/2000.0)
+				soundSystemLocal.alFilterf( listenerFilters[0], AL_LOWPASS_GAINHF, 0.266073f );
+
+
+				soundSystemLocal.alFilteri( listenerFilters[1], AL_FILTER_TYPE, AL_FILTER_LOWPASS );
+				// original EAX occusion value was -1150
+				// default OCCLUSIONLFRATIO is 0.25
+				// default OCCLUSIONROOMRATIO is 1.5
+
+				// pow(10.0, (-1150*(0.25+1.5-1.0))/2000.0)
+				soundSystemLocal.alFilterf( listenerFilters[1], AL_LOWPASS_GAIN, 0.370467f );
+				// pow(10.0, (-1150*1.5)/2000.0)
+				soundSystemLocal.alFilterf( listenerFilters[1], AL_LOWPASS_GAINHF, 0.137246f );
+			}
+			// allow reducing the gain effect globally via s_alReverbGain CVar
+			listenerSlotReverbGain = soundSystemLocal.s_alReverbGain.GetFloat();
+			soundSystemLocal.alAuxiliaryEffectSlotf( listenerSlot, AL_EFFECTSLOT_GAIN, listenerSlotReverbGain );
+		}
+	}
 
 	gameMsec = 0;
 	game44kHz = 0;
@@ -82,6 +138,10 @@ idSoundWorldLocal::idSoundWorldLocal
 */
 idSoundWorldLocal::idSoundWorldLocal()
 {
+	listenerEffect                = 0;
+	listenerSlot                  = 0;
+	listenerAreFiltersInitialized = false;
+	listenerSlotReverbGain = 1.0f;
 }
 
 /*
@@ -112,6 +172,8 @@ void idSoundWorldLocal::Shutdown()
 
 	AVIClose();
 
+	// delete emitters before deletign the listenerSlot, so their sources aren't
+	// associated with the listenerSlot anymore
 	for( i = 0; i < emitters.Num(); i++ )
 	{
 		if( emitters[i] )
@@ -120,6 +182,30 @@ void idSoundWorldLocal::Shutdown()
 			emitters[i] = NULL;
 		}
 	}
+
+	if( idSoundSystemLocal::useEFXReverb )
+	{
+		if( soundSystemLocal.alIsAuxiliaryEffectSlot( listenerSlot ) )
+		{
+			soundSystemLocal.alAuxiliaryEffectSloti( listenerSlot, AL_EFFECTSLOT_EFFECT, AL_EFFECTSLOT_NULL );
+			soundSystemLocal.alDeleteAuxiliaryEffectSlots( 1, &listenerSlot );
+			listenerSlot = AL_EFFECTSLOT_NULL;
+		}
+
+		if( listenerAreFiltersInitialized )
+		{
+			listenerAreFiltersInitialized = false;
+
+			if( listenerFilters[0] != AL_FILTER_NULL && listenerFilters[1] != AL_FILTER_NULL )
+			{
+				soundSystemLocal.alDeleteFilters( 2, listenerFilters );
+				listenerFilters[0] = AL_FILTER_NULL;
+				listenerFilters[1] = AL_FILTER_NULL;
+			}
+		}
+		listenerSlotReverbGain = 1.0f;
+	}
+
 	localSound = NULL;
 }
 
@@ -272,16 +358,15 @@ void idSoundWorldLocal::ProcessDemoCommand( idDemoFile* readDemo )
 		return;
 	}
 
-	// RB: fixed bad (int&) cast on Linux 64 bit
-	int	dc;
+	int dc;
+
 	if( !readDemo->ReadInt( dc ) )
 	{
 		return;
 	}
 
-	switch( ( soundDemoCommand_t ) dc )
+	switch( ( soundDemoCommand_t )dc )
 	{
-		// RB end
 		case SCMD_STATE:
 			// we need to protect this from the async thread
 			// other instances of calling idSoundWorldLocal::ReadFromSaveGame do this while the sound code is muted
@@ -457,91 +542,64 @@ void idSoundWorldLocal::MixLoop( int current44kHz, int numSpeakers, float* final
 	// if noclip flying outside the world, leave silence
 	if( listenerArea == -1 )
 	{
-
-		// RB begin
-#if defined(USE_OPENAL)
-		if( idSoundSystemLocal::useOpenAL )
-		{
-			alListenerf( AL_GAIN, 0.0f );
-		}
-#endif
-		// RB end
+		alListenerf( AL_GAIN, 0.0f );
 		return;
 	}
 
 	// update the listener position and orientation
+	ALfloat listenerPosition[3];
 
-	// RB begin
-#if defined(USE_OPENAL)
-	if( idSoundSystemLocal::useOpenAL )
+	listenerPosition[0] = -listenerPos.y;
+	listenerPosition[1] =  listenerPos.z;
+	listenerPosition[2] = -listenerPos.x;
+
+	ALfloat listenerOrientation[6];
+
+	listenerOrientation[0] = -listenerAxis[0].y;
+	listenerOrientation[1] =  listenerAxis[0].z;
+	listenerOrientation[2] = -listenerAxis[0].x;
+
+	listenerOrientation[3] = -listenerAxis[2].y;
+	listenerOrientation[4] =  listenerAxis[2].z;
+	listenerOrientation[5] = -listenerAxis[2].x;
+
+	alListenerf( AL_GAIN, 1.0f );
+	alListenerfv( AL_POSITION, listenerPosition );
+	alListenerfv( AL_ORIENTATION, listenerOrientation );
+
+	if( idSoundSystemLocal::useEFXReverb && soundSystemLocal.efxloaded )
 	{
-		ALfloat listenerPosition[3];
+		ALuint effect = 0;
+		idStr s( listenerArea );
 
-		listenerPosition[0] = -listenerPos.y;
-		listenerPosition[1] =  listenerPos.z;
-		listenerPosition[2] = -listenerPos.x;
-
-		ALfloat listenerOrientation[6];
-
-		listenerOrientation[0] = -listenerAxis[0].y;
-		listenerOrientation[1] =  listenerAxis[0].z;
-		listenerOrientation[2] = -listenerAxis[0].x;
-
-		listenerOrientation[3] = -listenerAxis[2].y;
-		listenerOrientation[4] =  listenerAxis[2].z;
-		listenerOrientation[5] = -listenerAxis[2].x;
-
-		alListenerf( AL_GAIN, 1.0f );
-		alListenerfv( AL_POSITION, listenerPosition );
-		alListenerfv( AL_ORIENTATION, listenerOrientation );
-
-#if ID_OPENAL
-		if( soundSystemLocal.s_useEAXReverb.GetBool() )
+		// allow reducing the gain effect globally via s_alReverbGain CVar
+		float gain = soundSystemLocal.s_alReverbGain.GetFloat();
+		if( listenerSlotReverbGain != gain )
 		{
-			if( soundSystemLocal.efxloaded )
-			{
-				idSoundEffect* effect = NULL;
-				int EnvironmentID = -1;
-				idStr defaultStr( "default" );
-				idStr listenerAreaStr( listenerArea );
-
-				soundSystemLocal.EFXDatabase.FindEffect( listenerAreaStr, &effect, &EnvironmentID );
-				if( !effect )
-				{
-					soundSystemLocal.EFXDatabase.FindEffect( listenerAreaName, &effect, &EnvironmentID );
-				}
-				if( !effect )
-				{
-					soundSystemLocal.EFXDatabase.FindEffect( defaultStr, &effect, &EnvironmentID );
-				}
-
-				// only update if change in settings
-				if( soundSystemLocal.s_muteEAXReverb.GetBool() || ( listenerEnvironmentID != EnvironmentID ) )
-				{
-					EAXREVERBPROPERTIES EnvironmentParameters;
-
-					// get area reverb setting from EAX Manager
-					if( ( effect ) && ( effect->data ) && ( memcpy( &EnvironmentParameters, effect->data, effect->datasize ) ) )
-					{
-						if( soundSystemLocal.s_muteEAXReverb.GetBool() )
-						{
-							EnvironmentParameters.lRoom = -10000;
-							EnvironmentID = -2;
-						}
-						if( soundSystemLocal.alEAXSet )
-						{
-							soundSystemLocal.alEAXSet( &EAXPROPERTYID_EAX_FXSlot0, EAXREVERB_ALLPARAMETERS, 0, &EnvironmentParameters, sizeof( EnvironmentParameters ) );
-						}
-					}
-					listenerEnvironmentID = EnvironmentID;
-				}
-			}
+			listenerSlotReverbGain = gain;
+			soundSystemLocal.alAuxiliaryEffectSlotf( listenerSlot, AL_EFFECTSLOT_GAIN, gain );
 		}
-#endif
-	}
-#endif
-	// RB end
 
+		bool found = soundSystemLocal.EFXDatabase.FindEffect( s, &effect );
+		if( !found )
+		{
+			s = listenerAreaName;
+			found = soundSystemLocal.EFXDatabase.FindEffect( s, &effect );
+		}
+		if( !found )
+		{
+			s = "default";
+			found = soundSystemLocal.EFXDatabase.FindEffect( s, &effect );
+		}
+
+		// only update if change in settings
+		if( found && listenerEffect != effect )
+		{
+			EFXprintf( "Switching to EFX '%s' (#%u)\n", s.c_str(), effect );
+			listenerEffect = effect;
+			soundSystemLocal.alAuxiliaryEffectSloti( listenerSlot, AL_EFFECTSLOT_EFFECT, effect );
+		}
+	}
 
 	// debugging option to mute all but a single soundEmitter
 	if( idSoundSystemLocal::s_singleEmitter.GetInteger() > 0 && idSoundSystemLocal::s_singleEmitter.GetInteger() < emitters.Num() )
@@ -597,14 +655,11 @@ void idSoundWorldLocal::MixLoop( int current44kHz, int numSpeakers, float* final
 		}
 	}
 
-	// RB begin
-#if defined(USE_OPENAL)
-	if( !idSoundSystemLocal::useOpenAL && enviroSuitActive )
+	// TODO port to OpenAL
+	if( false && enviroSuitActive )
 	{
 		soundSystemLocal.DoEnviroSuit( finalMixBuffer, MIXBUFFER_SAMPLES, numSpeakers );
 	}
-#endif
-	// RB end
 }
 
 //==============================================================================
@@ -623,7 +678,7 @@ void idSoundWorldLocal::AVIOpen( const char* path, const char* name )
 
 	lastAVI44kHz = game44kHz - game44kHz % MIXBUFFER_SAMPLES;
 
-	if( soundSystemLocal.snd_audio_hw->GetNumberOfSpeakers() == 6 )
+	if( idSoundSystemLocal::s_numberOfSpeakers.GetInteger() == 6 )
 	{
 		fpa[0] = fileSystem->OpenFileWrite( aviDemoPath + "channel_51_left.raw" );
 		fpa[1] = fileSystem->OpenFileWrite( aviDemoPath + "channel_51_right.raw" );
@@ -659,19 +714,10 @@ void idSoundWorldLocal::AVIUpdate()
 		return;
 	}
 
-	if( !soundSystemLocal.snd_audio_hw )
-	{
-		numSpeakers = 2;
-	}
-	else
-	{
-		numSpeakers = soundSystemLocal.snd_audio_hw->GetNumberOfSpeakers();
-	}
+	numSpeakers = idSoundSystemLocal::s_numberOfSpeakers.GetInteger();
 
 	float	mix[MIXBUFFER_SAMPLES * 6 + 16];
-	// RB: 64 bit fix, changed int to intptr_t
 	float*	mix_p = ( float* )( ( ( intptr_t )mix + 15 ) & ~15 );	// SIMD align
-	// RB end
 
 	SIMDProcessor->Memset( mix_p, 0, MIXBUFFER_SAMPLES * sizeof( float )*numSpeakers );
 
@@ -733,7 +779,7 @@ void idSoundWorldLocal::AVIClose()
 			fpa[i] = NULL;
 		}
 	}
-	if( soundSystemLocal.snd_audio_hw->GetNumberOfSpeakers() == 2 )
+	if( idSoundSystemLocal::s_numberOfSpeakers.GetInteger() == 2 )
 	{
 		// convert it to a wave file
 		idFile* rL, *lL, *wO;
@@ -1361,20 +1407,10 @@ void idSoundWorldLocal::WriteToSaveGameSoundChannel( idFile* saveGame, idSoundCh
 	saveGame->WriteInt( ch->trigger44kHzTime );
 	saveGame->WriteInt( ch->triggerGame44kHzTime );
 	WriteToSaveGameSoundShaderParams( saveGame, &ch->parms );
-	// RB: 64 bit fixes, changed int to intptr_t
-#if defined(__x86_64__)
-	// FIXME
-	saveGame->WriteInt( 0 /* (intptr_t)ch->leadinSample */ );
+	saveGame->WriteInt( 0 /* ch->leadinSample */ );
 	saveGame->WriteInt( ch->triggerChannel );
-	saveGame->WriteInt( ( int& )ch->soundShader );
-	saveGame->WriteInt( 0 /* (intptr_t)ch->decoder */ );
-#else
-	saveGame->WriteInt( ( intptr_t ) ch->leadinSample );
-	saveGame->WriteInt( ch->triggerChannel );
-	saveGame->WriteInt( ( intptr_t ) ch->soundShader );
-	saveGame->WriteInt( ( intptr_t ) ch->decoder );
-#endif
-	// RB end
+	saveGame->WriteInt( 0 /* ch->soundShader */ );
+	saveGame->WriteInt( 0 /* ch->decoder */ );
 	saveGame->WriteFloat( ch->diversity );
 	saveGame->WriteFloat( ch->lastVolume );
 	for( int m = 0; m < 6; m++ )
@@ -1480,14 +1516,7 @@ void idSoundWorldLocal::ReadFromSaveGame( idFile* savefile )
 
 			idSoundChannel* chan = &def->channels[channel];
 
-			// RB begin
-#if defined(__x86_64__)
-			// RB: we set the chan->decoder to NULL so allocate a new decoder
-			if( chan->decoder == NULL )
-#else
-			if( chan->decoder != NULL )
-#endif
-				// RB end
+			if( !chan->decoder )
 			{
 				// The pointer in the save file is not valid, so we grab a new one
 				chan->decoder = idSampleDecoder::Alloc();
@@ -1512,12 +1541,12 @@ void idSoundWorldLocal::ReadFromSaveGame( idFile* savefile )
 
 			// make sure we start up the hardware voice if needed
 			chan->triggered = chan->triggerState;
-
-			// RB begin
-#if defined(USE_OPENAL)
 			chan->openalStreamingOffset = currentSoundTime - chan->trigger44kHzTime;
-#endif
-			// RB end
+			// DG: round up openalStreamingOffset to multiple of 8, so it still has an even number
+			//  if we calculate "how many 11kHz stereo samples do we need to decode" and don't
+			//  run into a "I need one more sample apparently, so decode 0 stereo samples"
+			//  situation that could cause an endless loop.. (44kHz/11kHz = 4; *2 for stereo => 8)
+			chan->openalStreamingOffset = ( chan->openalStreamingOffset + 7 ) & ~7;
 
 			// adjust the hardware fade time
 			if( chan->channelFade.fadeStart44kHz != 0 )
@@ -1569,46 +1598,20 @@ void idSoundWorldLocal::ReadFromSaveGameSoundChannel( idFile* saveGame, idSoundC
 {
 	saveGame->ReadBool( ch->triggerState );
 	char tmp;
+	int i;
 	saveGame->ReadChar( tmp );
 	saveGame->ReadChar( tmp );
 	saveGame->ReadChar( tmp );
 	saveGame->ReadInt( ch->trigger44kHzTime );
 	saveGame->ReadInt( ch->triggerGame44kHzTime );
 	ReadFromSaveGameSoundShaderParams( saveGame, &ch->parms );
-
-	// RB: 64 bit fixes
-#if defined(__x86_64__)
-	int dummy, soundShader;
-
-	saveGame->ReadInt( dummy );
+	saveGame->ReadInt( i );
 	ch->leadinSample = NULL;
 	saveGame->ReadInt( ch->triggerChannel );
-	saveGame->ReadInt( ( int& )ch->soundShader );
-	saveGame->ReadInt( dummy );
+	saveGame->ReadInt( i );
+	ch->soundShader = NULL;
+	saveGame->ReadInt( i );
 	ch->decoder = NULL;
-
-#if 0
-	idStr soundShaderStr;
-	if( soundShader && saveGame->ReadString( soundShaderStr ) )
-	{
-		ch->soundShader = declManager->FindSound( soundShaderStr );
-	}
-	else
-	{
-		ch->soundShader = NULL;
-	}
-#else
-	//ch->soundShader = NULL;
-#endif
-
-#else
-	saveGame->ReadInt( ( int& )ch->leadinSample );
-	saveGame->ReadInt( ch->triggerChannel );
-	saveGame->ReadInt( ( int& )ch->soundShader );
-	saveGame->ReadInt( ( int& )ch->decoder );
-
-#endif
-	// RB end
 	saveGame->ReadFloat( ch->diversity );
 	saveGame->ReadFloat( ch->lastVolume );
 	for( int m = 0; m < 6; m++ )
@@ -1670,6 +1673,18 @@ void idSoundWorldLocal::Pause()
 	}
 
 	pause44kHz = soundSystemLocal.GetCurrent44kHzTime();
+
+	for( int i = 0; i < emitters.Num(); i++ )
+	{
+		idSoundEmitterLocal* emitter = emitters[i];
+
+		// if no channels are active, do nothing
+		if( emitter == NULL || !emitter->playing )
+		{
+			continue;
+		}
+		emitter->PauseAll();
+	}
 }
 
 /*
@@ -1691,6 +1706,18 @@ void idSoundWorldLocal::UnPause()
 	OffsetSoundTime( offset44kHz );
 
 	pause44kHz = -1;
+
+	for( int i = 0; i < emitters.Num(); i++ )
+	{
+		idSoundEmitterLocal* emitter = emitters[i];
+
+		// if no channels are active, do nothing
+		if( emitter == NULL || !emitter->playing )
+		{
+			continue;
+		}
+		emitter->UnPauseAll();
+	}
 }
 
 /*
@@ -1915,9 +1942,7 @@ void idSoundWorldLocal::AddChannelContribution( idSoundEmitterLocal* sound, idSo
 		volume = soundSystemLocal.dB2Scale( parms->volume );
 	}
 
-	// global volume scale
-	volume *= soundSystemLocal.dB2Scale( idSoundSystemLocal::s_volume.GetFloat() );
-
+	// DG: moved global volume scale down to after clamping to 1.0
 
 	// volume fading
 	float	fadeDb = chan->channelFade.FadeDbAt44kHz( current44kHz );
@@ -1990,6 +2015,31 @@ void idSoundWorldLocal::AddChannelContribution( idSoundEmitterLocal* sound, idSo
 		}
 	}
 
+	// DG: scaling the volume of *everything* down a bit to prevent some sounds
+	//     (like shotgun shot) being "drowned" when lots of other loud sounds
+	//     (like shotgun impacts on metal) are played at the same time
+	//     I guess this happens because the loud sounds mixed together are too loud so
+	//     OpenAL just makes *everything* quiter or sth like that.
+	//     See also https://github.com/dhewm/dhewm3/issues/179
+	if( soundSystemLocal.s_scaleDownAndClamp.GetBool() )
+	{
+		// First clamp it to 1.0 - that's done anyway when setting AL_GAIN below,
+		// for consistency it must be done before scaling, because many player-weapon
+		// sounds have a too high volume defined and only sound right (relative to
+		// other weapons) when clamped
+		// see https://github.com/dhewm/dhewm3/issues/326#issuecomment-1366833004
+		if( volume > 1.0f )
+		{
+			volume = 1.0f;
+		}
+
+		volume *= 0.333f; // (0.333 worked fine, 0.5 didn't)
+	}
+
+	// global volume scale - DG: now done after clamping to 1.0, so reducing the
+	// global volume doesn't cause the different weapon volume issues described above
+	volume *= soundSystemLocal.dB2Scale( idSoundSystemLocal::s_volume.GetFloat() );
+
 	//
 	// do we have anything to add?
 	//
@@ -2004,17 +2054,12 @@ void idSoundWorldLocal::AddChannelContribution( idSoundEmitterLocal* sound, idSo
 	//
 	int offset = current44kHz - chan->trigger44kHzTime;
 	float inputSamples[MIXBUFFER_SAMPLES * 2 + 16];
-	// RB: 64 bit fix, changed int to intptr_t
 	float* alignedInputSamples = ( float* )( ( ( ( intptr_t )inputSamples ) + 15 ) & ~15 );
-	// RB end
 
 	//
 	// allocate and initialize hardware source
 	//
-
-	// RB begin
-#if defined(USE_OPENAL)
-	if( idSoundSystemLocal::useOpenAL && sound->removeStatus < REMOVE_STATUS_SAMPLEFINISHED )
+	if( sound->removeStatus < REMOVE_STATUS_SAMPLEFINISHED )
 	{
 		if( !alIsSource( chan->openalSource ) )
 		{
@@ -2043,22 +2088,37 @@ void idSoundWorldLocal::AddChannelContribution( idSoundEmitterLocal* sound, idSo
 				alSource3f( chan->openalSource, AL_POSITION, -spatializedOriginInMeters.y, spatializedOriginInMeters.z, -spatializedOriginInMeters.x );
 				alSourcef( chan->openalSource, AL_GAIN, ( volume ) < ( 1.0f ) ? ( volume ) : ( 1.0f ) );
 			}
-			alSourcei( chan->openalSource, AL_LOOPING, ( looping && chan->soundShader->entries[0]->hardwareBuffer ) ? AL_TRUE : AL_FALSE );
-#if !defined(MACOS_X)
+			// DG: looping sounds with a leadin can't just use a HW buffer and openal's AL_LOOPING
+			//     because we need to switch from leadin to the looped sound.. see https://github.com/dhewm/dhewm3/issues/291
+			bool haveLeadin = chan->soundShader->numLeadins > 0;
+			alSourcei( chan->openalSource, AL_LOOPING, ( looping && chan->soundShader->entries[0]->hardwareBuffer && !haveLeadin ) ? AL_TRUE : AL_FALSE );
+#if 1
 			alSourcef( chan->openalSource, AL_REFERENCE_DISTANCE, mind );
 			alSourcef( chan->openalSource, AL_MAX_DISTANCE, maxd );
 #endif
 			alSourcef( chan->openalSource, AL_PITCH, ( slowmoActive && !chan->disallowSlow ) ? ( slowmoSpeed ) : ( 1.0f ) );
-#if ID_OPENAL
-			long lOcclusion = ( enviroSuitActive ? -1150 : 0 );
-			if( soundSystemLocal.alEAXSet )
+
+			if( idSoundSystemLocal::useEFXReverb )
 			{
-				soundSystemLocal.alEAXSet( &EAXPROPERTYID_EAX_Source, EAXSOURCE_OCCLUSION, chan->openalSource, &lOcclusion, sizeof( lOcclusion ) );
+				if( enviroSuitActive )
+				{
+					alSourcei( chan->openalSource, AL_DIRECT_FILTER, listenerFilters[0] );
+					alSource3i( chan->openalSource, AL_AUXILIARY_SEND_FILTER, listenerSlot, 0, listenerFilters[1] );
+				}
+				else
+				{
+					alSourcei( chan->openalSource, AL_DIRECT_FILTER, AL_FILTER_NULL );
+					alSource3i( chan->openalSource, AL_AUXILIARY_SEND_FILTER, listenerSlot, 0, AL_FILTER_NULL );
+				}
 			}
-#endif
-			if( ( !looping && chan->leadinSample->hardwareBuffer ) || ( looping && chan->soundShader->entries[0]->hardwareBuffer ) )
+
+
+			if( ( !looping && chan->leadinSample->hardwareBuffer )
+					|| ( looping && !haveLeadin && chan->soundShader->entries[0]->hardwareBuffer ) )
 			{
 				// handle uncompressed (non streaming) single shot and looping sounds
+				// DG: ... that have no leadin (with leadin we still need to switch to another sound,
+				//     just use streaming code for that) - see https://github.com/dhewm/dhewm3/issues/291
 				if( chan->triggered )
 				{
 					alSourcei( chan->openalSource, AL_BUFFER, looping ? chan->soundShader->entries[0]->openalBuffer : chan->leadinSample->openalBuffer );
@@ -2072,16 +2132,12 @@ void idSoundWorldLocal::AddChannelContribution( idSoundEmitterLocal* sound, idSo
 				// handle streaming sounds (decode on the fly) both single shot AND looping
 				if( chan->triggered )
 				{
-					alSourcei( chan->openalSource, AL_BUFFER, NULL );
+					alSourcei( chan->openalSource, AL_BUFFER, 0 );
 					alDeleteBuffers( 3, &chan->lastopenalStreamingBuffer[0] );
 					chan->lastopenalStreamingBuffer[0] = chan->openalStreamingBuffer[0];
 					chan->lastopenalStreamingBuffer[1] = chan->openalStreamingBuffer[1];
 					chan->lastopenalStreamingBuffer[2] = chan->openalStreamingBuffer[2];
 					alGenBuffers( 3, &chan->openalStreamingBuffer[0] );
-					if( soundSystemLocal.alEAXSetBufferMode )
-					{
-						soundSystemLocal.alEAXSetBufferMode( 3, &chan->openalStreamingBuffer[0], alGetEnumValue( ID_ALCHAR "AL_STORAGE_ACCESSIBLE" ) );
-					}
 					buffers[0] = chan->openalStreamingBuffer[0];
 					buffers[1] = chan->openalStreamingBuffer[1];
 					buffers[2] = chan->openalStreamingBuffer[2];
@@ -2133,9 +2189,10 @@ void idSoundWorldLocal::AddChannelContribution( idSoundEmitterLocal* sound, idSo
 			}
 		}
 	}
-	else
-#endif // #if defined(USE_OPENAL)
-		// RB end
+#if 1 // DG: I /think/ this was only relevant for the old sound backends?
+	// FIXME: completely remove else branch, but for testing leave it in under com_asyncSound 2
+	//        (which also does the old 92-100ms updates)
+	else if( com_asyncSound.GetInteger() == 2 )
 	{
 
 		if( slowmoActive && !chan->disallowSlow )
@@ -2263,6 +2320,7 @@ void idSoundWorldLocal::AddChannelContribution( idSoundEmitterLocal* sound, idSo
 		}
 
 	}
+#endif // 1/0
 
 	soundSystemLocal.soundStats.activeSounds++;
 

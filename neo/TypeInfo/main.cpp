@@ -175,43 +175,23 @@ const char* Sys_Cwd()
 	return cwd;
 }
 
-const char* Sys_DefaultCDPath()
+bool Sys_GetPath( sysPath_t type, idStr& path )
 {
-	return "";
-}
+	switch( type )
+	{
+		case PATH_BASE:
+			path = Sys_Cwd();
+			return true;
 
-const char* Sys_DefaultBasePath()
-{
-// RB begin
-	static char basePath[MAX_OSPATH];
-	idStr cwdPath;
+		case PATH_SAVE:
+			path = cvarSystem->GetCVarString( "fs_basepath" );
+			return true;
 
-	cwdPath = Sys_Cwd();
+		case PATH_EXE:
+			return false;
+	}
 
-	cwdPath.Replace( "bin/win32", "" );
-	cwdPath.Replace( "bin\\win32", "" );
-
-	cwdPath.Replace( "bin/win64", "" );
-	cwdPath.Replace( "bin\\win64", "" );
-
-	cwdPath.Replace( "/src", "" );
-	cwdPath.Replace( "\\src", "" );
-
-	cwdPath.Copynz( basePath, cwdPath.c_str(), sizeof( basePath ) );
-	return basePath;
-
-	//return Sys_Cwd();
-// RB end
-}
-
-const char* Sys_DefaultSavePath()
-{
-	return cvarSystem->GetCVarString( "fs_basepath" );
-}
-
-const char* Sys_EXEPath()
-{
-	return "";
+	return false;
 }
 
 int Sys_ListFiles( const char* directory, const char* extension, idStrList& list )
@@ -270,18 +250,11 @@ int Sys_ListFiles( const char* directory, const char* extension, idStrList& list
 // RB end
 #else
 
-const char* 	Sys_DefaultCDPath()
+bool Sys_GetPath( sysPath_t, idStr& )
 {
-	return "";
+	return false;
 }
-const char* 	Sys_DefaultBasePath()
-{
-	return "";
-}
-const char* 	Sys_DefaultSavePath()
-{
-	return "";
-}
+
 int				Sys_ListFiles( const char* directory, const char* extension, idStrList& list )
 {
 	return 0;
@@ -320,18 +293,6 @@ double			idSysLocal::ClockTicksPerSecond()
 cpuid_t			idSysLocal::GetProcessorId()
 {
 	return ( cpuid_t )0;
-}
-const char* 	idSysLocal::GetProcessorString()
-{
-	return "";
-}
-const char* 	idSysLocal::FPU_GetState()
-{
-	return "";
-}
-bool			idSysLocal::FPU_StackIsEmpty()
-{
-	return true;
 }
 void			idSysLocal::FPU_SetFTZ( bool enable ) {}
 void			idSysLocal::FPU_SetDAZ( bool enable ) {}
@@ -387,8 +348,6 @@ sysEvent_t		idSysLocal::GenerateMouseMoveEvent( int deltax, int deltay )
 
 void			idSysLocal::OpenURL( const char* url, bool quit ) { }
 void			idSysLocal::StartProcess( const char* exeName, bool quit ) { }
-
-void			idSysLocal::FPU_EnableExceptions( int exceptions ) { }
 
 idSysLocal		sysLocal;
 idSys* 			sys = &sysLocal;

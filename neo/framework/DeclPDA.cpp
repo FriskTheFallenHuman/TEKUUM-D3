@@ -29,11 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#if defined(STANDALONE)
-	idCVar g_useOldPDAStrings( "g_useOldPDAStrings", "0", CVAR_BOOL, "Read strings from the .pda files rather than from the .lang file" );
-#else
-	idCVar g_useOldPDAStrings( "g_useOldPDAStrings", "1", CVAR_BOOL, "Read strings from the .pda files rather than from the .lang file" );
-#endif
+idCVar g_useOldPDAStrings( "g_useOldPDAStrings", "1", CVAR_BOOL, "Read strings from the .pda files rather than from the .lang file" );
 
 /*
 =================
@@ -549,6 +545,13 @@ bool idDeclEmail::Parse( const char* _text, const int textLength, bool allowBina
 			{
 				text = common->GetLanguageDict()->GetString( baseStrId + "text" );
 			}
+			continue;
+		}
+
+		if( !token.Icmp( "image" ) )
+		{
+			src.ReadToken( &token );
+			image = token;
 			continue;
 		}
 	}

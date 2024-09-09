@@ -84,6 +84,7 @@ If you have questions concerning this license or the applicable additional terms
 		// FIXME: change ALIGNTYPE* ?
 		#define ALIGNTYPE16
 		#define ALIGNTYPE128
+		// DG end
 
 		#ifdef GAME_DLL
 			#define ID_GAME_API					__attribute__((visibility ("default")))
@@ -101,7 +102,6 @@ If you have questions concerning this license or the applicable additional terms
 	#define NEWLINE							"\r\n"
 
 	#define ID_INLINE						inline
-
 	#ifdef _MSC_VER
 		#define ID_FORCE_INLINE					__forceinline
 	#else
@@ -141,43 +141,8 @@ If you have questions concerning this license or the applicable additional terms
 	#endif
 
 
-#elif defined(__ANDROID__)
-	#define _alloca							alloca
+#elif defined(__linux__) || defined(__FreeBSD__) || defined(__GNUC__) || defined(__clang__)
 
-	#define ALIGN16( x )					x __attribute__ ((aligned (16)))
-	#define ALIGNTYPE8						__attribute__ ((aligned (8)))
-	#define ALIGNTYPE16						__attribute__ ((aligned (16)))
-	#define ALIGNTYPE128					__attribute__ ((aligned (128)))
-
-	#define PACKED							__attribute__((packed))
-
-
-	#define FORMAT_PRINTF( x )
-
-	#define PATHSEPARATOR_STR				"/"
-	#define PATHSEPARATOR_CHAR				'/'
-	#define NEWLINE							"\n"
-
-	#define ID_INLINE						inline
-
-	// DG: this should at least work with GCC/MinGW, probably with clang as well..
-	#define ID_FORCE_INLINE					inline // TODO: always_inline?
-	// DG end
-
-	#define ID_INLINE_EXTERN				extern inline
-
-	// DG: GCC/MinGW, probably clang
-	#define ID_FORCE_INLINE_EXTERN			extern inline // TODO: always_inline ?
-	// DG end
-
-	#define ID_STATIC_TEMPLATE
-
-	#define ID_HDRSTOP
-	#define CALLBACK
-	#define __cdecl
-
-#elif defined(__linux__)
-	#define _alloca							alloca
 
 	#ifdef GAME_DLL
 		#define ID_GAME_API					__attribute__((visibility ("default")))
@@ -185,6 +150,8 @@ If you have questions concerning this license or the applicable additional terms
 		#define ID_GAME_API
 	#endif
 
+	#define _alloca							alloca
+
 	#define ALIGN16( x )					x __attribute__ ((aligned (16)))
 	#define ALIGNTYPE8						__attribute__ ((aligned (8)))
 	#define ALIGNTYPE16						__attribute__ ((aligned (16)))
@@ -217,14 +184,10 @@ If you have questions concerning this license or the applicable additional terms
 	#define CALLBACK
 	#define __cdecl
 
+#else
+	#error unknown build enviorment
 #endif
 // RB end
-
-#ifdef __GNUC__
-	#define id_attribute(x) __attribute__(x)
-#else
-	#define id_attribute(x)
-#endif
 
 /*
 ================================================================================================
@@ -284,12 +247,15 @@ bulk of the codebase, so it is the best place for analyze pragmas.
 	// win32 needs this, but 360 doesn't
 	#pragma warning( disable: 6540 )	// warning C6540: The use of attribute annotations on this function will invalidate all of its existing __declspec annotations [D:\tech5\engine\engine-10.vcxproj]
 
+	#pragma warning( disable: 4467 )	// .. Include\CodeAnalysis\SourceAnnotations.h(68): warning C4467: usage of ATL attributes is deprecated
 
-	// checking format strings catches a LOT of errors
-	#include <CodeAnalysis\SourceAnnotations.h>
-	#define	VERIFY_FORMAT_STRING	[SA_FormatString(Style="printf")]
-	// DG: alternative for GCC with attribute (NOOP for MSVC)
-	#define ID_STATIC_ATTRIBUTE_PRINTF(STRIDX, FIRSTARGIDX)
+	#if !defined(VERIFY_FORMAT_STRING)
+		// checking format strings catches a LOT of errors
+		#include <CodeAnalysis\SourceAnnotations.h>
+		#define	VERIFY_FORMAT_STRING	[SA_FormatString(Style="printf")]
+		// DG: alternative for GCC with attribute (NOOP for MSVC)
+		#define ID_STATIC_ATTRIBUTE_PRINTF(STRIDX, FIRSTARGIDX)
+	#endif
 
 #else
 	#define	VERIFY_FORMAT_STRING

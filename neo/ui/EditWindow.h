@@ -45,7 +45,7 @@ public:
 	virtual void		Draw( int time, float x, float y );
 	virtual const char* HandleEvent( const sysEvent_t* event, bool* updateVisuals );
 	virtual void		PostParse();
-	virtual void		GainFocus( bool scripts );
+	virtual void		GainFocus();
 	virtual size_t		Allocated()
 	{
 		return idWindow::Allocated();
@@ -56,9 +56,7 @@ public:
 	virtual void 		HandleBuddyUpdate( idWindow* buddy );
 	virtual void		Activate( bool activate, idStr& act );
 
-	// RB: added parm recurseChildren
-	void				RunNamedEvent( const char* eventName, bool recurseChildren = true );
-	// RB end
+	void				RunNamedEvent( const char* eventName );
 
 private:
 

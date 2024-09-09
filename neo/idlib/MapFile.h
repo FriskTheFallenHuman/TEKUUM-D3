@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2015 Robert Beckebans
+Copyright (C) 2015-2021 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -45,10 +45,7 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 const int OLD_MAP_VERSION					= 1;
-// RB: added new map format
-const int DOOM3_MAP_VERSION					= 2;
-const int CURRENT_MAP_VERSION				= 3;
-// RB end
+const int CURRENT_MAP_VERSION				= 2;
 const int DEFAULT_CURVE_SUBDIVISION			= 4;
 const float DEFAULT_CURVE_MAX_ERROR			= 4.0f;
 const float DEFAULT_CURVE_MAX_ERROR_CD		= 24.0f;
@@ -87,6 +84,7 @@ class idMapBrushSide
 public:
 	idMapBrushSide();
 	~idMapBrushSide() { }
+
 	const char* 			GetMaterial() const
 	{
 		return material;
@@ -267,7 +265,7 @@ public:
 	{
 		indexes.Resize( _indexes.Num() );
 
-		for( int i = 0; i < _indexes.Num(); i++ )
+		for( unsigned int i = 0; i < _indexes.Num(); i++ )
 		{
 			indexes[i] = _indexes[i];
 		}
@@ -277,8 +275,6 @@ public:
 	{
 		return indexes;
 	}
-
-//	MapPolygon& operator = ( const MapPolygon& poly );
 
 
 protected:
@@ -294,16 +290,6 @@ ID_INLINE MapPolygon::MapPolygon( int numIndexes )
 {
 	//indexes.AssureSize( 3 );
 }
-
-/*
-ID_INLINE MapPolygon& MapPolygon::operator = ( const MapPolygon& poly )
-{
-	material = poly.material;
-	indexes = indexes;
-
-	return *this;
-}
-*/
 
 
 class MapPolygonMesh : public idMapPrimitive

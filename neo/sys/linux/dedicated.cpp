@@ -72,17 +72,6 @@ unsigned char Sys_MapCharForKey( int key )
 }
 
 /*
-================
-Sys_GetVideoRam
-returns in megabytes
-================
-*/
-int Sys_GetVideoRam()
-{
-	return 64;
-}
-
-/*
 ==========
 GL
 ==========

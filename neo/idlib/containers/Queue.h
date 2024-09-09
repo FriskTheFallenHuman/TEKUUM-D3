@@ -225,7 +225,7 @@ idQueue<type,nodePtr>::Test
 template< typename type, idQueueNode<type> type::*nodePtr >
 void idQueue<type, nodePtr>::Test()
 {
-#if !defined(__ANDROID__)
+
 	class idMyType
 	{
 	public:
@@ -238,7 +238,6 @@ void idQueue<type, nodePtr>::Test()
 	myQueue.Add( element );
 	element = myQueue.RemoveFirst();
 	delete element;
-#endif
 }
 
 #endif // !__QUEUE_H__

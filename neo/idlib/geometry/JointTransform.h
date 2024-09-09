@@ -132,7 +132,6 @@ public:
 	static void		Multiply( idJointMat& result, const idJointMat& m1, const idJointMat& m2 );
 	static void		InverseMultiply( idJointMat& result, const idJointMat& m1, const idJointMat& m2 );
 
-private:
 	float			mat[3 * 4];
 };
 

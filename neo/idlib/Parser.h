@@ -172,10 +172,9 @@ public:
 	// returns the current line number
 	const int		GetLineNum() const;
 	// print an error message
-	void			Error( const char* str, ... ) const id_attribute( ( format( printf, 2, 3 ) ) );
+	void			Error( VERIFY_FORMAT_STRING const char* str, ... ) const;
 	// print a warning message
-	void			Warning( const char* str, ... ) const id_attribute( ( format( printf, 2, 3 ) ) );
-
+	void			Warning( VERIFY_FORMAT_STRING const char* str, ... ) const;
 	// returns true if at the end of the file
 	bool			EndOfFile();
 	// add a global define that will be added to all opened sources
@@ -237,11 +236,9 @@ protected:
 	int				Directive_ifndef();
 	int				Directive_else();
 	int				Directive_endif();
-	// DG: use int instead of long for 64bit compatibility
-	int				EvaluateTokens( idToken* tokens, signed int* intvalue, double* floatvalue, int integer );
-	int				Evaluate( signed int* intvalue, double* floatvalue, int integer );
-	int				DollarEvaluate( signed int* intvalue, double* floatvalue, int integer );
-	// DG end
+	int				EvaluateTokens( idToken* tokens, int* intvalue, double* floatvalue, int integer );
+	int				Evaluate( int* intvalue, double* floatvalue, int integer );
+	int				DollarEvaluate( int* intvalue, double* floatvalue, int integer );
 	int				Directive_define();
 	int				Directive_elif();
 	int				Directive_if();

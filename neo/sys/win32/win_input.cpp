@@ -27,8 +27,8 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
-#pragma hdrstop
 #include "precompiled.h"
+#pragma hdrstop
 
 #include "win_local.h"
 
@@ -1124,21 +1124,3 @@ void idJoystickWin32::PushButton( int inputDeviceNum, int key, bool value )
 		Sys_QueEvent( SE_KEY, key, value, 0, NULL, inputDeviceNum );
 	}
 }
-
-
-// touch screen input polling
-int Sys_PollTouchScreenInputEvents()
-{
-	return 0;
-}
-
-int	Sys_ReturnTouchScreenInputEvent( const int n, int& action, int& value, int& value2, int& value3, int& value4 )
-{
-	return 0;
-}
-
-void Sys_EndTouchScreenInputEvents()
-{
-}
-
-// RB end

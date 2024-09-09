@@ -114,11 +114,6 @@ public:
 	virtual bool		ProcessEvent( const sysEvent_t* event );
 
 	virtual void		StartMenu( bool playIntro = false );
-
-	// RB begin
-	virtual bool		IsMenuActive();
-	// RB end
-
 	virtual void		ExitMenu();
 	virtual void		GuiFrameEvents();
 	virtual void		SetGUI( idUserInterface* gui, HandleGuiCommand_t handle );
@@ -130,7 +125,6 @@ public:
 
 	virtual void		TimeHitch( int msec );
 
-#if defined(USE_CDKEY)
 	virtual void		ReadCDKey();
 	virtual void		WriteCDKey();
 	virtual const char* GetCDKey( bool xp );
@@ -138,10 +132,8 @@ public:
 	virtual bool		CDKeysAreValid( bool strict );
 	virtual void		ClearCDKey( bool valid[ 2 ] );
 	virtual void		SetCDKeyGuiVars();
-	virtual void		CDKeysAuthReply( bool valid, const char* auth_msg );
-#endif
-
 	virtual bool		WaitingForGameAuth();
+	virtual void		CDKeysAuthReply( bool valid, const char* auth_msg );
 
 	virtual int			GetSaveGameVersion();
 
@@ -192,11 +184,13 @@ public:
 	idStr				GetAutoSaveName( const char* mapName ) const;
 
 	bool				LoadGame( const char* saveName );
-	bool				SaveGame( const char* saveName, bool autosave = false );
+	// DG: added saveFileName so we can set a sensible filename for autosaves (see comment in MoveToNewMap())
+	bool				SaveGame( const char* saveName, bool autosave = false, const char* saveFileName = NULL );
 
-#if defined(USE_CDKEY)
+	bool				QuickSave();
+	bool				QuickLoad();
+
 	const char*			GetAuthMsg();
-#endif
 
 	//=====================================
 
@@ -212,6 +206,7 @@ public:
 	static idCVar		com_aviDemoTics;
 	static idCVar		com_wipeSeconds;
 	static idCVar		com_guid;
+	static idCVar		com_numQuicksaves;
 
 	static idCVar		gui_configServerRate;
 
@@ -293,14 +288,13 @@ public:
 	idUserInterface* 	guiActive;
 	HandleGuiCommand_t	guiHandle;
 
+	idUserInterface* 	guiInGame;
 	idUserInterface* 	guiMainMenu;
 	idListGUI* 			guiMainMenu_MapList;		// easy map list handling
 	idUserInterface* 	guiRestartMenu;
 	idUserInterface* 	guiLoading;
 	idUserInterface* 	guiIntro;
-#if !defined(STANDALONE)
 	idUserInterface* 	guiGameOver;
-#endif
 	idUserInterface* 	guiTest;
 	idUserInterface* 	guiTakeNotes;
 
@@ -364,9 +358,7 @@ public:
 	void				UnloadMap();
 
 	// return true if we actually waiting on an auth reply
-#if defined(USE_CDKEY)
 	bool				MaybeWaitOnCDKey();
-#endif
 
 	//------------------
 	// Session_menu.cpp
@@ -400,7 +392,6 @@ private:
 	bool				BoxDialogSanityCheck();
 	void				EmitGameAuth();
 
-#if defined(USE_CDKEY)
 	typedef enum
 	{
 		CDKEY_UNKNOWN,	// need to perform checks on the key
@@ -419,8 +410,10 @@ private:
 	cdKeyState_t		xpkey_state;
 	int					authEmitTimeout;
 	bool				authWaitBox;
+
 	idStr				authMsg;
-#endif
+
+	bool				demoversion; // DG: true if running the Demo version of Doom3, for FT_IsDemo (see Common.h)
 };
 
 extern idSessionLocal	sessLocal;

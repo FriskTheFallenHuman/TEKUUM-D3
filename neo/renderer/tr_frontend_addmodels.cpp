@@ -1298,7 +1298,7 @@ void R_AddModels()
 	{
 		for( viewEntity_t* vEntity = tr.viewDef->viewEntitys; vEntity != NULL; vEntity = vEntity->next )
 		{
-			tr.frontEndJobList->AddParallelJob( ( jobRun_t )R_AddSingleModel, vEntity );
+			tr.frontEndJobList->AddJob( ( jobRun_t )R_AddSingleModel, vEntity );
 		}
 		tr.frontEndJobList->Submit();
 		tr.frontEndJobList->Wait();
@@ -1324,11 +1324,11 @@ void R_AddModels()
 			{
 				for( staticShadowVolumeParms_t* shadowParms = vEntity->staticShadowVolumes; shadowParms != NULL; shadowParms = shadowParms->next )
 				{
-					tr.frontEndJobList->AddParallelJob( ( jobRun_t )StaticShadowVolumeJob, shadowParms );
+					tr.frontEndJobList->AddJob( ( jobRun_t )StaticShadowVolumeJob, shadowParms );
 				}
 				for( dynamicShadowVolumeParms_t* shadowParms = vEntity->dynamicShadowVolumes; shadowParms != NULL; shadowParms = shadowParms->next )
 				{
-					tr.frontEndJobList->AddParallelJob( ( jobRun_t )DynamicShadowVolumeJob, shadowParms );
+					tr.frontEndJobList->AddJob( ( jobRun_t )DynamicShadowVolumeJob, shadowParms );
 				}
 				vEntity->staticShadowVolumes = NULL;
 				vEntity->dynamicShadowVolumes = NULL;

@@ -29,9 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __LIST_H__
 #define __LIST_H__
 
-#if defined(__ANDROID__)
-	//#include <new>
-#endif
+#include <new>
 
 /*
 ===============================================================================
@@ -42,7 +40,68 @@ If you have questions concerning this license or the applicable additional terms
 ===============================================================================
 */
 
+/*
+========================
+idListArrayNew
+========================
+*/
+template< typename _type_ >
+ID_INLINE void* idListArrayNew( int num, bool zeroBuffer )
+{
+	_type_ * ptr = NULL;
+	if( zeroBuffer )
+	{
+		ptr = ( _type_* )Mem_ClearedAlloc( sizeof( _type_ ) * num );
+	}
+	else
+	{
+		ptr = ( _type_* )Mem_Alloc( sizeof( _type_ ) * num );
+	}
+	for( int i = 0; i < num; i++ )
+	{
+		new( &ptr[i] ) _type_;
+	}
+	return ptr;
+}
 
+/*
+========================
+idListArrayDelete
+========================
+*/
+template< typename _type_ >
+ID_INLINE void idListArrayDelete( void* ptr, int num )
+{
+	// Call the destructors on all the elements
+	for( int i = 0; i < num; i++ )
+	{
+		( ( _type_* )ptr )[i].~_type_();
+	}
+	Mem_Free( ptr );
+}
+
+/*
+========================
+idListArrayResize
+========================
+*/
+template< typename _type_ >
+ID_INLINE void* idListArrayResize( void* voldptr, int oldNum, int newNum, bool zeroBuffer )
+{
+	_type_ * oldptr = ( _type_* )voldptr;
+	_type_ * newptr = NULL;
+	if( newNum > 0 )
+	{
+		newptr = ( _type_* )idListArrayNew<_type_>( newNum, zeroBuffer );
+		int overlap = Min( oldNum, newNum );
+		for( int i = 0; i < overlap; i++ )
+		{
+			newptr[i] = oldptr[i];
+		}
+	}
+	idListArrayDelete<_type_>( voldptr, oldNum );
+	return newptr;
+}
 
 /*
 ================
@@ -110,8 +169,6 @@ public:
 	void			Swap( idList& other );								// swap the contents of the lists
 	void			DeleteContents( bool clear = true );				// delete the contents of the list
 
-
-
 private:
 	int				num;
 	int				size;
@@ -136,7 +193,7 @@ ID_INLINE idList<_type_>::idList( int newgranularity )
 
 /*
 ================
-idList<_type_,_tag_>::idList( const idList< _type_ > &other )
+idList<_type_>::idList( const idList< _type_ > &other )
 ================
 */
 template< typename _type_ >
@@ -148,7 +205,7 @@ ID_INLINE idList<_type_>::idList( const idList& other )
 
 /*
 ================
-idList<_type_,_tag_>::~idList< _type_ >
+idList<_type_>::~idList< _type_ >
 ================
 */
 template< typename _type_ >
@@ -159,7 +216,7 @@ ID_INLINE idList<_type_>::~idList()
 
 /*
 ================
-idList<_type_,_tag_>::Clear
+idList<_type_>::Clear
 
 Frees up the memory allocated by the list.  Assumes that _type_ automatically handles freeing up memory.
 ================
@@ -169,7 +226,7 @@ ID_INLINE void idList<_type_>::Clear()
 {
 	if( list )
 	{
-		delete[] list;
+		idListArrayDelete< _type_ >( list, size );
 	}
 
 	list	= NULL;
@@ -179,7 +236,7 @@ ID_INLINE void idList<_type_>::Clear()
 
 /*
 ================
-idList<_type_,_tag_>::DeleteContents
+idList<_type_>::DeleteContents
 
 Calls the destructor of all elements in the list.  Conditionally frees up memory used by the list.
 Note that this only works on lists containing pointers to objects and will cause a compiler error
@@ -212,7 +269,7 @@ ID_INLINE void idList<_type_>::DeleteContents( bool clear )
 
 /*
 ================
-idList<_type_,_tag_>::Allocated
+idList<_type_>::Allocated
 
 return total memory allocated for the list in bytes, but doesn't take into account additional memory allocated by _type_
 ================
@@ -225,7 +282,7 @@ ID_INLINE size_t idList<_type_>::Allocated() const
 
 /*
 ================
-idList<_type_,_tag_>::Size
+idList<_type_>::Size
 
 return total size of list in bytes, but doesn't take into account additional memory allocated by _type_
 ================
@@ -238,7 +295,7 @@ ID_INLINE size_t idList<_type_>::Size() const
 
 /*
 ================
-idList<_type_,_tag_>::MemoryUsed
+idList<_type_>::MemoryUsed
 ================
 */
 template< typename _type_ >
@@ -249,7 +306,7 @@ ID_INLINE size_t idList<_type_>::MemoryUsed() const
 
 /*
 ================
-idList<_type_,_tag_>::Num
+idList<_type_>::Num
 
 Returns the number of elements currently contained in the list.
 Note that this is NOT an indication of the memory allocated.
@@ -263,7 +320,7 @@ ID_INLINE int idList<_type_>::Num() const
 
 /*
 ================
-idList<_type_,_tag_>::NumAllocated
+idList<_type_>::NumAllocated
 
 Returns the number of elements currently allocated for.
 ================
@@ -276,7 +333,7 @@ ID_INLINE int idList<_type_>::NumAllocated() const
 
 /*
 ================
-idList<_type_,_tag_>::SetNum
+idList<_type_>::SetNum
 ================
 */
 template< typename _type_ >
@@ -292,7 +349,7 @@ ID_INLINE void idList<_type_>::SetNum( int newnum )
 
 /*
 ================
-idList<_type_,_tag_>::SetGranularity
+idList<_type_>::SetGranularity
 
 Sets the base size of the array and resizes the array to match.
 ================
@@ -319,7 +376,7 @@ ID_INLINE void idList<_type_>::SetGranularity( int newgranularity )
 
 /*
 ================
-idList<_type_,_tag_>::GetGranularity
+idList<_type_>::GetGranularity
 
 Get the current granularity.
 ================
@@ -332,7 +389,7 @@ ID_INLINE int idList<_type_>::GetGranularity() const
 
 /*
 ================
-idList<_type_,_tag_>::Condense
+idList<_type_>::Condense
 
 Resizes the array to exactly the number of elements it contains or frees up memory if empty.
 ================
@@ -355,7 +412,7 @@ ID_INLINE void idList<_type_>::Condense()
 
 /*
 ================
-idList<_type_,_tag_>::Resize
+idList<_type_>::Resize
 
 Allocates memory for the amount of elements requested while keeping the contents intact.
 Contents are copied using their = operator so that data is correnctly instantiated.
@@ -364,9 +421,6 @@ Contents are copied using their = operator so that data is correnctly instantiat
 template< typename _type_ >
 ID_INLINE void idList<_type_>::Resize( int newsize )
 {
-	_type_*	temp;
-	int		i;
-
 	assert( newsize >= 0 );
 
 	// free up the list if no data is being reserved
@@ -382,24 +436,11 @@ ID_INLINE void idList<_type_>::Resize( int newsize )
 		return;
 	}
 
-	temp	= list;
-	size	= newsize;
+	list = ( _type_* )idListArrayResize< _type_ >( list, size, newsize, false );
+	size = newsize;
 	if( size < num )
 	{
 		num = size;
-	}
-
-	// copy the old list into our new one
-	list = new _type_[ size ];
-	for( i = 0; i < num; i++ )
-	{
-		list[ i ] = temp[ i ];
-	}
-
-	// delete the old list if it exists
-	if( temp )
-	{
-		delete[] temp;
 	}
 }
 
@@ -414,9 +455,6 @@ Contents are copied using their = operator so that data is correnctly instantiat
 template< typename _type_ >
 ID_INLINE void idList<_type_>::Resize( int newsize, int newgranularity )
 {
-	_type_*	temp;
-	int		i;
-
 	assert( newsize >= 0 );
 
 	assert( newgranularity > 0 );
@@ -429,30 +467,17 @@ ID_INLINE void idList<_type_>::Resize( int newsize, int newgranularity )
 		return;
 	}
 
-	temp	= list;
-	size	= newsize;
+	list = ( _type_* )idListArrayResize< _type_ >( list, size, newsize, false );
+	size = newsize;
 	if( size < num )
 	{
 		num = size;
-	}
-
-	// copy the old list into our new one
-	list = new _type_[ size ];
-	for( i = 0; i < num; i++ )
-	{
-		list[ i ] = temp[ i ];
-	}
-
-	// delete the old list if it exists
-	if( temp )
-	{
-		delete[] temp;
 	}
 }
 
 /*
 ================
-idList<_type_,_tag_>::AssureSize
+idList<_type_>::AssureSize
 
 Makes sure the list has at least the given number of elements.
 ================
@@ -480,7 +505,7 @@ ID_INLINE void idList<_type_>::AssureSize( int newSize )
 
 /*
 ================
-idList<_type_,_tag_>::AssureSize
+idList<_type_>::AssureSize
 
 Makes sure the list has at least the given number of elements and initialize any elements not yet initialized.
 ================
@@ -514,7 +539,7 @@ ID_INLINE void idList<_type_>::AssureSize( int newSize, const _type_ &initValue 
 
 /*
 ================
-idList<_type_,_tag_>::AssureSizeAlloc
+idList<_type_>::AssureSizeAlloc
 
 Makes sure the list has at least the given number of elements and allocates any elements using the allocator.
 
@@ -551,7 +576,7 @@ ID_INLINE void idList<_type_>::AssureSizeAlloc( int newSize, new_t* allocator )
 
 /*
 ================
-idList<_type_,_tag_>::operator=
+idList<_type_>::operator=
 
 Copies the contents and size attributes of another list.
 ================
@@ -569,7 +594,7 @@ ID_INLINE idList<_type_>& idList<_type_>::operator=( const idList<_type_>& other
 
 	if( size )
 	{
-		list = new _type_[ size ];
+		list = ( _type_* )idListArrayNew< _type_ >( size, false );
 		for( i = 0; i < num; i++ )
 		{
 			list[ i ] = other.list[ i ];
@@ -581,7 +606,7 @@ ID_INLINE idList<_type_>& idList<_type_>::operator=( const idList<_type_>& other
 
 /*
 ================
-idList<_type_,_tag_>::operator[] const
+idList<_type_>::operator[] const
 
 Access operator.  Index must be within range or an assert will be issued in debug builds.
 Release builds do no range checking.
@@ -598,7 +623,7 @@ ID_INLINE const _type_& idList<_type_>::operator[]( int index ) const
 
 /*
 ================
-idList<_type_,_tag_>::operator[]
+idList<_type_>::operator[]
 
 Access operator.  Index must be within range or an assert will be issued in debug builds.
 Release builds do no range checking.
@@ -615,7 +640,7 @@ ID_INLINE _type_& idList<_type_>::operator[]( int index )
 
 /*
 ================
-idList<_type_,_tag_>::Ptr
+idList<_type_>::Ptr
 
 Returns a pointer to the begining of the array.  Useful for iterating through the list in loops.
 
@@ -632,7 +657,7 @@ ID_INLINE _type_* idList<_type_>::Ptr()
 
 /*
 ================
-idList<_type_,_tag_>::Ptr
+idList<_type_>::Ptr
 
 Returns a pointer to the begining of the array.  Useful for iterating through the list in loops.
 
@@ -649,7 +674,7 @@ const ID_INLINE _type_* idList<_type_>::Ptr() const
 
 /*
 ================
-idList<_type_,_tag_>::Alloc
+idList<_type_>::Alloc
 
 Returns a reference to a new data element at the end of the list.
 ================
@@ -672,7 +697,7 @@ ID_INLINE _type_& idList<_type_>::Alloc()
 
 /*
 ================
-idList<_type_,_tag_>::Append
+idList<_type_>::Append
 
 Increases the size of the list by one element and copies the supplied data into it.
 
@@ -708,7 +733,7 @@ ID_INLINE int idList<_type_>::Append( _type_ const& obj )
 
 /*
 ================
-idList<_type_,_tag_>::Insert
+idList<_type_>::Insert
 
 Increases the size of the list by at leat one element if necessary
 and inserts the supplied data into it.
@@ -755,7 +780,7 @@ ID_INLINE int idList<_type_>::Insert( _type_ const& obj, int index )
 
 /*
 ================
-idList<_type_,_tag_>::Append
+idList<_type_>::Append
 
 adds the other list to this one
 
@@ -763,7 +788,7 @@ Returns the size of the new combined list
 ================
 */
 template< typename _type_ >
-ID_INLINE int idList<_type_>::Append( const idList< _type_>& other )
+ID_INLINE int idList<_type_>::Append( const idList< _type_ >& other )
 {
 	if( !list )
 	{
@@ -785,7 +810,7 @@ ID_INLINE int idList<_type_>::Append( const idList< _type_>& other )
 
 /*
 ================
-idList<_type_,_tag_>::AddUnique
+idList<_type_>::AddUnique
 
 Adds the data to the list if it doesn't already exist.  Returns the index of the data in the list.
 ================
@@ -806,7 +831,7 @@ ID_INLINE int idList<_type_>::AddUnique( _type_ const& obj )
 
 /*
 ================
-idList<_type_,_tag_>::FindIndex
+idList<_type_>::FindIndex
 
 Searches for the specified data in the list and returns it's index.  Returns -1 if the data is not found.
 ================
@@ -830,7 +855,7 @@ ID_INLINE int idList<_type_>::FindIndex( _type_ const& obj ) const
 
 /*
 ================
-idList<_type_,_tag_>::Find
+idList<_type_>::Find
 
 Searches for the specified data in the list and returns it's address. Returns NULL if the data is not found.
 ================
@@ -851,7 +876,7 @@ ID_INLINE _type_* idList<_type_>::Find( _type_ const& obj ) const
 
 /*
 ================
-idList<_type_,_tag_>::FindNull
+idList<_type_>::FindNull
 
 Searches for a NULL pointer in the list.  Returns -1 if NULL is not found.
 
@@ -878,7 +903,7 @@ ID_INLINE int idList<_type_>::FindNull() const
 
 /*
 ================
-idList<_type_,_tag_>::IndexOf
+idList<_type_>::IndexOf
 
 Takes a pointer to an element in the list and returns the index of the element.
 This is NOT a guarantee that the object is really in the list.
@@ -901,7 +926,7 @@ ID_INLINE int idList<_type_>::IndexOf( _type_ const* objptr ) const
 
 /*
 ================
-idList<_type_,_tag_>::RemoveIndex
+idList<_type_>::RemoveIndex
 
 Removes the element at the specified index and moves all data following the element down to fill in the gap.
 The number of elements in the list is reduced by one.  Returns false if the index is outside the bounds of the list.
@@ -933,7 +958,7 @@ ID_INLINE bool idList<_type_>::RemoveIndex( int index )
 
 /*
 ========================
-idList<_type_,_tag_>::RemoveIndexFast
+idList<_type_>::RemoveIndexFast
 
 Removes the element at the specified index and moves the last element into its spot, rather
 than moving the whole array down by one. Of course, this doesn't maintain the order of
@@ -965,7 +990,7 @@ ID_INLINE bool idList<_type_>::RemoveIndexFast( int index )
 
 /*
 ================
-idList<_type_,_tag_>::Remove
+idList<_type_>::Remove
 
 Removes the element if it is found within the list and moves all data following the element down to fill in the gap.
 The number of elements in the list is reduced by one.  Returns false if the data is not found in the list.  Note that
@@ -988,14 +1013,14 @@ ID_INLINE bool idList<_type_>::Remove( _type_ const& obj )
 //
 ///*
 //================
-//idList<_type_,_tag_>::Sort
+//idList<_type_>::Sort
 //
 //Performs a qsort on the list using the supplied comparison function.  Note that the data is merely moved around the
 //list, so any pointers to data within the list may no longer be valid.
 //================
 //*/
-//template< typename _type_, memTag_t _tag_ >
-//ID_INLINE void idList<_type_,_tag_>::Sort( cmp_t *compare ) {
+//template< typename _type_ >
+//ID_INLINE void idList<_type_>::Sort( cmp_t *compare ) {
 //	if ( !list ) {
 //		return;
 //	}
@@ -1007,7 +1032,7 @@ ID_INLINE bool idList<_type_>::Remove( _type_ const& obj )
 
 /*
 ========================
-idList<_type_,_tag_>::SortWithTemplate
+idList<_type_>::SortWithTemplate
 
 Performs a QuickSort on the list using the supplied sort algorithm.
 
@@ -1027,13 +1052,13 @@ ID_INLINE void idList<_type_>::SortWithTemplate( const idSort<_type_>& sort )
 //
 ///*
 //================
-//idList<_type_,_tag_>::SortSubSection
+//idList<_type_>::SortSubSection
 //
 //Sorts a subsection of the list.
 //================
 //*/
-//template< typename _type_, memTag_t _tag_ >
-//ID_INLINE void idList<_type_,_tag_>::SortSubSection( int startIndex, int endIndex, cmp_t *compare ) {
+//template< typename _type_ >
+//ID_INLINE void idList<_type_>::SortSubSection( int startIndex, int endIndex, cmp_t *compare ) {
 //	if ( !list ) {
 //		return;
 //	}

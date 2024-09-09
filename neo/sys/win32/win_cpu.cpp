@@ -27,8 +27,8 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
-#pragma hdrstop
 #include "precompiled.h"
+#pragma hdrstop
 
 #include "win_local.h"
 
@@ -102,7 +102,8 @@ Sys_ClockTicksPerSecond
 */
 double Sys_ClockTicksPerSecond() {
 	static double ticks = 0;
-#if 0
+// SRS - Make sure #ifdef is consistent with Sys_GetClockTicks() so same scale is used for ticks
+#if defined(_WIN64)
 
 	if ( !ticks ) {
 		LARGE_INTEGER li;
@@ -393,8 +394,8 @@ LogicalProcPerPhysicalProc
 // RB: no checks on Win64
 #if !defined(_WIN64)
 #define NUM_LOGICAL_BITS   0x00FF0000     // EBX[23:16] Bit 16-23 in ebx contains the number of logical
-                                          // processors per physical processor when execute cpuid with 
-                                          // eax set to 1
+										  // processors per physical processor when execute cpuid with 
+										  // eax set to 1
 static unsigned char LogicalProcPerPhysicalProc() {
 	unsigned int regebx = 0;
 	__asm {
@@ -414,8 +415,8 @@ GetAPIC_ID
 // RB: no checks on Win64
 #if !defined(_WIN64)
 #define INITIAL_APIC_ID_BITS  0xFF000000  // EBX[31:24] Bits 24-31 (8 bits) return the 8-bit unique 
-                                          // initial APIC ID for the processor this code is running on.
-                                          // Default value = 0xff if HT is not supported
+										  // initial APIC ID for the processor this code is running on.
+										  // Default value = 0xff if HT is not supported
 static unsigned char GetAPIC_ID() {
 	unsigned int regebx = 0;
 	__asm {
@@ -432,7 +433,7 @@ static unsigned char GetAPIC_ID() {
 CPUCount
 
 	logicalNum is the number of logical CPU per physical CPU
-    physicalNum is the total number of physical processor
+	physicalNum is the total number of physical processor
 	returns one of the HT_* flags
 ================
 */
@@ -476,7 +477,7 @@ int CPUCount( int &logicalNum, int &physicalNum ) {
 
 		while( i < logicalNum ) {
 			i *= 2;
- 			PHY_ID_MASK  <<= 1;
+			PHY_ID_MASK  <<= 1;
 			PHY_ID_SHIFT++;
 		}
 		
@@ -511,10 +512,10 @@ int CPUCount( int &logicalNum, int &physicalNum ) {
 			}
 			dwAffinityMask = dwAffinityMask << 1;
 		}
-	        
+			
 		// Reset the processor affinity
 		SetProcessAffinityMask( hCurrentProcessHandle, dwProcessAffinity );
-	    
+		
 		if ( logicalNum == 1 ) {  // Normal P4 : HT is disabled in hardware
 			statusFlag = HT_DISABLED;
 		} else {
@@ -621,9 +622,9 @@ DWORD CountSetBits( ULONG_PTR bitMask ) {
 typedef BOOL (WINAPI *LPFN_GLPI)( PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD );
 
 enum LOGICAL_PROCESSOR_RELATIONSHIP_LOCAL {
-    localRelationProcessorCore,
-    localRelationNumaNode,
-    localRelationCache,
+	localRelationProcessorCore,
+	localRelationNumaNode,
+	localRelationCache,
 	localRelationProcessorPackage
 };
 
@@ -847,312 +848,15 @@ cpuid_t Sys_GetCPUId()
 ===============================================================================
 */
 
-typedef struct bitFlag_s {
-	char *		name;
-	int			bit;
-} bitFlag_t;
-
-static byte fpuState[128], *statePtr = fpuState;
-static char fpuString[2048];
-static bitFlag_t controlWordFlags[] = {
-	{ "Invalid operation", 0 },
-	{ "Denormalized operand", 1 },
-	{ "Divide-by-zero", 2 },
-	{ "Numeric overflow", 3 },
-	{ "Numeric underflow", 4 },
-	{ "Inexact result (precision)", 5 },
-	{ "Infinity control", 12 },
-	{ "", 0 }
-};
-static char *precisionControlField[] = {
-	"Single Precision (24-bits)",
-	"Reserved",
-	"Double Precision (53-bits)",
-	"Double Extended Precision (64-bits)"
-};
-static char *roundingControlField[] = {
-	"Round to nearest",
-	"Round down",
-	"Round up",
-	"Round toward zero"
-};
-static bitFlag_t statusWordFlags[] = {
-	{ "Invalid operation", 0 },
-	{ "Denormalized operand", 1 },
-	{ "Divide-by-zero", 2 },
-	{ "Numeric overflow", 3 },
-	{ "Numeric underflow", 4 },
-	{ "Inexact result (precision)", 5 },
-	{ "Stack fault", 6 },
-	{ "Error summary status", 7 },
-	{ "FPU busy", 15 },
-	{ "", 0 }
-};
-
-/*
-===============
-Sys_FPU_PrintStateFlags
-===============
-*/
-int Sys_FPU_PrintStateFlags( char *ptr, int ctrl, int stat, int tags, int inof, int inse, int opof, int opse ) {
-	int i, length = 0;
-
-	length += sprintf( ptr+length,	"CTRL = %08x\n"
-									"STAT = %08x\n"
-									"TAGS = %08x\n"
-									"INOF = %08x\n"
-									"INSE = %08x\n"
-									"OPOF = %08x\n"
-									"OPSE = %08x\n"
-									"\n",
-									ctrl, stat, tags, inof, inse, opof, opse );
-
-	length += sprintf( ptr+length, "Control Word:\n" );
-	for ( i = 0; controlWordFlags[i].name[0]; i++ ) {
-		length += sprintf( ptr+length, "  %-30s = %s\n", controlWordFlags[i].name, ( ctrl & ( 1 << controlWordFlags[i].bit ) ) ? "true" : "false" );
-	}
-	length += sprintf( ptr+length, "  %-30s = %s\n", "Precision control", precisionControlField[(ctrl>>8)&3] );
-	length += sprintf( ptr+length, "  %-30s = %s\n", "Rounding control", roundingControlField[(ctrl>>10)&3] );
-
-	length += sprintf( ptr+length, "Status Word:\n" );
-	for ( i = 0; statusWordFlags[i].name[0]; i++ ) {
-		ptr += sprintf( ptr+length, "  %-30s = %s\n", statusWordFlags[i].name, ( stat & ( 1 << statusWordFlags[i].bit ) ) ? "true" : "false" );
-	}
-	length += sprintf( ptr+length, "  %-30s = %d%d%d%d\n", "Condition code", (stat>>8)&1, (stat>>9)&1, (stat>>10)&1, (stat>>14)&1 );
-	length += sprintf( ptr+length, "  %-30s = %d\n", "Top of stack pointer", (stat>>11)&7 );
-
-	return length;
-}
-
-/*
-===============
-Sys_FPU_StackIsEmpty
-===============
-*/
-bool Sys_FPU_StackIsEmpty()
-{
-#if !defined(_WIN64)
-	__asm {
-		mov			eax, statePtr
-		fnstenv		[eax]
-		mov			eax, [eax+8]
-		xor			eax, 0xFFFFFFFF
-		and			eax, 0x0000FFFF
-		jz			empty
-	}
-	return false;
-empty:
-#endif
-	return true;
-}
-
-/*
-===============
-Sys_FPU_ClearStack
-===============
-*/
-void Sys_FPU_ClearStack()
-{
-#if !defined(_WIN64)
-	__asm {
-		mov			eax, statePtr
-		fnstenv		[eax]
-		mov			eax, [eax+8]
-		xor			eax, 0xFFFFFFFF
-		mov			edx, (3<<14)
-	emptyStack:
-		mov			ecx, eax
-		and			ecx, edx
-		jz			done
-		fstp		st
-		shr			edx, 2
-		jmp			emptyStack
-	done:
-	}
-#endif
-}
-
-/*
-===============
-Sys_FPU_GetState
-
-  gets the FPU state without changing the state
-===============
-*/
-const char *Sys_FPU_GetState()
-{
-#if defined(_WIN64)
-	return "TODO Sys_FPU_GetState()";
-#else
-	double fpuStack[8] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
-	double *fpuStackPtr = fpuStack;
-	int i, numValues;
-	char *ptr;
-
-	__asm {
-		mov			esi, statePtr
-		mov			edi, fpuStackPtr
-		fnstenv		[esi]
-		mov			esi, [esi+8]
-		xor			esi, 0xFFFFFFFF
-		mov			edx, (3<<14)
-		xor			eax, eax
-		mov			ecx, esi
-		and			ecx, edx
-		jz			done
-		fst			qword ptr [edi+0]
-		inc			eax
-		shr			edx, 2
-		mov			ecx, esi
-		and			ecx, edx
-		jz			done
-		fxch		st(1)
-		fst			qword ptr [edi+8]
-		inc			eax
-		fxch		st(1)
-		shr			edx, 2
-		mov			ecx, esi
-		and			ecx, edx
-		jz			done
-		fxch		st(2)
-		fst			qword ptr [edi+16]
-		inc			eax
-		fxch		st(2)
-		shr			edx, 2
-		mov			ecx, esi
-		and			ecx, edx
-		jz			done
-		fxch		st(3)
-		fst			qword ptr [edi+24]
-		inc			eax
-		fxch		st(3)
-		shr			edx, 2
-		mov			ecx, esi
-		and			ecx, edx
-		jz			done
-		fxch		st(4)
-		fst			qword ptr [edi+32]
-		inc			eax
-		fxch		st(4)
-		shr			edx, 2
-		mov			ecx, esi
-		and			ecx, edx
-		jz			done
-		fxch		st(5)
-		fst			qword ptr [edi+40]
-		inc			eax
-		fxch		st(5)
-		shr			edx, 2
-		mov			ecx, esi
-		and			ecx, edx
-		jz			done
-		fxch		st(6)
-		fst			qword ptr [edi+48]
-		inc			eax
-		fxch		st(6)
-		shr			edx, 2
-		mov			ecx, esi
-		and			ecx, edx
-		jz			done
-		fxch		st(7)
-		fst			qword ptr [edi+56]
-		inc			eax
-		fxch		st(7)
-	done:
-		mov			numValues, eax
-	}
-
-	int ctrl = *(int *)&fpuState[0];
-	int stat = *(int *)&fpuState[4];
-	int tags = *(int *)&fpuState[8];
-	int inof = *(int *)&fpuState[12];
-	int inse = *(int *)&fpuState[16];
-	int opof = *(int *)&fpuState[20];
-	int opse = *(int *)&fpuState[24];
-
-	ptr = fpuString;
-	ptr += sprintf( ptr,"FPU State:\n"
-						"num values on stack = %d\n", numValues );
-	for ( i = 0; i < 8; i++ ) {
-		ptr += sprintf( ptr, "ST%d = %1.10e\n", i, fpuStack[i] );
-	}
-
-	Sys_FPU_PrintStateFlags( ptr, ctrl, stat, tags, inof, inse, opof, opse );
-
-	return fpuString;
-#endif
-}
-
-/*
-===============
-Sys_FPU_EnableExceptions
-===============
-*/
-void Sys_FPU_EnableExceptions( int exceptions )
-{
-#if !defined(_WIN64)
-	__asm {
-		mov			eax, statePtr
-		mov			ecx, exceptions
-		and			cx, 63
-		not			cx
-		fnstcw		word ptr [eax]
-		mov			bx, word ptr [eax]
-		or			bx, 63
-		and			bx, cx
-		mov			word ptr [eax], bx
-		fldcw		word ptr [eax]
-	}
-#endif
-}
-
 /*
 ===============
 Sys_FPU_SetPrecision
 ===============
 */
-void Sys_FPU_SetPrecision( int precision )
+void Sys_FPU_SetPrecision()
 {
-#if !defined(_WIN64)
-	short precisionBitTable[4] = { 0, 1, 3, 0 };
-	short precisionBits = precisionBitTable[precision & 3] << 8;
-	short precisionMask = ~( ( 1 << 9 ) | ( 1 << 8 ) );
-
-	__asm {
-		mov			eax, statePtr
-		mov			cx, precisionBits
-		fnstcw		word ptr [eax]
-		mov			bx, word ptr [eax]
-		and			bx, precisionMask
-		or			bx, cx
-		mov			word ptr [eax], bx
-		fldcw		word ptr [eax]
-	}
-#endif
-}
-
-/*
-================
-Sys_FPU_SetRounding
-================
-*/
-void Sys_FPU_SetRounding( int rounding )
-{
-#if !defined(_WIN64)
-	short roundingBitTable[4] = { 0, 1, 2, 3 };
-	short roundingBits = roundingBitTable[rounding & 3] << 10;
-	short roundingMask = ~( ( 1 << 11 ) | ( 1 << 10 ) );
-
-	__asm {
-		mov			eax, statePtr
-		mov			cx, roundingBits
-		fnstcw		word ptr [eax]
-		mov			bx, word ptr [eax]
-		and			bx, roundingMask
-		or			bx, cx
-		mov			word ptr [eax], bx
-		fldcw		word ptr [eax]
-	}
+#if defined( _MSC_VER ) && defined( _M_IX86 )
+	_controlfp( _PC_64, _MCW_PC );
 #endif
 }
 

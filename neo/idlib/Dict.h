@@ -30,6 +30,8 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __DICT_H__
 #define __DICT_H__
 
+class idSerializer;
+
 /*
 ===============================================================================
 
@@ -185,6 +187,9 @@ public:
 	// RB begin
 	void				WriteJSON( idFile* f, const char* prefix = "" ) const;
 	// RB end
+
+	void				WriteToIniFile( idFile* f ) const;
+	bool				ReadFromIniFile( idFile* f );
 
 	// returns a unique checksum for this dictionary's content
 	int					Checksum() const;

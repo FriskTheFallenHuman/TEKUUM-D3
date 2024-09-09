@@ -141,7 +141,7 @@ idParallelJobList_Threads
 
 static idCVar jobs_longJobMicroSec( "jobs_longJobMicroSec", "10000", CVAR_INTEGER, "print a warning for jobs that take more than this number of microseconds" );
 
-// RB: already defined in sys_public.h
+
 //const static int		MAX_THREADS	= 32;
 
 struct threadJobListState_t
@@ -272,9 +272,8 @@ private:
 		void* 		data;
 		int			executed;
 	};
-
-	idList< job_t >			jobList;
-	idList< idSysInterlockedInteger >	signalJobCount;
+	idList< job_t  >		jobList;
+	idList< idSysInterlockedInteger  >	signalJobCount;
 	idSysInterlockedInteger				currentJob;
 	idSysInterlockedInteger				fetchLock;
 	idSysInterlockedInteger				numThreadsExecuting;
@@ -852,10 +851,10 @@ idParallelJobList::~idParallelJobList()
 
 /*
 ========================
-idParallelJobList::AddParallelJob
+idParallelJobList::AddJob
 ========================
 */
-void idParallelJobList::AddParallelJob( jobRun_t function, void* data )
+void idParallelJobList::AddJob( jobRun_t function, void* data )
 {
 	assert( IsRegisteredJob( function ) );
 	jobListThreads->AddJob( function, data );
@@ -1098,10 +1097,15 @@ idJobThread::Start
 void idJobThread::Start( core_t core, unsigned int threadNum )
 {
 	this->threadNum = threadNum;
-
+	// DG: change threadname from "JobListProcessor_%d" to "JLProc_%d", because Linux
+	// has a 15 (+ \0) char limit for threadnames.
+	// furthermore: va is not thread safe, use snPrintf instead
 	// RB: parallel jobs should not wait for the main or async threads
-	//StartWorkerThread( va( "JobListProcessor_%d", threadNum ), core, THREAD_NORMAL, JOB_THREAD_STACK_SIZE );
-	StartWorkerThread( va( "JobListProcessor_%d", threadNum ), core, THREAD_ABOVE_NORMAL, JOB_THREAD_STACK_SIZE );
+	char name[16];
+	idStr::snPrintf( name, 16, "JLProc_%d", threadNum );
+	//StartWorkerThread( name, core, THREAD_NORMAL, JOB_THREAD_STACK_SIZE );
+	StartWorkerThread( name, core, THREAD_ABOVE_NORMAL, JOB_THREAD_STACK_SIZE );
+	// DG end
 	// RB end
 }
 
@@ -1254,7 +1258,7 @@ extern void Sys_CPUCount( int& logicalNum, int& coreNum, int& packageNum );
 // Hyperthreading is not dead yet.  Intel's Core i7 Processor is quad-core with HT for 8 logicals.
 
 // DOOM3: We don't have that many jobs, so just set this fairly low so we don't spin up a ton of idle threads
-#define MAX_JOB_THREADS		2
+#define MAX_JOB_THREADS		32
 #define NUM_JOB_THREADS		"2"
 #define JOB_THREAD_CORES	{	CORE_ANY, CORE_ANY, CORE_ANY, CORE_ANY,	\
 								CORE_ANY, CORE_ANY, CORE_ANY, CORE_ANY,	\
@@ -1328,7 +1332,7 @@ void idParallelJobManagerLocal::Init()
 	}
 	maxThreads = jobs_numThreads.GetInteger();
 
-	Sys_CPUCount( numPhysicalCpuCores, numLogicalCpuCores, numCpuPackages );
+	Sys_CPUCount( numLogicalCpuCores, numPhysicalCpuCores, numCpuPackages );
 }
 
 /*

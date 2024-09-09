@@ -69,10 +69,6 @@ void Sys_DestroyThread( xthreadInfo& info )
 {
 }
 
-void	Sys_FlushCacheMemory( void* base, int bytes )
-{
-}
-
 void Sys_Error( const char* error, ... )
 {
 	va_list		argptr;
@@ -155,11 +151,6 @@ sysEvent_t	Sys_GetEvent()
 
 void	Sys_Mkdir( const char* path )
 {
-}
-
-const char* Sys_DefaultCDPath()
-{
-	return "";
 }
 
 const char* Sys_DefaultBasePath()
@@ -249,10 +240,6 @@ const char* Sys_NetAdrToString( const netadr_t a )
 						 a.ip[0], a.ip[1], a.ip[2], a.ip[3], BigShort( a.port ) );
 	}
 	return s;
-}
-
-void Sys_DoPreferences()
-{
 }
 
 int main( int argc, char** argv )

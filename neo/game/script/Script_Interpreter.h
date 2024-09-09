@@ -96,8 +96,8 @@ public:
 	int					CurrentLine() const;
 	const char*			CurrentFile() const;
 
-	void				Error( const char* fmt, ... ) const id_attribute( ( format( printf, 2, 3 ) ) );
-	void				Warning( const char* fmt, ... ) const id_attribute( ( format( printf, 2, 3 ) ) );
+	void				Error( VERIFY_FORMAT_STRING const char* fmt, ... ) const;
+	void				Warning( VERIFY_FORMAT_STRING const char* fmt, ... ) const;
 	void				DisplayInfo() const;
 
 	bool				BeginMultiFrameEvent( idEntity* ent, const idEventDef* event );

@@ -37,7 +37,6 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-
 #include "CollisionModel_local.h"
 
 /*
@@ -93,7 +92,7 @@ bool idCollisionModelManagerLocal::TestTrmVertsInBrush( cm_traceWork_t* tw, cm_b
 
 		// see if the point is inside the brush
 		bestPlane = 0;
-		bestd = -idMath::INFINITY;
+		bestd = -idMath::INFINITUM;
 		for( i = 0; i < b->numPlanes; i++ )
 		{
 			d = b->planes[i].Distance( *p );
@@ -129,13 +128,13 @@ bool idCollisionModelManagerLocal::TestTrmVertsInBrush( cm_traceWork_t* tw, cm_b
 CM_SetTrmEdgeSidedness
 ================
 */
-#define CM_SetTrmEdgeSidedness( edge, bpl, epl, bitNum ) {							\
-	if ( !(edge->sideSet & (1<<bitNum)) ) {											\
-		float fl;																	\
-		fl = (bpl).PermutedInnerProduct( epl );										\
-		edge->side = (edge->side & ~(1<<bitNum)) | (IEEE_FLT_SIGNBITSET(fl) << bitNum);	\
-		edge->sideSet |= (1 << bitNum);												\
-	}																				\
+#define CM_SetTrmEdgeSidedness( edge, bpl, epl, bitNum ) {						\
+	const int mask = 1 << bitNum;												\
+	if ( ( edge->sideSet & mask ) == 0 ) {										\
+		const float fl = (bpl).PermutedInnerProduct( epl );						\
+		edge->side = ( edge->side & ~mask ) | ( ( fl < 0.0f ) ? mask : 0 );		\
+		edge->sideSet |= mask;													\
+	}																			\
 }
 
 /*
@@ -143,19 +142,13 @@ CM_SetTrmEdgeSidedness
 CM_SetTrmPolygonSidedness
 ================
 */
-#define CM_SetTrmPolygonSidedness( v, plane, bitNum ) {								\
-	if ( !((v)->sideSet & (1<<bitNum)) ) {											\
-		float fl;																	\
-		fl = plane.Distance( (v)->p );												\
-		/* cannot use float sign bit because it is undetermined when fl == 0.0f */	\
-		if ( fl < 0.0f ) {															\
-			(v)->side |= (1 << bitNum);												\
-		}																			\
-		else {																		\
-			(v)->side &= ~(1 << bitNum);											\
-		}																			\
-		(v)->sideSet |= (1 << bitNum);												\
-	}																				\
+#define CM_SetTrmPolygonSidedness( v, plane, bitNum ) {						\
+	const int mask = 1 << bitNum;											\
+	if ( ( (v)->sideSet & mask ) == 0 ) {									\
+		const float fl = plane.Distance( (v)->p );							\
+		(v)->side = ( (v)->side & ~mask ) | ( ( fl < 0.0f ) ? mask : 0 );		\
+		(v)->sideSet |= mask;												\
+	}																		\
 }
 
 /*
@@ -232,7 +225,7 @@ bool idCollisionModelManagerLocal::TestTrmInPolygon( cm_traceWork_t* tw, cm_poly
 				}
 
 				bestPlane = 0;
-				bestd = -idMath::INFINITY;
+				bestd = -idMath::INFINITUM;
 				for( k = 0; k < tw->numPolys; k++ )
 				{
 					d = tw->polys[k].plane.Distance( v->p );

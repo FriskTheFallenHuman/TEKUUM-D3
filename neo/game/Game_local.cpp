@@ -1798,7 +1798,7 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 				// precache the render model
 				renderModelManager->FindModel( kv->GetValue() );
 				// precache .cm files only
-				collisionModelManager->LoadModel( kv->GetValue(), true );
+				collisionModelManager->LoadModel( kv->GetValue() );
 			}
 		}
 		kv = dict->MatchPrefix( "model", kv );

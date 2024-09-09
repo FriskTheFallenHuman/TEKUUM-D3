@@ -2027,8 +2027,6 @@ GfxInfo_f
 */
 void GfxInfo_f( const idCmdArgs& args )
 {
-	common->Printf( "CPU: %s\n", Sys_GetProcessorString() );
-
 	const char* fsstrings[] =
 	{
 		"windowed",

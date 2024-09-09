@@ -1,12 +1,18 @@
 cmake_minimum_required(VERSION 2.20)
+
+# Check if vcpkg exist in our source folder
+if ( EXISTS "${CMAKE_SOURCE_DIR}/../vcpkg/scripts/buildsystems/vcpkg.cmake" )
+	set( CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/../vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "Vcpkg toolchain file" )
+else()
+	message( FATAL_ERROR "Vcpkg wasn't not found, aborting, make sure to git clone this with all submodules!")
+endif()
+
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 project(RBDOOM3 C CXX)
 
 option(USE_CMDLINE_TOOLS "Compile the built-in command line based tools" OFF)
 option(USE_MFC_TOOLS "Compile the built-in MFC based tools" OFF)
-option(USE_QT_TOOLS "Compile the built-in Qt based tools" OFF)
-option(USE_QT_WINDOWING "Run game as Qt app" OFF)
 option(STANDALONE "Skip Doom 3 base/ folder" OFF)
 option(FORCE_COLOR_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 option(COMPILE_COMMANDS "Generate compile_commands.json" OFF)
@@ -18,10 +24,6 @@ option(DEBUG_MEMORY "Enables memory logging to file" OFF)
 option(ONATIVE "Optimize for the host CPU" OFF)
 option(RETAIL "Strip certain developer features and cheats from shipping builds" OFF)
 
-#if(USE_QT_TOOLS)
-#	set(USE_QT_WINDOWING TRUE)
-#endif()
-
 # if(ANGLE OR GLES2)
 	# set(USE_CMDLINE_TOOLS FALSE)
 # endif()
@@ -30,19 +32,19 @@ option(RETAIL "Strip certain developer features and cheats from shipping builds"
 include( CPUDefine )
 
 if( UNIX )
-    # SRS - Disable precompiled headers when cross-compiling on OSX, e.g. when creating universal binaries
-    #     - Also disable precompiled headers when using the Ninja Multi-Config generator on linux or macOS
-    if ( ( CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64" AND CMAKE_OSX_ARCHITECTURES MATCHES "arm64" ) OR
-       ( CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64"  AND CMAKE_OSX_ARCHITECTURES MATCHES "x86_64" ) OR
-       ( CMAKE_GENERATOR MATCHES "Ninja Multi-Config" ) )
-        set( USE_PRECOMPILED_HEADERS OFF )
-    endif()
+	# SRS - Disable precompiled headers when cross-compiling on OSX, e.g. when creating universal binaries
+	#     - Also disable precompiled headers when using the Ninja Multi-Config generator on linux or macOS
+	if ( ( CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64" AND CMAKE_OSX_ARCHITECTURES MATCHES "arm64" ) OR
+	   ( CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64"  AND CMAKE_OSX_ARCHITECTURES MATCHES "x86_64" ) OR
+	   ( CMAKE_GENERATOR MATCHES "Ninja Multi-Config" ) )
+		set( USE_PRECOMPILED_HEADERS OFF )
+	endif()
 
 	# SRS - For single-config dev builds, define NO_MULTI_CONFIG to search for basepath up 1 dir level vs 2
-    if( ( CMAKE_GENERATOR MATCHES "Makefiles" ) OR
-       ( CMAKE_GENERATOR MATCHES "Ninja" AND NOT CMAKE_GENERATOR MATCHES "Multi-Config" ) )
+	if( ( CMAKE_GENERATOR MATCHES "Makefiles" ) OR
+	   ( CMAKE_GENERATOR MATCHES "Ninja" AND NOT CMAKE_GENERATOR MATCHES "Multi-Config" ) )
 		add_definitions( -DNO_MULTI_CONFIG )
-    endif()
+	endif()
 endif()
 
 if( COMPILE_COMMANDS )
@@ -111,19 +113,6 @@ if( CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang" )
 	endif()
 
 	add_compile_options( -fno-strict-aliasing )
-
-	# SRS - Make sure OSX can find system headers and add support for minimum OSX runtime version
-	if( APPLE )
-		# SRS - Also add -fasm-blocks otherwise Xcode complains and -Qunused-arguments to silence MMX/SSE unused arg warnings when compiling for Apple arm64
-		add_definitions( -fasm-blocks -Qunused-arguments )
-		if( CMAKE_OSX_SYSROOT )
-			add_definitions( -isysroot "${CMAKE_OSX_SYSROOT}" )
-			message( STATUS "Using macOS sysroot: " ${CMAKE_OSX_SYSROOT} )
-		endif()
-		if( CMAKE_OSX_DEPLOYMENT_TARGET )
-			add_definitions( -mmacosx-version-min="${CMAKE_OSX_DEPLOYMENT_TARGET}" )
-		endif()
-	endif()
 
 	set(C MAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -ggdb -D_DEBUG -O0" )
 	#set( CMAKE_C_FLAGS_DEBUGALL "${CMAKE_C_FLAGS_DEBUGALL} -g -ggdb -D_DEBUG" )
@@ -215,11 +204,19 @@ if( RETAIL )
 	add_definitions( -DID_RETAIL )
 endif()
 
-# SRS - on Apple set find_package() to prefer dylibs over macOS frameworks and xcframeworks
-#     - required for cmake >= 3.29 and MoltenVK, also prefers openal-soft over Apple OpenAL
-if( APPLE )
-	set( CMAKE_FIND_FRAMEWORK LAST )
-endif()
+find_package( Stb REQUIRED )
+include_directories( ${Stb_INCLUDE_DIR} )
+
+find_package( OpenAL REQUIRED )
+include_directories( ${OPENAL_INCLUDE_DIR} )
+
+find_package( GLEW REQUIRED )
+include_directories( ${GLEW_INCLUDE_DIRS} )
+
+find_package( Freetype REQUIRED )
+find_path( FREETYPE_INCLUDE_DIR "fttypes.h" PATH_SUFFIXES "freetype" )
+include_directories( ${FREETYPE_INCLUDE_DIR} )
+set( FREETYPE_LIBRARY Freetype::Freetype )
 
 add_subdirectory(game)
 add_subdirectory(d3xp)
@@ -255,19 +252,8 @@ file(GLOB RENDERER_JOBS_STATICSHADOWVOLUME_SOURCES renderer/jobs/staticshadowvol
 file(GLOB RENDERER_OPENGL_INCLUDES renderer/OpenGL/*.h)
 file(GLOB RENDERER_OPENGL_SOURCES renderer/OpenGL/*.cpp)
 
-set(SOUND_INCLUDES
-	sound/snd_local.h
-	sound/sound.h)
-
-set(SOUND_SOURCES
-	sound/snd_cache.cpp
-	sound/snd_decoder.cpp
-	#sound/snd_efxfile.cpp
-	sound/snd_emitter.cpp
-	sound/snd_shader.cpp
-	sound/snd_system.cpp
-	sound/snd_wavefile.cpp
-	sound/snd_world.cpp)
+file(GLOB SOUND_INCLUDES sound/*.h)
+file(GLOB SOUND_SOURCES sound/*.cpp)
 
 file(GLOB SYS_INCLUDES sys/*.h)
 file(GLOB SYS_SOURCES sys/*.cpp)
@@ -385,101 +371,16 @@ file(GLOB EDITOR_SCRIPT_SOURCES tools/script/*.cpp)
 file(GLOB EDITOR_SOUND_INCLUDES tools/sound/*.h)
 file(GLOB EDITOR_SOUND_SOURCES tools/sound/*.cpp)
 
-if(USE_QT_WINDOWING)
+file(GLOB_RECURSE WIN32_INCLUDES sys/win32/*.h)
+file(GLOB_RECURSE WIN32_SOURCES sys/win32/*.cpp)
 
-	set(WIN32_INCLUDES
-		sys/win32/win_local.h
-		sys/win32/rc/doom_resource.h
-		)
-
-	set(WIN32_SOURCES
-		sys/win32/win_cpu.cpp
-		sys/win32/win_main.cpp
-		sys/win32/win_net.cpp
-		sys/win32/win_shared.cpp
-		sys/win32/win_snd.cpp
-		#sys/win32/win_syscon.cpp
-		sys/win32/win_taskkeyhook.cpp
-		)
-
-	set(WIN32_RESOURCES sys/win32/rc/res/doom.ico)
-
+if(ANGLE)
+	list(REMOVE_ITEM WIN32_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/sys/win32/win_glimp.cpp)
 else()
-	file(GLOB_RECURSE WIN32_INCLUDES sys/win32/*.h)
-	file(GLOB_RECURSE WIN32_SOURCES sys/win32/*.cpp)
-
-	if(ANGLE)
-		list(REMOVE_ITEM WIN32_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/sys/win32/win_glimp.cpp)
-	else()
-		list(REMOVE_ITEM WIN32_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/sys/win32/win_egl.cpp)
-	endif()
-
-	set(WIN32_RESOURCES
-		sys/win32/rc/res/BEVEL.BMP
-		sys/win32/rc/res/BITMAP2.BMP
-		sys/win32/rc/res/BMP00001.BMP
-		sys/win32/rc/res/BMP0002.BMP
-		sys/win32/rc/res/DEFTEX.WAL
-		sys/win32/rc/res/ENDCAP.BMP
-		sys/win32/rc/res/GetString.htm
-		sys/win32/rc/res/IBEVEL.BMP
-		sys/win32/rc/res/IENDCAP.BMP
-		sys/win32/rc/res/MEFileToolbar.bmp
-		sys/win32/rc/res/MEtoolbar.bmp
-		sys/win32/rc/res/MaterialEditor.ico
-		sys/win32/rc/res/PropTree.rc2
-		sys/win32/rc/res/Q.BMP
-		sys/win32/rc/res/RADIANT3.GIF
-		sys/win32/rc/res/Radiant.ico
-		sys/win32/rc/res/RadiantDoc.ico
-		sys/win32/rc/res/TOOLBAR1.BMP
-		sys/win32/rc/res/TOOLBAR2.BMP
-		sys/win32/rc/res/Toolbar.bmp
-		sys/win32/rc/res/VIEWDEFA.BMP
-		sys/win32/rc/res/VIEWOPPO.BMP
-		sys/win32/rc/res/bmp00002.bmp
-		sys/win32/rc/res/bmp00003.bmp
-		sys/win32/rc/res/bmp00004.bmp
-		sys/win32/rc/res/bmp00005.bmp
-		sys/win32/rc/res/cchsb.bmp
-		sys/win32/rc/res/ccrgb.bmp
-		sys/win32/rc/res/dbg_back.bmp
-		sys/win32/rc/res/dbg_breakpoint.ico
-		sys/win32/rc/res/dbg_current.ico
-		sys/win32/rc/res/dbg_currentline.ico
-		sys/win32/rc/res/dbg_empty.ico
-		sys/win32/rc/res/dbg_open.bmp
-		sys/win32/rc/res/dbg_toolbar.bmp
-		sys/win32/rc/res/doom.ico
-		sys/win32/rc/res/fpoint.cur
-		sys/win32/rc/res/fxed_link.ico
-		sys/win32/rc/res/fxed_toolbar.bmp
-		sys/win32/rc/res/fxeditor.ico
-		sys/win32/rc/res/guied.ico
-		sys/win32/rc/res/guied_collapse.ico
-		sys/win32/rc/res/guied_expand.ico
-		sys/win32/rc/res/guied_hand.cur
-		sys/win32/rc/res/guied_nav_visible.ico
-		sys/win32/rc/res/guied_nav_visibledisabled.ico
-		sys/win32/rc/res/guied_scripts.ico
-		sys/win32/rc/res/guied_scripts_white.ico
-		sys/win32/rc/res/guied_viewer_toolbar.bmp
-		sys/win32/rc/res/icon2.ico
-		sys/win32/rc/res/logo_sm3dfx.bmp
-		sys/win32/rc/res/matedtree.bmp
-		sys/win32/rc/res/me_disabled_icon.ico
-		sys/win32/rc/res/me_enabled.ico
-		sys/win32/rc/res/me_off_icon.ico
-		sys/win32/rc/res/me_on_icon.ico
-		sys/win32/rc/res/qe3.ico
-		sys/win32/rc/res/shaderbar.bmp
-		sys/win32/rc/res/shaderdoc.ico
-		sys/win32/rc/res/shaderframe.ico
-		sys/win32/rc/res/spliter.cur
-		)
+	list(REMOVE_ITEM WIN32_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/sys/win32/win_egl.cpp)
 endif()
 
-
+file(GLOB_RECURSE WIN32_RESOURCES sys/win32/rc/res/*.BMP sys/win32/rc/res/*.ico sys/win32/rc/res/*.cur)
 if(USE_MFC_TOOLS)
 	list(APPEND WIN32_RESOURCES sys/win32/rc/doom.rc)
 else()
@@ -488,149 +389,35 @@ endif()
 
 
 set(POSIX_INCLUDES
-    sys/posix/posix_public.h
-    )
+	sys/posix/posix_public.h
+	)
 
 set(POSIX_SOURCES
-    sys/posix/posix_net.cpp
-    sys/posix/posix_main.cpp
-    sys/posix/posix_signal.cpp
-    sys/posix/posix_threads.cpp
-    )
+	sys/posix/posix_net.cpp
+	sys/posix/posix_main.cpp
+	sys/posix/posix_signal.cpp
+	sys/posix/posix_threads.cpp
+	)
 
 set(LINUX_INCLUDES
-    sys/linux/sound.h
-    )
+	sys/linux/sound.h
+	)
 
 set(LINUX_SOURCES
-    sys/linux/linux_main.cpp
-    sys/linux/sound.cpp
-    sys/linux/sound_pulse.cpp
-    sys/linux/stack.cpp
-    )
+	sys/linux/linux_main.cpp
+	sys/linux/sound.cpp
+	sys/linux/sound_pulse.cpp
+	sys/linux/stack.cpp
+	)
 
 set(SDL_INCLUDES
-    sys/sdl/sdl_local.h
-    )
+	sys/sdl/sdl_local.h
+	)
 
 set(SDL_SOURCES
-    sys/sdl/sdl_events.cpp
-    sys/sdl/sdl_glimp.cpp
-    )
-
-
-if(USE_QT_TOOLS)
-
-	#set(QT_USE_QTOPENGL TRUE)
-	#set(QT_USE_IMPORTED_TARGETS TRUE)
-
-	set(CMAKE_INCLUDE_CURRENT_DIR ON)
-	#set(CMAKE_AUTOMOC ON)
-
-	if(MSVC)
-		#set(CMAKE_PREFIX_PATH "C:\\Qt\\Qt5.2.1-src\\5.2.1\\msvc2010_opengl")
-		set(CMAKE_PREFIX_PATH "C:\\Qt\\Qt5.2.1-src\\qtbase")
-
-		if(CMAKE_CL_64)
-			set(CMAKE_LIBRARY_PATH "C:\\Program Files (x86)\\Windows Kits\\8.0\\Lib\\win8\\um\\x64")
-		else()
-			#set(CMAKE_LIBRARY_PATH "C:\\Program Files (x86)\\Windows Kits\\8.0\\Lib\\win8\\um\\x86")
-			set(CMAKE_LIBRARY_PATH "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v7.1A\\Lib")
-		endif()
-	endif()
-
-	find_package(Qt5Core REQUIRED)
-	find_package(Qt5Widgets REQUIRED)
-	find_package(Qt5OpenGL REQUIRED)
-
-	include_directories(${Qt5Core_INCLUDE_DIRS})
-	add_definitions(${Qt5Core_DEFINITIONS})
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5Core_EXECUTABLE_COMPILE_FLAGS}")
-
-	include_directories(${Qt5Widgets_INCLUDE_DIRS})
-	add_definitions(${Qt5Widgets_DEFINITIONS})
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
-
-	include_directories(${Qt5OpenGL_INCLUDE_DIRS})
-	add_definitions(${Qt5OpenGL_DEFINITIONS})
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5OpenGL_EXECUTABLE_COMPILE_FLAGS}")
-
-	set(QT_LIBRARIES
-		Qt5::Widgets
-		Qt5::OpenGL)
-
-
-	set(EDITOR_QTSTRING_INCLUDES
-		tools/qtstringeditor/QtStringEditor.h)
-
-	set(EDITOR_QTSTRING_SOURCES
-		tools/qtstringeditor/main.cpp)
-
-	set(EDITOR_QTSTRING_RESOURCES
-		tools/qtstringeditor/QtStringEditor.qrc)
-
-	set(EDITOR_QTSTRING_FORMS
-		tools/qtstringeditor/QtStringEditor.ui)
-
-	qt5_wrap_cpp(EDITOR_QTSTRING_INCLUDES_MOC ${EDITOR_QTSTRING_INCLUDES})
-	qt5_wrap_ui(EDITOR_QTSTRING_FORMS_INCLUDES ${EDITOR_QTSTRING_FORMS})
-	qt5_add_resources(EDITOR_QTSTRING_RESOURCES_RCC ${EDITOR_QTSTRING_RESOURCES})
-
-	source_group("tools\\qtstringeditor\\Header Files" FILES ${EDITOR_QTSTRING_INCLUDES})
-	source_group("tools\\qtstringeditor\\Source Files" FILES ${EDITOR_QTSTRING_SOURCES})
-	source_group("tools\\qtstringeditor\\Resource Files" FILES ${EDITOR_QTSTRING_RESOURCES})
-	source_group("tools\\qtstringeditor\\Form Files" FILES ${EDITOR_QTSTRING_FORMS})
-
-	source_group("tools\\qtstringeditor\\Generated Files" FILES ${EDITOR_QTSTRING_INCLUDES_MOC})
-	source_group("tools\\qtstringeditor\\Generated Files" FILES ${EDITOR_QTSTRING_FORMS_INCLUDES})
-	source_group("tools\\qtstringeditor\\Generated Files" FILES ${EDITOR_QTSTRING_RESOURCES_RCC})
-
-
-
-	file(GLOB EDITOR_QTRADIANT_INCLUDES	tools/qtradiant/src/*.h)
-	file(GLOB EDITOR_QTRADIANT_SOURCES tools/qtradiant/src/*.cpp)
-
-	#file(GLOB EDITOR_QTRADIANT_RESOURCES tools/qtradiant/resources/icons/*.png)
-	set(EDITOR_QTRADIANT_RESOURCES tools/qtradiant/QtRadiant.qrc)
-	file(GLOB EDITOR_QTRADIANT_FORMS tools/qtradiant/src/*.ui)
-
-	qt5_wrap_cpp(EDITOR_QTRADIANT_INCLUDES_MOC ${EDITOR_QTRADIANT_INCLUDES})
-	qt5_wrap_ui(EDITOR_QTRADIANT_FORMS_INCLUDES ${EDITOR_QTRADIANT_FORMS})
-	qt5_add_resources(EDITOR_QTRADIANT_RESOURCES_RCC ${EDITOR_QTRADIANT_RESOURCES})
-
-	source_group("tools\\qtradiant\\Header Files" FILES ${EDITOR_QTRADIANT_INCLUDES})
-	source_group("tools\\qtradiant\\Source Files" FILES ${EDITOR_QTRADIANT_SOURCES})
-	source_group("tools\\qtradiant\\Resource Files" FILES ${EDITOR_QTRADIANT_RESOURCES})
-	source_group("tools\\qtradiant\\Form Files" FILES ${EDITOR_QTRADIANT_FORMS})
-
-	source_group("tools\\qtradiant\\Generated Files" FILES ${EDITOR_QTRADIANT_INCLUDES_MOC})
-	source_group("tools\\qtradiant\\Generated Files" FILES ${EDITOR_QTRADIANT_FORMS_INCLUDES})
-	source_group("tools\\qtradiant\\Generated Files" FILES ${EDITOR_QTRADIANT_RESOURCES_RCC})
-
-	if(USE_QT_WINDOWING)
-		add_definitions(-DUSE_QT_WINDOWING)
-
-		file(GLOB QTTEKUUM_INCLUDES sys/qt/*.h)
-		file(GLOB QTTEKUUM_SOURCES sys/qt/*.cpp)
-
-		set(QTTEKUUM_RESOURCES sys/qt/Tekuum.qrc)
-		file(GLOB QTTEKUUM_FORMS sys/qt/*.ui)
-
-		qt5_wrap_cpp(QTTEKUUM_INCLUDES_MOC ${QTTEKUUM_INCLUDES})
-		qt5_wrap_ui(QTTEKUUM_FORMS_INCLUDES ${QTTEKUUM_FORMS})
-		qt5_add_resources(QTTEKUUM_RESOURCES_RCC ${QTTEKUUM_RESOURCES})
-
-		source_group("sys\\qt\\Header Files" FILES ${QTTEKUUM_INCLUDES})
-		source_group("sys\\qt\\Source Files" FILES ${QTTEKUUM_SOURCES})
-		source_group("sys\\qt\\Resource Files" FILES ${QTTEKUUM_RESOURCES})
-		source_group("sys\\qt\\Form Files" FILES ${QTTEKUUM_FORMS})
-
-		source_group("sys\\qt\\Generated Files" FILES ${QTTEKUUM_INCLUDES_MOC})
-		source_group("sys\\qt\\Generated Files" FILES ${QTTEKUUM_FORMS_INCLUDES})
-		source_group("sys\\qt\\Generated Files" FILES ${QTTEKUUM_RESOURCES_RCC})
-	endif()
-
-endif(USE_QT_TOOLS)
+	sys/sdl/sdl_events.cpp
+	sys/sdl/sdl_glimp.cpp
+	)
 
 source_group("AAS" FILES ${AAS_INCLUDES})
 source_group("AAS" FILES ${AAS_SOURCES})
@@ -673,15 +460,9 @@ source_group("Sys\\Common" FILES ${COMMON_INCLUDES})
 source_group("Sys\\Common" FILES ${COMMON_SOURCES})
 source_group("Sys\\SDL" FILES ${SDL_INCLUDES})
 source_group("Sys\\SDL" FILES ${SDL_SOURCES})
-#if(USE_QT_WINDOWING)
-#	source_group("Sys\\Win32" FILES ${WIN32_INCLUDES})
-#	source_group("Sys\\QT\\Win32" FILES ${WIN32_SOURCES})
-#	source_group("Sys\\QT\\Win32\\Resources" FILES ${WIN32_RESOURCES})
-#else()
-	source_group("Sys\\Win32" FILES ${WIN32_INCLUDES})
-	source_group("Sys\\Win32" FILES ${WIN32_SOURCES})
-	source_group("Sys\\Win32\\Resources" FILES ${WIN32_RESOURCES})
-#endif()
+source_group("Sys\\Win32" FILES ${WIN32_INCLUDES})
+source_group("Sys\\Win32" FILES ${WIN32_SOURCES})
+source_group("Sys\\Win32\\Resources" FILES ${WIN32_RESOURCES})
 
 source_group("tools\\compilers" FILES ${COMPILER_INCLUDES})
 source_group("tools\\compilers\\aas" FILES ${COMPILER_AAS_INCLUDES})
@@ -783,7 +564,6 @@ endif()
 
 add_definitions(-D__DOOM__
 				-D__DOOM_DLL__
-				-DGLEW_STATIC
 				-DBUILD_FREETYPE
 				-DFT2_BUILD_LIBRARY)
 
@@ -804,11 +584,9 @@ endif()
 
 include_directories(
 			idlib
-			libs/curl/include
-			#libs/openal/include
-			libs/glew/include
-			libs/freetype/include
-			libs/zlib)
+			libs/miniz
+			libs/minizip
+			libs/freetype/include)
 
 link_directories(
 			${CMAKE_CURRENT_SOURCE_DIR}/libs/curl/lib
@@ -886,54 +664,6 @@ if(MSVC)
 			${EDITOR_RADIANT_SOURCES}
 			${EDITOR_SCRIPT_SOURCES}
 			${EDITOR_SOUND_SOURCES})
-
-	elseif(USE_QT_TOOLS)
-
-		add_definitions(-DUSE_QT_TOOLS) # ${Qt5_DEFINITIONS})
-		#include(${QT_USE_FILE})
-
-		# As all intermediate files are generated outside the source tree,
-		# the header file generated by uic will not be located by the compiler.
-		# In order to handle this, the build directory needs to be added to the list of include directories.
-		#include_directories(${CMAKE_CURRENT_BINARY_DIR})
-
-		list(APPEND TEKUUM_INCLUDES
-			${TOOLS_INCLUDES}
-
-			${QTTEKUUM_INCLUDES}
-			${QTTEKUUM_SOURCES}
-			${QTTEKUUM_RESOURCES}
-
-			${EDITOR_QTRADIANT_INCLUDES}
-			${EDITOR_QTRADIANT_SOURCES}
-			${EDITOR_QTRADIANT_RESOURCES}
-			${EDITOR_QTRADIANT_FORMS}
-
-			${EDITOR_QTRADIANT_INCLUDES_MOC}
-			${EDITOR_QTRADIANT_FORMS_INCLUDES}
-			${EDITOR_QTRADIANT_RESOURCES_RCC}
-
-			${EDITOR_QTSTRING_INCLUDES}
-			${EDITOR_QTSTRING_SOURCES}
-			${EDITOR_QTSTRING_RESOURCES}
-			${EDITOR_QTSTRING_FORMS}
-
-			${EDITOR_QTSTRING_INCLUDES_MOC}
-			${EDITOR_QTSTRING_FORMS_INCLUDES}
-			${EDITOR_QTSTRING_RESOURCES_RCC}
-			)
-
-		if(USE_QT_WINDOWING)
-			list(APPEND TEKUUM_SOURCES
-				${QTTEKUUM_INCLUDES}
-				${QTTEKUUM_SOURCES}
-				${QTTEKUUM_RESOURCES}
-				${QTTEKUUM_FORMS}
-
-				${QTTEKUUM_INCLUDES_MOC}
-				${QTTEKUUM_FORMS_INCLUDES}
-				${QTTEKUUM_RESOURCES_RCC})
-		endif(USE_QT_WINDOWING)
 	endif()
 
 	list(APPEND TEKUUM_INCLUDES
@@ -959,13 +689,6 @@ if(MSVC)
 		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/jobs/staticshadowvolume/StaticShadowVolume.cpp )
 		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/jobs/ShadowShared.cpp )
 		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/RenderLog.cpp )
-
-		if( USE_QT_WINDOWING )
-			list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${QTTEKUUM_SOURCES} )
-			list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${QTTEKUUM_INCLUDES_MOC} )
-			list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${QTTEKUUM_RESOURCES} )
-			list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${QTTEKUUM_RESOURCES_RCC} )
-		endif()
 
 		#list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${TOOLS_COMAFX_SOURCES} )
 		#list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${TOOLS_COMMON_SOURCES} )
@@ -1001,26 +724,24 @@ if(MSVC)
 		)
 	endif()
 
-	if( USE_QT_WINDOWING )
-		add_executable( ${PROJECT_NAME} ${TEKUUM_INCLUDES} ${TEKUUM_SOURCES} ${QTTEKUUM_INCLUDES} ${QTTEKUUM_SOURCES} ${QTTEKUUM_RESOURCES} )
-	else()
-		add_executable( ${PROJECT_NAME} WIN32 ${TEKUUM_INCLUDES} ${TEKUUM_SOURCES} ${WIN32_RESOURCES} )
-	endif()
+	add_executable( ${PROJECT_NAME} WIN32 ${TEKUUM_INCLUDES} ${TEKUUM_SOURCES} ${WIN32_RESOURCES} )
 
 	if(ANGLE)
 		add_dependencies( ${PROJECT_NAME} idlib external libANGLE )
 		target_link_libraries( ${PROJECT_NAME}
 			idlib
 			external
+			GLEW::GLEW
+			${OPENAL_LIBRARY}
+			${FREETYPE_LIBRARY}
 			libANGLE
 			${DirectX_LIBRARIES}
 			${QT_LIBRARIES}
-			#libcurl
 			#openal32
 			#opengl32
 			glu32
 			dbghelp
-			eaxguid
+			#eaxguid
 			iphlpapi
 			winmm
 			ws2_32.lib)
@@ -1029,17 +750,19 @@ if(MSVC)
 		target_link_libraries(${PROJECT_NAME}
 			idlib
 			external
+			GLEW::GLEW
+			${OPENAL_LIBRARY}
+			${FREETYPE_LIBRARY}
 			${DirectX_LIBRARIES}
 			${QT_LIBRARIES}
-			#libcurl
 			#openal32
 			opengl32
 			glu32
 			dbghelp
-			eaxguid
+			#eaxguid
 			iphlpapi
 			winmm
-			ws2_32.lib)
+			ws2_32)
 	endif()
 
 	# set MSVC default debug directory on executable
@@ -1052,19 +775,19 @@ if(MSVC)
 
 elseif( UNIX )
 
-    if( SDL2 )
-        find_package( SDL2 REQUIRED )
-        include_directories( ${SDL2_INCLUDE_DIR} )
-        set( SDLx_LIBRARY ${SDL2_LIBRARY})
-    else()
-        find_package( SDL REQUIRED )
-        include_directories( ${SDL_INCLUDE_DIR} )
-        set( SDLx_LIBRARY ${SDL_LIBRARY} )
-    endif()
+	if( SDL2 )
+		find_package( SDL2 REQUIRED )
+		include_directories( ${SDL2_INCLUDE_DIR} )
+		set( SDLx_LIBRARY ${SDL2_LIBRARY})
+	else()
+		find_package( SDL REQUIRED )
+		include_directories( ${SDL_INCLUDE_DIR} )
+		set( SDLx_LIBRARY ${SDL_LIBRARY} )
+	endif()
 
-    add_definitions( -DUSE_SDL )
-    add_definitions( -DUSE_SDL_ASYNC )
-    add_definitions( -DUSE_SOUND_PULSE )
+	add_definitions( -DUSE_SDL )
+	add_definitions( -DUSE_SDL_ASYNC )
+	add_definitions( -DUSE_SOUND_PULSE )
 	add_definitions( -DUSE_EXCEPTIONS )
 
 	if(MESA)
@@ -1072,21 +795,21 @@ elseif( UNIX )
 		add_definitions( -DUSE_MESA )
 	endif()
 
-    #find_package(PulseAudio REQUIRED)
+	#find_package(PulseAudio REQUIRED)
 
-    list(APPEND TEKUUM_INCLUDES
-        ${SYS_INCLUDES}
-        ${POSIX_INCLUDES}
-        ${SDL_INCLUDES}
-        ${LINUX_INCLUDES})
+	list(APPEND TEKUUM_INCLUDES
+		${SYS_INCLUDES}
+		${POSIX_INCLUDES}
+		${SDL_INCLUDES}
+		${LINUX_INCLUDES})
 
-    list(APPEND TEKUUM_SOURCES
-        ${SYS_SOURCES}
-        ${POSIX_SOURCES}
-        ${SDL_SOURCES}
-        ${LINUX_SOURCES})
+	list(APPEND TEKUUM_SOURCES
+		${SYS_SOURCES}
+		${POSIX_SOURCES}
+		${SDL_SOURCES}
+		${LINUX_SOURCES})
 
-    list(REMOVE_DUPLICATES TEKUUM_SOURCES)
+	list(REMOVE_DUPLICATES TEKUUM_SOURCES)
 
 	if( USE_PRECOMPILED_HEADERS )
 		set( TEKUUM_PRECOMPILED_SOURCES ${TEKUUM_SOURCES})
@@ -1159,15 +882,18 @@ elseif( UNIX )
 	endif()
 
 	target_link_libraries(${PROJECT_NAME}
-        idlib
+		idlib
 		external
-        GL
-        pthread
-        dl
-        rt
-        pulse
-        pulse-simple
-        ${SDLx_LIBRARY})
+		GLEW::GLEW
+		${OPENAL_LIBRARY}
+		${FREETYPE_LIBRARY}
+		GL
+		pthread
+		dl
+		rt
+		pulse
+		pulse-simple
+		${SDLx_LIBRARY})
 endif()
 
 set_target_properties( ${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:>${CMAKE_SOURCE_DIR}/.. LIBRARY_OUTPUT_DIRECTORY $<1:>${CMAKE_SOURCE_DIR}/.. )

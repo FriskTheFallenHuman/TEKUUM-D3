@@ -1681,7 +1681,7 @@ void idAsyncServer::ProcessAuthMessage( const idBitMsg& msg )
 		return;
 	}
 
-	idStr::snPrintf( challenges[ i ].guid, 12, client_guid );
+	idStr::snPrintf( challenges[ i ].guid, 12, "%s", client_guid );
 	if( reply == AUTH_OK )
 	{
 		challenges[ i ].authState = CDK_OK;
@@ -1766,7 +1766,7 @@ void idAsyncServer::ProcessChallengeMessage( const netadr_t from, const idBitMsg
 
 	serverPort.SendPacket( from, outMsg.GetData(), outMsg.GetSize() );
 
-#if defined(USE_CDKEY)
+#if ID_ENFORCE_KEY_CLIENT
 	if( Sys_IsLANAddress( from ) )
 	{
 		// no CD Key check for LAN clients
@@ -1794,6 +1794,10 @@ void idAsyncServer::ProcessChallengeMessage( const netadr_t from, const idBitMsg
 		}
 	}
 #else
+	if( ! Sys_IsLANAddress( from ) )
+	{
+		common->Printf( "Build Does not have CD Key Enforcement enabled. Client %s is not a LAN address, but will be accepted\n", Sys_NetAdrToString( from ) );
+	}
 	challenges[i].authState = CDK_OK;
 #endif
 }
@@ -1957,16 +1961,11 @@ void idAsyncServer::ProcessConnectMessage( const netadr_t from, const idBitMsg& 
 	clientRate = msg.ReadInt();
 
 	// check the client data - only for non pure servers
-
-	// RB: bad for android development
-#if 0
 	if( !sessLocal.mapSpawnData.serverInfo.GetInt( "si_pure" ) && clientDataChecksum != serverDataChecksum )
 	{
 		PrintOOB( from, SERVER_PRINT_MISC, "#str_04842" );
 		return;
 	}
-#endif
-	// RB end
 
 	if( ( ichallenge = ValidateChallenge( from, challenge, clientId ) ) == -1 )
 	{
@@ -2019,7 +2018,7 @@ void idAsyncServer::ProcessConnectMessage( const netadr_t from, const idBitMsg& 
 			PrintOOB( from, SERVER_PRINT_MISC, msg );
 
 			// update the guid in the challenges
-			idStr::snPrintf( challenges[ ichallenge ].guid, sizeof( challenges[ ichallenge ].guid ), guid );
+			idStr::snPrintf( challenges[ ichallenge ].guid, sizeof( challenges[ ichallenge ].guid ), "%s", guid );
 
 			// once auth replied denied, stop sending further requests
 			if( challenges[ ichallenge ].authReply != AUTH_DENY )
@@ -2921,7 +2920,7 @@ void idAsyncServer::RunFrame()
 
 			idStr msg;
 			GetAsyncStatsAvgMsg( msg );
-			common->Printf( va( "%s\n", msg.c_str() ) );
+			common->Printf( "%s\n", msg.c_str() );
 
 			nextAsyncStatsTime = serverTime + 1000;
 		}

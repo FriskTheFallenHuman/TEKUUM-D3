@@ -122,7 +122,7 @@ class idDrawVert
 
 public:
 	idVec3				xyz;			// 12 bytes
-private:
+//private:
 	// RB: don't let the old tools code mess with these values
 	halfFloat_t			st[2];			// 4 bytes
 	byte				normal[4];		// 4 bytes
@@ -166,6 +166,8 @@ public:
 	void				SetTexCoordS( float s );
 	void				SetTexCoordT( float t );
 	const idVec2		GetTexCoord() const;
+	const float			GetTexCoordS() const;
+	const float			GetTexCoordT() const;
 	const halfFloat_t	GetTexCoordNativeS() const;
 	const halfFloat_t	GetTexCoordNativeT() const;
 
@@ -217,7 +219,7 @@ ID_INLINE void VertexFloatToByte( const float& x, const float& y, const float& z
 {
 	assert_4_byte_aligned( bval );	// for __stvebx
 
-#if defined(USE_INTRINSICS)
+#if defined(USE_INTRINSICS_SSE)
 
 	const __m128 vector_float_one			= { 1.0f, 1.0f, 1.0f, 1.0f };
 	const __m128 vector_float_half			= { 0.5f, 0.5f, 0.5f, 0.5f };
@@ -607,6 +609,26 @@ ID_INLINE const idVec2	idDrawVert::GetTexCoord() const
 
 /*
 ========================
+idDrawVert::GetTexCoordT
+========================
+*/
+ID_INLINE const float idDrawVert::GetTexCoordS() const
+{
+	return F16toF32( st[0] );
+}
+
+/*
+========================
+idDrawVert::GetTexCoordS
+========================
+*/
+ID_INLINE const float idDrawVert::GetTexCoordT() const
+{
+	return F16toF32( st[1] );
+}
+
+/*
+========================
 idDrawVert::GetTexCoordNativeS
 ========================
 */
@@ -678,7 +700,7 @@ ID_INLINE void WriteDrawVerts16( idDrawVert* destVerts, const idDrawVert* localV
 	assert_16_byte_aligned( destVerts );
 	assert_16_byte_aligned( localVerts );
 
-#if defined(USE_INTRINSICS)
+#if defined(USE_INTRINSICS_SSE)
 
 	for( int i = 0; i < numVerts; i++ )
 	{

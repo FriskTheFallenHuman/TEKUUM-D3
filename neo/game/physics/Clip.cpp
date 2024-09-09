@@ -236,7 +236,7 @@ bool idClipModel::LoadModel( const char* name )
 		FreeTraceModel( traceModelIndex );
 		traceModelIndex = -1;
 	}
-	collisionModelHandle = collisionModelManager->LoadModel( name, false );
+	collisionModelHandle = collisionModelManager->LoadModel( name );
 	if( collisionModelHandle )
 	{
 		collisionModelManager->GetModelBounds( collisionModelHandle, bounds );
@@ -456,7 +456,7 @@ void idClipModel::Restore( idRestoreGame* savefile )
 	savefile->ReadString( collisionModelName );
 	if( collisionModelName.Length() )
 	{
-		collisionModelHandle = collisionModelManager->LoadModel( collisionModelName, false );
+		collisionModelHandle = collisionModelManager->LoadModel( collisionModelName );
 	}
 	else
 	{
@@ -683,7 +683,7 @@ idClipModel::CheckModel
 */
 cmHandle_t idClipModel::CheckModel( const char* name )
 {
-	return collisionModelManager->LoadModel( name, false );
+	return collisionModelManager->LoadModel( name );
 }
 
 
@@ -783,7 +783,7 @@ void idClip::Init()
 	numClipSectors = 0;
 	touchCount = -1;
 	// get world map bounds
-	h = collisionModelManager->LoadModel( "worldMap", false );
+	h = collisionModelManager->LoadModel( "worldMap" );
 	collisionModelManager->GetModelBounds( h, worldBounds );
 	// create world sectors
 	CreateClipSectors_r( 0, worldBounds, maxSector );

@@ -40,28 +40,21 @@ If you have questions concerning this license or the applicable additional terms
 class idSysLocal : public idSys
 {
 public:
-	virtual void			DebugPrintf( const char* fmt, ... )id_attribute( ( format( printf, 2, 3 ) ) );
+	virtual void			DebugPrintf( VERIFY_FORMAT_STRING const char* fmt, ... );
 	virtual void			DebugVPrintf( const char* fmt, va_list arg );
 
 	virtual double			GetClockTicks();
 	virtual double			ClockTicksPerSecond();
 	virtual cpuid_t			GetProcessorId();
-	virtual const char* 	GetProcessorString();
-	virtual const char* 	FPU_GetState();
-	virtual bool			FPU_StackIsEmpty();
 	virtual void			FPU_SetFTZ( bool enable );
 	virtual void			FPU_SetDAZ( bool enable );
-
-	virtual void			FPU_EnableExceptions( int exceptions );
 
 	virtual bool			LockMemory( void* ptr, int bytes );
 	virtual bool			UnlockMemory( void* ptr, int bytes );
 
-	// RB: 64 bit fixes, changed int to intptr_t
-	virtual intptr_t		DLL_Load( const char* dllName );
-	virtual void* 			DLL_GetProcAddress( intptr_t dllHandle, const char* procName );
-	virtual void			DLL_Unload( intptr_t dllHandle );
-	// RB end
+	virtual uintptr_t		DLL_Load( const char* dllName );
+	virtual void* 			DLL_GetProcAddress( uintptr_t dllHandle, const char* procName );
+	virtual void			DLL_Unload( uintptr_t dllHandle );
 	virtual void			DLL_GetFileName( const char* baseName, char* dllName, int maxLength );
 
 	virtual sysEvent_t		GenerateMouseButtonEvent( int button, bool down );

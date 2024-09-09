@@ -607,10 +607,7 @@ int idBitMsg::ReadDeltaByteCounter( int oldValue ) const
 		return oldValue;
 	}
 	newValue = ReadBits( i );
-
-	// RB: fixed missing parentheses
 	return ( ( oldValue & ~( ( 1 << i ) - 1 ) ) | newValue );
-	// RB end
 }
 
 /*
@@ -628,10 +625,7 @@ int idBitMsg::ReadDeltaShortCounter( int oldValue ) const
 		return oldValue;
 	}
 	newValue = ReadBits( i );
-
-	// RB: fixed missing parentheses
 	return ( ( oldValue & ~( ( 1 << i ) - 1 ) ) | newValue );
-	// RB end
 }
 
 /*
@@ -649,10 +643,7 @@ int idBitMsg::ReadDeltaIntCounter( int oldValue ) const
 		return oldValue;
 	}
 	newValue = ReadBits( i );
-
-	// RB: fixed missing parentheses
 	return ( ( oldValue & ~( ( 1 << i ) - 1 ) ) | newValue );
-	// RB end
 }
 
 /*

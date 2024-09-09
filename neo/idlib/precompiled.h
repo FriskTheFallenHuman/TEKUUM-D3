@@ -34,21 +34,12 @@ If you have questions concerning this license or the applicable additional terms
 #include "sys/sys_includes.h"
 #include "sys/sys_assert.h"
 #include "sys/sys_types.h"
-
-// RB begin
-#if 1 //!defined(__ANDROID__)
-	#include "sys/sys_intrinsics.h"
-#endif
-// RB end
+#include "sys/sys_intrinsics.h"
 #include "sys/sys_threading.h"
 
 //-----------------------------------------------------
 
-// Signed because -1 means "File not found" and we don't want that to compare > than any other time
-// RB: don't use time_t because it can cause trouble with different implementations on 32 and 64 bit
-#define ID_TIME_T int64
-// RB end
-
+#define ID_TIME_T time_t // Signed because -1 means "File not found" and we don't want that to compare > than any other time
 
 // non-portable system services
 #include "../sys/sys_public.h"
@@ -65,6 +56,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "../framework/CmdSystem.h"
 #include "../framework/CVarSystem.h"
 #include "../framework/Common.h"
+// DG: needed for idFile_InZip in File.h
+#include "../framework/Unzip.h"
+// DG end
 #include "../framework/File.h"
 #include "../framework/FileSystem.h"
 #include "../framework/UsercmdGen.h"
@@ -86,120 +80,18 @@ const int MAX_EXPRESSION_OPS = 4096;
 const int MAX_EXPRESSION_REGISTERS = 4096;
 
 // renderer
+// everything that is needed by the backend needs
+// to be double buffered to allow it to run in
+// parallel on a dual cpu machine
+const uint32 NUM_FRAME_DATA = 2;
 
-
-
-// RB begin
-#if defined(USE_ANGLE)
-	#include <GLES2/gl2.h>
-	#include <GLES2/gl2ext.h>
-
-	#define GL_CLAMP_TO_BORDER GL_CLAMP_TO_EDGE
-
-	//#define glClearDepth glClearDepthf
-	//#define glDepthRange glDepthRangef
-
-#elif !defined(ID_TYPEINFO) && !defined(__ANDROID__)
-	#include "../libs/glew/include/GL/glew.h"
-	//#include "../renderer/qgl.h"
+#if defined(USE_VULKAN)
+	#include "../renderer/Vulkan/qvk.h"
+#else
+	// RB: replaced QGL with GLEW
+	#include <GL/glew.h>
+	// RB end
 #endif
-
-#if defined(__ANDROID__)
-
-	#if defined(USE_GLES3)
-		#include <GLES3/gl3.h>
-		//#include <GLES3/gl3ext.h>
-	#elif defined(USE_GLES2)
-		#include <GLES2/gl2.h>
-		#include <GLES2/gl2ext.h>
-	#elif defined(USE_GLES1)
-		#include <GLES/gl.h>
-		#include <GLES/glext.h>
-	#endif
-
-
-	#if defined(USE_GLES2)
-
-		#define glClearDepth glClearDepthf
-		#define glDepthRange glDepthRangef
-
-		#define glLoadIdentity esLoadIdentity
-		#define glLoadMatrixf esLoadMatrixf
-		#define glMatrixMode esMatrixMode
-		#define glOrtho esOrthof
-		#define glPushMatrix esPushMatrix
-		#define glPopMatrix glPopMatrix
-
-		#define glEnableClientState esEnableClientState
-		#define glDisableClientState esDisableClientState
-
-		#define glVertexPointer esVertexPointer
-		#define glNormalPointer esNormalPointer
-		#define glTexCoordPointer esTexCoordPointer
-		#define glColorPointer esColorPointer
-
-		#define glColor4f esColor4f
-
-
-		#define GL_MODELVIEW 0x1700
-		#define GL_PROJECTION 0x1701
-
-		#define GL_VERTEX_ARRAY 0x8074
-		#define GL_NORMAL_ARRAY 0x8075
-		#define GL_COLOR_ARRAY 0x8076
-		#define GL_TEXTURE_COORD_ARRAY 0x8078
-
-
-		#define GL_TEXTURE_CUBE_MAP_EXT GL_TEXTURE_CUBE_MAP
-		#define GL_TEXTURE_BINDING_CUBE_MAP_EXT GL_TEXTURE_BINDING_CUBE_MAP
-		#define GL_TEXTURE_CUBE_MAP_POSITIVE_X_EXT GL_TEXTURE_CUBE_MAP_POSITIVE_X
-		#define GL_TEXTURE_CUBE_MAP_NEGATIVE_X_EXT GL_TEXTURE_CUBE_MAP_NEGATIVE_X
-		#define GL_TEXTURE_CUBE_MAP_POSITIVE_Y_EXT GL_TEXTURE_CUBE_MAP_POSITIVE_Y
-		#define GL_TEXTURE_CUBE_MAP_NEGATIVE_Y_EXT GL_TEXTURE_CUBE_MAP_NEGATIVE_Y
-		#define GL_TEXTURE_CUBE_MAP_POSITIVE_Z_EXT GL_TEXTURE_CUBE_MAP_POSITIVE_Z
-		#define GL_TEXTURE_CUBE_MAP_NEGATIVE_Z_EXT GL_TEXTURE_CUBE_MAP_NEGATIVE_Z
-
-	#elif defined(USE_GLES1)
-
-		#define glClearDepth glClearDepthf
-		#define glDepthRange glDepthRangef
-		#define glOrtho glOrthof
-
-		#define GL_TEXTURE_CUBE_MAP_EXT GL_TEXTURE_CUBE_MAP_OES
-		#define GL_TEXTURE_BINDING_CUBE_MAP_EXT GL_TEXTURE_BINDING_CUBE_MAP_OES
-		#define GL_TEXTURE_CUBE_MAP_POSITIVE_X_EXT GL_TEXTURE_CUBE_MAP_POSITIVE_X_OES
-		#define GL_TEXTURE_CUBE_MAP_NEGATIVE_X_EXT GL_TEXTURE_CUBE_MAP_NEGATIVE_X_OES
-		#define GL_TEXTURE_CUBE_MAP_POSITIVE_Y_EXT GL_TEXTURE_CUBE_MAP_POSITIVE_Y_OES
-		#define GL_TEXTURE_CUBE_MAP_NEGATIVE_Y_EXT GL_TEXTURE_CUBE_MAP_NEGATIVE_Y_OES
-		#define GL_TEXTURE_CUBE_MAP_POSITIVE_Z_EXT GL_TEXTURE_CUBE_MAP_POSITIVE_Z_OES
-		#define GL_TEXTURE_CUBE_MAP_NEGATIVE_Z_EXT GL_TEXTURE_CUBE_MAP_NEGATIVE_Z_OES
-
-	#endif
-
-
-
-
-#endif // defined(__ANDROID__)
-
-
-/* -------------------- OpenGL Extensions -------------------- */
-
-
-#ifndef GL_EXT_texture_compression_s3tc
-	#define GL_EXT_texture_compression_s3tc 1
-
-	#define GL_COMPRESSED_RGB_S3TC_DXT1_EXT							0x83F0
-	#define GL_COMPRESSED_RGBA_S3TC_DXT1_EXT						0x83F1
-	#define GL_COMPRESSED_RGBA_S3TC_DXT3_EXT						0x83F2
-	#define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT						0x83F3
-
-#endif // GL_EXT_texture_compression_s3tc
-
-#ifndef GL_OES_compressed_ETC1_RGB8_texture
-	#define GL_ETC1_RGB8_OES                                        0x8D64
-#endif
-
-// RB end
 #include "../renderer/Cinematic.h"
 #include "../renderer/Material.h"
 #include "../renderer/BufferObject.h"
@@ -216,13 +108,8 @@ const int MAX_EXPRESSION_REGISTERS = 4096;
 #include "../framework/async/NetworkSystem.h"
 
 // user interfaces
-#if defined(STANDALONE)
-	#include "../ui-lua/ListGUI.h"
-	#include "../ui-lua/UserInterface.h"
-#else
-	#include "../ui/ListGUI.h"
-	#include "../ui/UserInterface.h"
-#endif
+#include "../ui/ListGUI.h"
+#include "../ui/UserInterface.h"
 
 // collision detection system
 #include "../cm/CollisionModel.h"
@@ -265,7 +152,7 @@ const int MAX_EXPRESSION_REGISTERS = 4096;
 
 		// The editor entry points are always declared, but may just be
 		// stubbed out on non-windows platforms.
-		#if defined(USE_MFC_TOOLS) || defined(USE_QT_TOOLS) || defined(USE_GTK_TOOLS)
+		#if defined(USE_MFC_TOOLS)
 			#include "../tools/edit_public.h"
 		#endif
 

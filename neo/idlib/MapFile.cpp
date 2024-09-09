@@ -49,10 +49,8 @@ StringCRC
 ID_INLINE unsigned int StringCRC( const char* str )
 {
 	unsigned int i, crc;
-	const unsigned char* ptr;
 
 	crc = 0;
-	ptr = reinterpret_cast<const unsigned char*>( str );
 	for( i = 0; str[i]; i++ )
 	{
 		crc ^= str[i] << ( i & 3 );
@@ -184,8 +182,6 @@ idMapPatch* idMapPatch::Parse( idLexer& src, const idVec3& origin, bool patchDef
 		delete patch;
 		return NULL;
 	}
-
-
 	for( j = 0; j < patch->GetWidth(); j++ )
 	{
 		if( !src.ExpectTokenString( "(" ) )
@@ -218,7 +214,6 @@ idMapPatch* idMapPatch::Parse( idLexer& src, const idVec3& origin, bool patchDef
 			return NULL;
 		}
 	}
-
 	if( !src.ExpectTokenString( ")" ) )
 	{
 		src.Error( "idMapPatch::Parse: unable to parse patch control points, no closure" );
@@ -478,8 +473,7 @@ idMapBrush::ParseQ3
 */
 idMapBrush* idMapBrush::ParseQ3( idLexer& src, const idVec3& origin )
 {
-	int i, shift[2], rotate;
-	float scale[2];
+	int i;
 	idVec3 planepts[3];
 	idToken token;
 	idList<idMapBrushSide*> sides;
@@ -523,12 +517,12 @@ idMapBrush* idMapBrush::ParseQ3( idLexer& src, const idVec3& origin )
 		// we have an implicit 'textures/' in the old format
 		side->material = "textures/" + token;
 
-		// read the texture shift, rotate and scale
-		shift[0] = src.ParseInt();
-		shift[1] = src.ParseInt();
-		rotate = src.ParseInt();
-		scale[0] = src.ParseFloat();
-		scale[1] = src.ParseFloat();
+		// skip the texture shift, rotate and scale
+		src.ParseInt();
+		src.ParseInt();
+		src.ParseInt();
+		src.ParseFloat();
+		src.ParseFloat();
 		side->texMat[0] = idVec3( 0.03125f, 0.0f, 0.0f );
 		side->texMat[1] = idVec3( 0.0f, 0.03125f, 0.0f );
 		side->origin = origin;
@@ -895,8 +889,8 @@ idMapEntity* idMapEntity::ParseJSON( idLexer& src )
 {
 	idToken	token;
 	idMapEntity* mapEnt;
-	idMapPatch* mapPatch;
-	idMapBrush* mapBrush;
+	//idMapPatch* mapPatch;
+	//idMapBrush* mapBrush;
 	// RB begin
 	MapPolygonMesh* mapMesh;
 	// RB end
@@ -1104,11 +1098,11 @@ unsigned int idMapEntity::GetGeometryCRC() const
 class idSort_CompareMapEntity : public idSort_Quick< idMapEntity*, idSort_CompareMapEntity >
 {
 public:
-	int Compare( idMapEntity*& a, idMapEntity*& b ) const
+	int Compare( idMapEntity* const& a, idMapEntity* const& b ) const
 	{
 		if( idStr::Icmp( a->epairs.GetString( "name" ), "worldspawn" ) == 0 )
 		{
-			return -1;
+			return 1;
 		}
 
 		if( idStr::Icmp( b->epairs.GetString( "name" ), "worldspawn" ) == 0 )
@@ -1136,6 +1130,7 @@ bool idMapFile::Parse( const char* filename, bool ignoreRegion, bool osPath )
 
 	name = filename;
 	name.StripFileExtension();
+	name.StripFileExtension(); // RB: there might be .map.map
 	fullName = name;
 	hasPrimitiveData = false;
 
@@ -1173,10 +1168,11 @@ bool idMapFile::Parse( const char* filename, bool ignoreRegion, bool osPath )
 		return false;
 	}
 
-	if( token == "{" )
-	{
-		isJSON = true;
-	}
+	// RB: TODO check for JSON in another way
+	//if( token == "{" )
+	//{
+	//	isJSON = true;
+	//}
 
 	if( isJSON )
 	{
@@ -1223,7 +1219,22 @@ bool idMapFile::Parse( const char* filename, bool ignoreRegion, bool osPath )
 			}
 		}
 
-		entities.SortWithTemplate( idSort_CompareMapEntity() );
+		//entities.SortWithTemplate( idSort_CompareMapEntity() );
+
+		if( entities.Num() > 0 && ( idStr::Icmp( entities[0]->epairs.GetString( "name" ), "worldspawn" ) != 0 ) )
+		{
+			// move world spawn to first place
+			for( int i = 1; i < entities.Num(); i++ )
+			{
+				if( idStr::Icmp( entities[i]->epairs.GetString( "name" ), "worldspawn" ) == 0 )
+				{
+					idMapEntity* tmp = entities[0];
+					entities[0] = entities[i];
+					entities[i] = tmp;
+					break;
+				}
+			}
+		}
 	}
 	else
 	{
@@ -1317,6 +1328,55 @@ bool idMapFile::Parse( const char* filename, bool ignoreRegion, bool osPath )
 		}
 	}
 
+	// RB: <name>_extraents.map allows to add and override existing entities
+	idMapFile extrasMap;
+	fullName = name;
+	//fullName.StripFileExtension();
+	fullName += "_extra_ents.map";
+
+	if( extrasMap.Parse( fullName, ignoreRegion, osPath ) )
+	{
+		for( i = 0; i < extrasMap.entities.Num(); i++ )
+		{
+			idMapEntity* extraEnt = extrasMap.entities[i];
+
+			const idKeyValue* kv = extraEnt->epairs.FindKey( "name" );
+			if( kv && kv->GetValue().Length() )
+			{
+				mapEnt = FindEntity( kv->GetValue().c_str() );
+				if( mapEnt )
+				{
+					// allow override old settings
+					for( int j = 0; j < extraEnt->epairs.GetNumKeyVals(); j++ )
+					{
+						const idKeyValue* pair = extraEnt->epairs.GetKeyVal( j );
+						if( pair && pair->GetValue().Length() )
+						{
+							mapEnt->epairs.Set( pair->GetKey(), pair->GetValue() );
+						}
+					}
+
+					continue;
+				}
+			}
+
+			{
+				mapEnt = new idMapEntity();
+				entities.Append( mapEnt );
+
+				// don't grab brushes or polys
+				mapEnt->epairs.Copy( extraEnt->epairs );
+			}
+		}
+
+#if 0
+		fullName = name;
+		fullName += "_extra_debug.map";
+
+		Write( fullName, ".map" );
+#endif
+	}
+
 	hasPrimitiveData = true;
 	return true;
 }
@@ -1339,7 +1399,7 @@ bool idMapFile::Write( const char* fileName, const char* ext, bool fromBasePath 
 
 	if( fromBasePath )
 	{
-		fp = idLib::fileSystem->OpenFileWrite( qpath, "fs_basepath" );
+		fp = idLib::fileSystem->OpenFileWrite( qpath, "fs_devpath" );
 	}
 	else
 	{
@@ -1948,14 +2008,7 @@ MapPolygonMesh* MapPolygonMesh::Parse( idLexer& src, const idVec3& origin, float
 
 MapPolygonMesh* MapPolygonMesh::ParseJSON( idLexer& src )
 {
-	float		info[7];
 	idToken		token;
-	int			i;
-
-	//if( !src.ExpectTokenString( "{" ) )
-	//{
-	//	return NULL;
-	//}
 
 	MapPolygonMesh* mesh = new MapPolygonMesh();
 
@@ -2224,18 +2277,6 @@ bool MapPolygonMesh::IsAreaportal() const
 
 void MapPolygonMesh::GetBounds( idBounds& bounds ) const
 {
-#if 0
-	idBounds bounds;
-	bounds.Clear();
-
-	for( int i = 0; i < verts.Num(); i++ )
-	{
-		bounds.AddPoint( verts[i].xyz );
-	}
-
-	return bounds;
-#else
-
 	if( !verts.Num() )
 	{
 		bounds.Clear();
@@ -2273,7 +2314,6 @@ void MapPolygonMesh::GetBounds( idBounds& bounds ) const
 			bounds[1].z = p.z;
 		}
 	}
-#endif
 }
 
 bool idMapFile::ConvertToPolygonMeshFormat()

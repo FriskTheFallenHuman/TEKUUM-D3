@@ -240,13 +240,13 @@ bool idSoundShader::ParseShader( idLexer& src )
 		// reverb
 		else if( !token.Icmp( "reverb" ) )
 		{
-			int reg0 = src.ParseFloat();
+			src.ParseFloat();
 			if( !src.ExpectTokenString( "," ) )
 			{
 				src.FreeSource();
 				return false;
 			}
-			int reg1 = src.ParseFloat();
+			src.ParseFloat();
 			// no longer supported
 		}
 		// volume

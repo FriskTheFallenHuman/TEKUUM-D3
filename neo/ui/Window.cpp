@@ -42,6 +42,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "FieldWindow.h"
 #include "MarkerWindow.h"
 
+#include "GameSSDWindow.h"
+#include "GameBearShootWindow.h"
+#include "GameBustOutWindow.h"
 
 //
 //  gui editor is more integrated into the window now
@@ -103,13 +106,7 @@ const char* idWindow::ScriptNames[] =
 	"onTrigger",
 	"onActionRelease",
 	"onEnter",
-	"onEnterRelease",
-	// RB begin
-	"onFocusGain",
-	"onFocusLose",
-	"onOpen",
-	"onClose",
-	// RB end
+	"onEnterRelease"
 };
 
 /*
@@ -382,6 +379,7 @@ idWindow::BringToTop
 */
 void idWindow::BringToTop( idWindow* w )
 {
+
 	if( w && !( w->flags & WIN_MODAL ) )
 	{
 		return;
@@ -426,6 +424,7 @@ idWindow::MouseEnter
 */
 void idWindow::MouseEnter()
 {
+
 	if( noEvents )
 	{
 		return;
@@ -441,6 +440,7 @@ idWindow::MouseExit
 */
 void idWindow::MouseExit()
 {
+
 	if( noEvents )
 	{
 		return;
@@ -458,9 +458,9 @@ idWindow* idWindow::GetChildWithOnAction( float xd, float yd )
 {
 
 	int c = children.Num();
-	while( --c >= 0 )
+	while( c > 0 )
 	{
-		idWindow* child = children[c];
+		idWindow* child = children[--c];
 		if( child->visible && child->Contains( child->drawRect, gui->CursorX(), gui->CursorY() ) && !child->noEvents )
 		{
 			child->hover = true;
@@ -470,13 +470,11 @@ idWindow* idWindow::GetChildWithOnAction( float xd, float yd )
 			}
 		}
 
-#if 1
 		idWindow* check = child->GetChildWithOnAction( xd, yd );
 		if( check != NULL && check != child )
 		{
 			return check;
 		}
-#endif
 	}
 
 	return this;
@@ -502,14 +500,12 @@ const char* idWindow::RouteMouseCoords( float xd, float yd )
 		return "";
 	}
 
-#if 0
 	idWindow* child = GetChildWithOnAction( xd, yd );
 	if( overChild != child )
 	{
 		if( overChild )
 		{
 			overChild->MouseExit();
-
 			str = overChild->cmd;
 			if( str.Length() )
 			{
@@ -517,15 +513,10 @@ const char* idWindow::RouteMouseCoords( float xd, float yd )
 				overChild->cmd = "";
 			}
 		}
-
 		overChild = child;
 		if( overChild )
 		{
 			overChild->MouseEnter();
-
-			// RB
-			SetFocus( overChild, true );
-
 			str = overChild->cmd;
 			if( str.Length() )
 			{
@@ -536,69 +527,6 @@ const char* idWindow::RouteMouseCoords( float xd, float yd )
 			dc->SetCursor( overChild->cursor );
 		}
 	}
-#else
-	int c = children.Num();
-	while( --c >= 0 )
-	{
-		idWindow* child = children[c];
-
-		if( child->visible && !child->noEvents && child->Contains( child->drawRect, gui->CursorX(), gui->CursorY() ) )
-		{
-			dc->SetCursor( child->cursor );
-			child->hover = true;
-
-			if( overChild != child )
-			{
-				if( overChild )
-				{
-					// RB: clear old overChild
-					overChild->MouseExit();
-					str = overChild->cmd;
-					if( str.Length() )
-					{
-						gui->GetDesktop()->AddCommand( str );
-						overChild->cmd = "";
-					}
-				}
-
-				overChild = child;
-				if( overChild )
-				{
-					overChild->MouseEnter();
-					SetFocus( overChild, true );
-
-					str = overChild->cmd;
-					if( str.Length() )
-					{
-						gui->GetDesktop()->AddCommand( str );
-						overChild->cmd = "";
-					}
-				}
-			}
-			else
-			{
-				if( !( child->flags & WIN_HOLDCAPTURE ) )
-				{
-					child->RouteMouseCoords( xd, yd );
-				}
-			}
-
-			return "";
-		}
-	}
-
-	if( overChild )
-	{
-		overChild->MouseExit();
-		str = overChild->cmd;
-		if( str.Length() )
-		{
-			gui->GetDesktop()->AddCommand( str );
-			overChild->cmd = "";
-		}
-		overChild = NULL;
-	}
-#endif
 
 	return "";
 }
@@ -610,6 +538,7 @@ idWindow::Activate
 */
 void idWindow::Activate( bool activate,	idStr& act )
 {
+
 	int n = ( activate ) ? ON_ACTIVATE : ON_DEACTIVATE;
 
 	//  make sure win vars are updated before activation
@@ -636,13 +565,11 @@ idWindow::Trigger
 void idWindow::Trigger()
 {
 	RunScript( ON_TRIGGER );
-
 	int c = children.Num();
 	for( int i = 0; i < c; i++ )
 	{
 		children[i]->Trigger();
 	}
-
 	StateChanged( true );
 }
 
@@ -653,6 +580,7 @@ idWindow::StateChanged
 */
 void idWindow::StateChanged( bool redraw )
 {
+
 	UpdateWinVars();
 
 	if( expressionRegisters.Num() && ops.Num() )
@@ -672,21 +600,6 @@ void idWindow::StateChanged( bool redraw )
 			drawWindows[i].simp->StateChanged( redraw );
 		}
 	}
-
-#if 0
-	if( redraw )
-	{
-		if( flags & WIN_DESKTOP )
-		{
-			// RB: FIXME hud parameter
-			Redraw( 0.0f, 0.0f, false );
-		}
-		if( background && background->CinematicLength() )
-		{
-			background->UpdateCinematic( gui->GetTime() );
-		}
-	}
-#endif
 }
 
 /*
@@ -748,9 +661,9 @@ idWindow::RunTimeEvents
 */
 bool idWindow::RunTimeEvents( int time )
 {
+
 	if( time == lastTimeRun )
 	{
-		//common->Printf("Skipping gui time events at %i\n", time);
 		return false;
 	}
 
@@ -787,9 +700,7 @@ bool idWindow::RunTimeEvents( int time )
 idWindow::RunNamedEvent
 ================
 */
-// RB: added parm recurseChildren
-void idWindow::RunNamedEvent( const char* eventName, bool recurseChildren )
-// RB end
+void idWindow::RunNamedEvent( const char* eventName )
 {
 	int i;
 	int c;
@@ -816,17 +727,12 @@ void idWindow::RunNamedEvent( const char* eventName, bool recurseChildren )
 		break;
 	}
 
-	// RB: added parm recurseChildren
-	if( recurseChildren )
+	// Run the event in all the children as well
+	c = children.Num();
+	for( i = 0; i < c; i++ )
 	{
-		// Run the event in all the children as well
-		c = children.Num();
-		for( i = 0; i < c; i++ )
-		{
-			children[i]->RunNamedEvent( eventName );
-		}
+		children[i]->RunNamedEvent( eventName );
 	}
-	// RB end
 }
 
 /*
@@ -910,6 +816,7 @@ const char* idWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals 
 
 	if( visible && !noEvents )
 	{
+
 		if( event->evType == SE_KEY )
 		{
 			EvalRegs( -1, true );
@@ -918,11 +825,11 @@ const char* idWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals 
 				*updateVisuals = true;
 			}
 
-			if( event->evValue == K_MOUSE1 )//|| event->evType == SE_TOUCH_MOTION_DOWN )
+			if( event->evValue == K_MOUSE1 )
 			{
+
 				if( !event->evValue2 && GetCaptureChild() )
 				{
-					// RB: key up
 					GetCaptureChild()->LoseCapture();
 					gui->GetDesktop()->captureChild = NULL;
 					return "";
@@ -931,37 +838,29 @@ const char* idWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals 
 				int c = children.Num();
 				while( --c >= 0 )
 				{
-					idWindow* child = children[c];
-
-					if( child->visible && !child->noEvents && child->Contains( children[c]->drawRect, gui->CursorX(), gui->CursorY() ) )
+					if( children[c]->visible && children[c]->Contains( children[c]->drawRect, gui->CursorX(), gui->CursorY() ) && !( children[c]->noEvents ) )
 					{
+						idWindow* child = children[c];
 						if( event->evValue2 )
 						{
-							// RB: bring modal windows like pop up windows to top and let them eat all events
 							BringToTop( child );
-
 							SetFocus( child );
-
 							if( child->flags & WIN_HOLDCAPTURE )
 							{
 								SetCapture( child );
 							}
 						}
-
 						if( child->Contains( child->clientRect, gui->CursorX(), gui->CursorY() ) )
 						{
 							//if ((gui_edit.GetBool() && (child->flags & WIN_SELECTED)) || (!gui_edit.GetBool() && (child->flags & WIN_MOVABLE))) {
 							//	SetCapture(child);
 							//}
-
 							SetFocus( child );
-
 							const char* childRet = child->HandleEvent( event, updateVisuals );
 							if( childRet != NULL && *childRet != '\0' )
 							{
 								return childRet;
 							}
-
 							if( child->flags & WIN_MODAL )
 							{
 								return "";
@@ -971,9 +870,7 @@ const char* idWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals 
 						{
 							if( event->evValue2 )
 							{
-								// RB: key down
 								SetFocus( child );
-
 								bool capture = true;
 								if( capture && ( ( child->flags & WIN_MOVABLE ) || gui_edit.GetBool() ) )
 								{
@@ -987,23 +884,13 @@ const char* idWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals 
 						}
 					}
 				}
-
 				if( event->evValue2 && !actionDownRun )
 				{
 					actionDownRun = RunScript( ON_ACTION );
-
-					// MF begin: keep mouse events more consistent
-					//RouteMouseCoords( 0.0f, 0.0f );
-					// MF end
-
 				}
 				else if( !actionUpRun )
 				{
 					actionUpRun = RunScript( ON_ACTIONRELEASE );
-
-					// MF begin: keep mouse events more consistent
-					//RouteMouseCoords( 0.0f, 0.0f );
-					// MF end
 				}
 			}
 			else if( event->evValue == K_MOUSE2 )
@@ -1027,20 +914,17 @@ const char* idWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals 
 							BringToTop( child );
 							SetFocus( child );
 						}
-
 						if( child->Contains( child->clientRect, gui->CursorX(), gui->CursorY() ) || GetCaptureChild() == child )
 						{
 							if( ( gui_edit.GetBool() && ( child->flags & WIN_SELECTED ) ) || ( !gui_edit.GetBool() && ( child->flags & WIN_MOVABLE ) ) )
 							{
 								SetCapture( child );
 							}
-
 							const char* childRet = child->HandleEvent( event, updateVisuals );
 							if( childRet && *childRet )
 							{
 								return childRet;
 							}
-
 							if( child->flags & WIN_MODAL )
 							{
 								return "";
@@ -1071,7 +955,7 @@ const char* idWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals 
 					}
 				}
 			}
-			else if( ( event->evValue == K_TAB ) && event->evValue2 )
+			else if( event->evValue == K_TAB && event->evValue2 )
 			{
 				if( GetFocusedChild() )
 				{
@@ -1098,7 +982,6 @@ const char* idWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals 
 						bool foundFocus = false;
 						bool recurse = false;
 						int index = 0;
-
 						if( child )
 						{
 							index = parent->GetChildIndex( child ) + direction;
@@ -1107,7 +990,6 @@ const char* idWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals 
 						{
 							index = parent->GetChildCount() - 1;
 						}
-
 						while( index < parent->GetChildCount() && index >= 0 )
 						{
 							idWindow* testWindow = parent->GetChild( index );
@@ -1117,7 +999,6 @@ const char* idWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals 
 								foundFocus = true;
 								break;
 							}
-
 							if( testWindow && !testWindow->noEvents && testWindow->visible )
 							{
 								if( testWindow->flags & WIN_CANFOCUS )
@@ -1134,10 +1015,8 @@ const char* idWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals 
 									break;
 								}
 							}
-
 							index += direction;
 						}
-
 						if( foundFocus )
 						{
 							// We found a child to focus on
@@ -1185,8 +1064,7 @@ const char* idWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals 
 						return childRet;
 					}
 				}
-
-				//if( flags & WIN_WANTENTER )
+				if( flags & WIN_WANTENTER )
 				{
 					if( event->evValue2 )
 					{
@@ -1223,96 +1101,6 @@ const char* idWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals 
 				return mouseRet;
 			}
 		}
-		// RB: added touch screen events
-		else if( event->evType == SE_TOUCH_MOTION_DOWN || event->evType == SE_TOUCH_MOTION_UP )
-		{
-			EvalRegs( -1, true );
-			if( updateVisuals )
-			{
-				*updateVisuals = true;
-			}
-
-			//if( event->evType == SE_TOUCH_MOTION_DOWN )
-			{
-				if( event->evType == SE_TOUCH_MOTION_UP && GetCaptureChild() )
-				{
-					// RB: key up
-					GetCaptureChild()->LoseCapture();
-					gui->GetDesktop()->captureChild = NULL;
-					return "";
-				}
-
-				int c = children.Num();
-				while( --c >= 0 )
-				{
-					idWindow* child = children[c];
-
-					if( child->visible && !child->noEvents && child->Contains( children[c]->drawRect, gui->CursorX(), gui->CursorY() ) )
-					{
-						if( event->evType == SE_TOUCH_MOTION_DOWN )
-						{
-							// RB: bring modal windows like pop up windows to top and let them eat all events
-							BringToTop( child );
-
-							SetFocus( child );
-
-							if( child->flags & WIN_HOLDCAPTURE )
-							{
-								SetCapture( child );
-							}
-						}
-
-						if( child->Contains( child->clientRect, gui->CursorX(), gui->CursorY() ) )
-						{
-							//if ((gui_edit.GetBool() && (child->flags & WIN_SELECTED)) || (!gui_edit.GetBool() && (child->flags & WIN_MOVABLE))) {
-							//	SetCapture(child);
-							//}
-
-							SetFocus( child );
-
-							const char* childRet = child->HandleEvent( event, updateVisuals );
-							if( childRet != NULL && *childRet != '\0' )
-							{
-								return childRet;
-							}
-
-							if( child->flags & WIN_MODAL )
-							{
-								return "";
-							}
-						}
-						else
-						{
-							if( event->evType == SE_TOUCH_MOTION_DOWN )
-							{
-								// RB: key down
-								SetFocus( child );
-
-								bool capture = true;
-								if( capture && ( ( child->flags & WIN_MOVABLE ) || gui_edit.GetBool() ) )
-								{
-									SetCapture( child );
-								}
-								return "";
-							}
-							else
-							{
-							}
-						}
-					}
-				}
-
-				if( event->evType == SE_TOUCH_MOTION_DOWN && !actionDownRun )
-				{
-					actionDownRun = RunScript( ON_ACTION );
-				}
-				else if( !actionUpRun )
-				{
-					actionUpRun = RunScript( ON_ACTIONRELEASE );
-				}
-			}
-		}
-		// RB end
 		else if( event->evType == SE_NONE )
 		{
 		}
@@ -1463,6 +1251,7 @@ idWindow::Time
 */
 void idWindow::Time()
 {
+
 	if( noTime )
 	{
 		return;
@@ -1894,7 +1683,6 @@ void idWindow::SetupFromState()
 	}
 
 	CalcClientRect( 0, 0 );
-
 	if( scripts[ ON_ACTION ] )
 	{
 		cursor = idDeviceContext::CURSOR_HAND;
@@ -1925,18 +1713,8 @@ void idWindow::Sized()
 idWindow::GainFocus
 ================
 */
-void idWindow::GainFocus( bool scripts )
+void idWindow::GainFocus()
 {
-	if( noEvents || !scripts )
-	{
-		return;
-	}
-
-	UpdateWinVars();
-
-	RunScript( ON_FOCUSGAIN );
-
-	StateChanged( true );
 }
 
 /*
@@ -1944,18 +1722,8 @@ void idWindow::GainFocus( bool scripts )
 idWindow::LoseFocus
 ================
 */
-void idWindow::LoseFocus( bool scripts )
+void idWindow::LoseFocus()
 {
-	if( noEvents || !scripts )
-	{
-		return;
-	}
-
-	UpdateWinVars();
-
-	RunScript( ON_FOCUSLOSE );
-
-	StateChanged( true );
 }
 
 /*
@@ -1976,40 +1744,6 @@ void idWindow::LoseCapture()
 {
 	flags &= ~WIN_CAPTURE;
 }
-
-// RB begin
-/*
-================
-idWindow::Open
-================
-*/
-void idWindow::Open()
-{
-	visible = true;
-
-	UpdateWinVars();
-
-	RunScript( ON_OPEN );
-
-	StateChanged( true );
-}
-
-/*
-================
-idWindow::Close
-================
-*/
-void idWindow::Close()
-{
-	visible = false;
-
-	UpdateWinVars();
-
-	RunScript( ON_CLOSE );
-
-	StateChanged( true );
-}
-// RB end
 
 /*
 ================
@@ -2083,17 +1817,10 @@ idWindow* idWindow::SetFocus( idWindow* w, bool scripts )
 	if( w->flags & WIN_CANFOCUS )
 	{
 		lastFocus = gui->GetDesktop()->focusedChild;
-
-		// RB: don't call focus functions if we still have the same window focused
-		if( lastFocus == w )
-		{
-			return w;
-		}
-
 		if( lastFocus )
 		{
 			lastFocus->flags &= ~WIN_FOCUS;
-			lastFocus->LoseFocus( scripts );
+			lastFocus->LoseFocus();
 		}
 
 		//  call on lose focus
@@ -2110,7 +1837,7 @@ idWindow* idWindow::SetFocus( idWindow* w, bool scripts )
 		}
 
 		w->flags |= WIN_FOCUS;
-		w->GainFocus( scripts );
+		w->GainFocus();
 		gui->GetDesktop()->focusedChild = w;
 	}
 
@@ -3020,6 +2747,42 @@ bool idWindow::Parse( idTokenParser* src, bool rebuild )
 			dwt.win = win;
 			drawWindows.Append( dwt );
 		}
+		else if( token == "gameSSDDef" )
+		{
+			idGameSSDWindow* win = new idGameSSDWindow( gui );
+			SaveExpressionParseState();
+			win->Parse( src, rebuild );
+			RestoreExpressionParseState();
+			AddChild( win );
+			win->SetParent( this );
+			dwt.simp = NULL;
+			dwt.win = win;
+			drawWindows.Append( dwt );
+		}
+		else if( token == "gameBearShootDef" )
+		{
+			idGameBearShootWindow* win = new idGameBearShootWindow( gui );
+			SaveExpressionParseState();
+			win->Parse( src, rebuild );
+			RestoreExpressionParseState();
+			AddChild( win );
+			win->SetParent( this );
+			dwt.simp = NULL;
+			dwt.win = win;
+			drawWindows.Append( dwt );
+		}
+		else if( token == "gameBustOutDef" )
+		{
+			idGameBustOutWindow* win = new idGameBustOutWindow( gui );
+			SaveExpressionParseState();
+			win->Parse( src, rebuild );
+			RestoreExpressionParseState();
+			AddChild( win );
+			win->SetParent( this );
+			dwt.simp = NULL;
+			dwt.win = win;
+			drawWindows.Append( dwt );
+		}
 //
 //  added new onEvent
 		else if( token == "onNamedEvent" )
@@ -3855,8 +3618,8 @@ Returns a register index
 */
 // DG: component and the return value are really pointers, so use intptr_t
 intptr_t idWindow::ParseExpression( idTokenParser* src, idWinVar* var, intptr_t component )
-// DG end
 {
+	// DG end
 	return ParseExpressionPriority( src, TOP_PRIORITY, var );
 }
 

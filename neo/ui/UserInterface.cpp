@@ -133,17 +133,11 @@ void idUserInterfaceManagerLocal::Preload( const char* mapName )
 
 void idUserInterfaceManagerLocal::BeginLevelLoad()
 {
-	int c = guis.Num();
-	for( int i = 0; i < c; i++ )
+	for( int i = 0; i < guis.Num(); i++ )
 	{
 		if( ( guis[ i ]->GetDesktop()->GetFlags() & WIN_MENUGUI ) == 0 )
 		{
 			guis[ i ]->ClearRefs();
-			/*
-			delete guis[ i ];
-			guis.RemoveIndex( i );
-			i--; c--;
-			*/
 		}
 	}
 }
@@ -505,16 +499,6 @@ const char* idUserInterfaceLocal::HandleEvent( const sysEvent_t* event, int _tim
 			cursorY = 0;
 		}
 	}
-
-	// RB begin
-	if( event->evType == SE_TOUCH_MOTION_DOWN || event->evType == SE_TOUCH_MOTION_UP || event->evType == SE_TOUCH_MOTION_MOVE )
-	{
-		//common->Printf( "idUserInterfaceLocal::HandleEvent( motionEvent = %i, x = %i, y = %i )\n", event->evType, event->evValue, event->evValue2 );
-
-		cursorX = idMath::ClampFloat( 0, SCREEN_WIDTH - 1, event->evValue * 0.001f * SCREEN_WIDTH );
-		cursorY = idMath::ClampFloat( 0, SCREEN_HEIGHT - 1, event->evValue2 * 0.001f * SCREEN_HEIGHT );
-	}
-	// RB end
 
 	if( desktop )
 	{

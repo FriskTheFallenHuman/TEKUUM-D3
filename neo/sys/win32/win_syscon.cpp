@@ -26,8 +26,8 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
-#pragma hdrstop
 #include "precompiled.h"
+#pragma hdrstop
 
 #include <errno.h>
 #include <float.h>
@@ -84,7 +84,7 @@ typedef struct
 	bool		quitOnClose;
 	int			windowWidth, windowHeight;
 
-	WNDPROC		SysInputLineWndProc;
+	LONG_PTR	SysInputLineWndProc;
 
 	idEditField	historyEditLines[COMMAND_HISTORY];
 
@@ -98,9 +98,8 @@ typedef struct
 
 static WinConData s_wcd;
 
-static LONG WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
+static LRESULT CALLBACK ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 {
-	char* cmdString;
 	static bool s_timePolarity;
 
 	switch( uMsg )
@@ -112,10 +111,14 @@ static LONG WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 			}
 			break;
 		case WM_CLOSE:
+#ifdef ID_DEDICATED
+			if( cvarSystem->IsInitialized() )
+			{
+#else
 			if( cvarSystem->IsInitialized() && com_skipRenderer.GetBool() )
 			{
-				cmdString = Mem_CopyString( "quit" );
-				Sys_QueEvent( SE_CONSOLE, 0, 0, strlen( cmdString ) + 1, cmdString, 0 );
+#endif
+				cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "quit\n" );
 			}
 			else if( s_wcd.quitOnClose )
 			{
@@ -132,7 +135,7 @@ static LONG WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 			{
 				SetBkColor( ( HDC ) wParam, RGB( 0x00, 0x00, 0x80 ) );
 				SetTextColor( ( HDC ) wParam, RGB( 0xff, 0xff, 0x00 ) );
-				return ( long ) s_wcd.hbrEditBackground;
+				return ( LRESULT ) s_wcd.hbrEditBackground;
 			}
 			else if( ( HWND ) lParam == s_wcd.hwndErrorBox )
 			{
@@ -146,7 +149,7 @@ static LONG WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 					SetBkColor( ( HDC ) wParam, RGB( 0x80, 0x80, 0x80 ) );
 					SetTextColor( ( HDC ) wParam, RGB( 0x00, 0x0, 0x00 ) );
 				}
-				return ( long ) s_wcd.hbrErrorBackground;
+				return ( LRESULT ) s_wcd.hbrErrorBackground;
 			}
 			break;
 		case WM_SYSCOMMAND:
@@ -163,15 +166,18 @@ static LONG WINAPI ConWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 			}
 			else if( wParam == QUIT_ID )
 			{
+#ifdef ID_DEDICATED
+				cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "quit\n" );
+#else
 				if( s_wcd.quitOnClose )
 				{
 					PostQuitMessage( 0 );
 				}
 				else
 				{
-					cmdString = Mem_CopyString( "quit" );
-					Sys_QueEvent( SE_CONSOLE, 0, 0, strlen( cmdString ) + 1, cmdString, 0 );
+					cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "quit\n" );
 				}
+#endif
 			}
 			else if( wParam == CLEAR_ID )
 			{
@@ -312,7 +318,7 @@ LONG WINAPI InputLineWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 			break;
 	}
 
-	return CallWindowProc( s_wcd.SysInputLineWndProc, hWnd, uMsg, wParam, lParam );
+	return CallWindowProc( ( WNDPROC )s_wcd.SysInputLineWndProc, hWnd, uMsg, wParam, lParam );
 }
 
 /*
@@ -434,13 +440,7 @@ void Sys_CreateConsole()
 									 win32.hInstance, NULL );
 	SendMessage( s_wcd.hwndBuffer, WM_SETFONT, ( WPARAM ) s_wcd.hfBufferFont, 0 );
 
-	// RB begin
-#if defined(_WIN64)
-	s_wcd.SysInputLineWndProc = ( WNDPROC ) SetWindowLong( s_wcd.hwndInputLine, GWLP_WNDPROC, ( LONG_PTR ) InputLineWndProc );
-#else
-	s_wcd.SysInputLineWndProc = ( WNDPROC ) SetWindowLong( s_wcd.hwndInputLine, GWL_WNDPROC, ( LONG ) InputLineWndProc );
-#endif
-	// RB end
+	s_wcd.SysInputLineWndProc = ( LONG_PTR ) SetWindowLongPtr( s_wcd.hwndInputLine, GWLP_WNDPROC, ( LONG_PTR ) InputLineWndProc );
 	SendMessage( s_wcd.hwndInputLine, WM_SETFONT, ( WPARAM ) s_wcd.hfBufferFont, 0 );
 
 // don't show it now that we have a splash screen up

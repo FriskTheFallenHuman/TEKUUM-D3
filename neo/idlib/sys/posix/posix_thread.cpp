@@ -30,8 +30,16 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 #include "../../precompiled.h"
 
+#ifndef _WIN32
+	#include <sched.h>
+#endif
+
+#ifdef __APPLE__
+	#include "../../../sys/posix/posix_public.h"
+#endif
+
 #ifdef __FreeBSD__
-	#include <pthread_ng.h> // for pthread_set_name_np
+	#include <pthread_np.h> // for pthread_set_name_np
 #endif
 
 // DG: Note: On Linux you need at least (e)glibc 2.12 to be able to set the threadname
@@ -65,18 +73,15 @@ static int Sys_SetThreadName( pthread_t handle, const char* name )
 	{
 		idLib::common->Printf( "Setting threadname \"%s\" failed, reason: %s (%i)\n", name, strerror( errno ), errno );
 	}
-	// pthread_getname_np(pthread_t, char*, size_t)
 #elif defined(__FreeBSD__)
 	// according to http://www.freebsd.org/cgi/man.cgi?query=pthread_set_name_np&sektion=3
 	// the interface is void pthread_set_name_np(pthread_t tid, const char *name);
 	pthread_set_name_np( handle, name ); // doesn't return anything
-	// seems like there is no get_name equivalent
 #endif
 	/* TODO: OSX:
 		// according to http://stackoverflow.com/a/7989973
 		// this needs to be called in the thread to be named!
 		ret = pthread_setname_np(name);
-		// int pthread_getname_np(pthread_t, char*, size_t);
 
 		// so we'd have to wrap the xthread_t function in Sys_CreateThread and set the name in the wrapping function...
 	*/
@@ -84,7 +89,26 @@ static int Sys_SetThreadName( pthread_t handle, const char* name )
 	return ret;
 }
 
-// TODO: Sys_GetThreadName() ?
+static int Sys_GetThreadName( pthread_t handle, char* namebuf, size_t buflen )
+{
+	int ret = 0;
+#ifdef __linux__
+	ret = pthread_getname_np( handle, namebuf, buflen );
+	if( ret != 0 )
+	{
+		idLib::common->Printf( "Getting threadname failed, reason: %s (%i)\n", strerror( errno ), errno );
+	}
+#elif defined(__FreeBSD__)
+	// seems like there is no pthread_getname_np equivalent on FreeBSD
+	idStr::snPrintf( namebuf, buflen, "Can't read threadname on this platform!" );
+#endif
+	/* TODO: OSX:
+		// int pthread_getname_np(pthread_t, char*, size_t);
+	*/
+
+	return ret;
+}
+
 #endif // DEBUG_THREADS
 
 
@@ -123,7 +147,7 @@ uintptr_t Sys_CreateThread( xthread_t function, void* parms, xthreadPriority pri
 	pthread_attr_destroy( &attr );
 
 
-#if !defined(__ANDROID__)
+#if 0
 	// RB: realtime policies require root privileges
 
 	// all Linux threads have one of the following scheduling policies:
@@ -144,7 +168,7 @@ uintptr_t Sys_CreateThread( xthread_t function, void* parms, xthreadPriority pri
 	int error = pthread_getschedparam( handle, &schedulePolicy, &scheduleParam );
 	if( error != 0 )
 	{
-		idLib::common->Warning( "ERROR: pthread_getschedparam %s failed: %s\n", name, strerror( error ) );
+		idLib::common->FatalError( "ERROR: pthread_getschedparam %s failed: %s\n", name, strerror( error ) );
 		return ( uintptr_t )0;
 	}
 
@@ -179,14 +203,14 @@ uintptr_t Sys_CreateThread( xthread_t function, void* parms, xthreadPriority pri
 	error = pthread_setschedparam( handle, schedulePolicy, &scheduleParam );
 	if( error != 0 )
 	{
-		idLib::common->Warning( "ERROR: pthread_setschedparam( name = %s, policy = %i, priority = %i ) failed: %s\n", name, schedulePolicy, scheduleParam.__sched_priority, strerror( error ) );
+		idLib::common->FatalError( "ERROR: pthread_setschedparam( name = %s, policy = %i, priority = %i ) failed: %s\n", name, schedulePolicy, scheduleParam.__sched_priority, strerror( error ) );
 		return ( uintptr_t )0;
 	}
 
 	pthread_getschedparam( handle, &schedulePolicy, &scheduleParam );
 	if( error != 0 )
 	{
-		idLib::common->Warning( "ERROR: pthread_getschedparam %s failed: %s\n", name, strerror( error ) );
+		idLib::common->FatalError( "ERROR: pthread_getschedparam %s failed: %s\n", name, strerror( error ) );
 		return ( uintptr_t )0;
 	}
 #endif
@@ -230,7 +254,7 @@ void Sys_DestroyThread( uintptr_t threadHandle )
 	name[0] = '\0';
 
 #if defined(DEBUG_THREADS)
-	pthread_getname_np( threadHandle, name, sizeof( name ) );
+	Sys_GetThreadName( ( pthread_t )threadHandle, name, sizeof( name ) );
 #endif
 
 #if 0 //!defined(__ANDROID__)
@@ -253,7 +277,7 @@ Sys_Yield
 */
 void Sys_Yield()
 {
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) || defined(__APPLE__)
 	sched_yield();
 #else
 	pthread_yield();
@@ -405,7 +429,9 @@ bool Sys_SignalWait( signalHandle_t& handle, int timeout )
 		else
 		{
 			timespec ts;
+
 			clock_gettime( CLOCK_REALTIME, &ts );
+
 			// DG: handle timeouts > 1s better
 			ts.tv_nsec += ( timeout % 1000 ) * 1000000; // millisec to nanosec
 			ts.tv_sec  += timeout / 1000;

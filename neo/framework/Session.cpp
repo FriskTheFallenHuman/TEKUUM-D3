@@ -31,6 +31,9 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "Session_local.h"
 
+#define CDKEY_FILEPATH "../" BASE_GAMEDIR "/" CDKEY_FILE
+#define XPKEY_FILEPATH "../" BASE_GAMEDIR "/" XPKEY_FILE
+
 idCVar com_deltaTimeClamp( "com_deltaTimeClamp", "50", CVAR_SYSTEM | CVAR_INTEGER, "don't process more than this time in a single frame" );
 
 idCVar	idSessionLocal::com_showAngles( "com_showAngles", "0", CVAR_SYSTEM | CVAR_BOOL, "" );
@@ -48,6 +51,9 @@ idCVar	idSessionLocal::com_aviDemoHeight( "com_aviDemoHeight", "256", CVAR_SYSTE
 idCVar	idSessionLocal::com_aviDemoTics( "com_aviDemoTics", "2", CVAR_SYSTEM | CVAR_INTEGER, "", 1, 60 );
 idCVar	idSessionLocal::com_wipeSeconds( "com_wipeSeconds", "1", CVAR_SYSTEM, "" );
 idCVar	idSessionLocal::com_guid( "com_guid", "", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_ROM, "" );
+
+idCVar	idSessionLocal::com_numQuicksaves( "com_numQuicksaves", "4", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
+		"number of quicksaves to keep before overwriting the oldest", 1, 99 );
 
 idSessionLocal		sessLocal;
 idSession*			session = &sessLocal;
@@ -85,6 +91,7 @@ void Session_RescanSI_f( const idCmdArgs& args )
 	}
 }
 
+#ifndef	ID_DEDICATED
 /*
 ==================
 Session_Map_f
@@ -101,6 +108,14 @@ static void Session_Map_f( const idCmdArgs& args )
 	map = args.Argv( 1 );
 	if( !map.Length() )
 	{
+		// DG: if the map command is called without any arguments, print the current map
+		// TODO: could check whether we're currently in a game, otherwise the last loaded
+		//       map is printed.. but OTOH, who cares
+		const char* curmap = sessLocal.mapSpawnData.serverInfo.GetString( "si_map" );
+		if( curmap[0] != '\0' )
+		{
+			common->Printf( "Current Map: %s\n", curmap );
+		}
 		return;
 	}
 	map.StripFileExtension();
@@ -197,6 +212,7 @@ static void Session_TestMap_f( const idCmdArgs& args )
 	sprintf( string, "devmap %s", map.c_str() );
 	cmdSystem->BufferCommandText( CMD_EXEC_NOW, string );
 }
+#endif
 
 /*
 ==================
@@ -212,7 +228,7 @@ static void Sess_WritePrecache_f( const idCmdArgs& args )
 	}
 	idStr	str = args.Argv( 1 );
 	str.DefaultFileExtension( ".cfg" );
-	idFile* f = fileSystem->OpenFileWrite( str );
+	idFile* f = fileSystem->OpenFileWrite( str, "fs_configpath" );
 	declManager->WritePrecacheCommands( f );
 	renderModelManager->WritePrecacheCommands( f );
 	uiManager->WritePrecacheCommands( f );
@@ -225,7 +241,6 @@ static void Sess_WritePrecache_f( const idCmdArgs& args )
 idSessionLocal::MaybeWaitOnCDKey
 ===============
 */
-#if defined(USE_CDKEY)
 bool idSessionLocal::MaybeWaitOnCDKey()
 {
 	if( authEmitTimeout > 0 )
@@ -236,7 +251,6 @@ bool idSessionLocal::MaybeWaitOnCDKey()
 	}
 	return false;
 }
-#endif
 
 /*
 ===================
@@ -245,7 +259,6 @@ Session_PromptKey_f
 */
 static void Session_PromptKey_f( const idCmdArgs& args )
 {
-#if defined(USE_CDKEY)
 	const char*	retkey;
 	bool		valid[ 2 ];
 	static bool recursed = false;
@@ -319,7 +332,6 @@ static void Session_PromptKey_f( const idCmdArgs& args )
 	}
 	while( retkey );
 	recursed = false;
-#endif // #if defined(USE_CDKEY)
 }
 
 /*
@@ -337,6 +349,7 @@ idSessionLocal::Clear
 */
 void idSessionLocal::Clear()
 {
+
 	insideUpdateScreen = false;
 	insideExecuteMapChange = false;
 
@@ -366,7 +379,6 @@ void idSessionLocal::Clear()
 	// RB end
 
 	syncNextGameFrame = false;
-
 	mapSpawned = false;
 	guiActive = NULL;
 	aviCaptureMode = false;
@@ -388,12 +400,10 @@ void idSessionLocal::Clear()
 	loadGameList.Clear();
 	modsList.Clear();
 
-#if defined(USE_CDKEY)
 	authEmitTimeout = 0;
 	authWaitBox = false;
 
 	authMsg.Clear();
-#endif
 }
 
 /*
@@ -403,15 +413,9 @@ idSessionLocal::idSessionLocal
 */
 idSessionLocal::idSessionLocal()
 {
-#if defined(STANDALONE)
-	guiMainMenu = guiIntro \
-				  = guiRestartMenu = guiLoading = guiActive \
-									 = guiTest = guiMsg = guiMsgRestore = guiTakeNotes = NULL;
-#else
-	guiMainMenu = guiIntro \
-				  = guiRestartMenu = guiLoading = guiGameOver = guiActive \
-									 = guiTest = guiMsg = guiMsgRestore = guiTakeNotes = NULL;
-#endif
+	guiInGame = guiMainMenu = guiIntro \
+							  = guiRestartMenu = guiLoading = guiGameOver = guiActive \
+									  = guiTest = guiMsg = guiMsgRestore = guiTakeNotes = NULL;
 
 	menuSoundWorld = NULL;
 
@@ -471,6 +475,12 @@ void idSessionLocal::Shutdown()
 	if( aviCaptureMode )
 	{
 		EndAVICapture();
+	}
+
+	if( timeDemo == TD_YES )
+	{
+		// else the game freezes when showing the timedemo results
+		timeDemo = TD_YES_THEN_QUIT;
 	}
 
 	Stop();
@@ -564,7 +574,6 @@ void idSessionLocal::CompleteWipe()
 		UpdateScreen( captureToImage, true );
 		return;
 	}
-
 	while( com_ticNumber < wipeStopTic )
 	{
 #if ID_CONSOLE_LOCK
@@ -572,7 +581,6 @@ void idSessionLocal::CompleteWipe()
 #endif
 		UpdateScreen( captureToImage, true );
 	}
-	// RB end
 }
 
 /*
@@ -696,6 +704,7 @@ static void Session_DemoShot_f( const idCmdArgs& args )
 	}
 }
 
+#ifndef	ID_DEDICATED
 /*
 ================
 Session_RecordDemo_f
@@ -857,6 +866,7 @@ static void Session_TimeCmdDemo_f( const idCmdArgs& args )
 {
 	sessLocal.TimeCmdDemo( args.Argv( 1 ) );
 }
+#endif
 
 /*
 ================
@@ -873,27 +883,7 @@ static void Session_Disconnect_f( const idCmdArgs& args )
 	}
 }
 
-#ifdef ID_DEMO_BUILD
-/*
-================
-Session_EndOfDemo_f
-================
-*/
-static void Session_EndOfDemo_f( const idCmdArgs& args )
-{
-	sessLocal.Stop();
-	sessLocal.StartMenu();
-	if( soundSystem )
-	{
-		soundSystem->SetMute( false );
-	}
-	if( sessLocal.guiActive )
-	{
-		sessLocal.guiActive->HandleNamedEvent( "endOfDemo" );
-	}
-}
-#endif
-
+#ifndef	ID_DEDICATED
 /*
 ================
 Session_ExitCmdDemo_f
@@ -910,6 +900,7 @@ static void Session_ExitCmdDemo_f( const idCmdArgs& args )
 	common->Printf( "Command demo exited at logIndex %i\n", sessLocal.logIndex );
 	sessLocal.cmdDemoFile = NULL;
 }
+#endif
 
 /*
 ================
@@ -1072,11 +1063,7 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName )
 	// bring up the loading screen manually, since demos won't
 	// call ExecuteMapChange()
 	guiLoading = uiManager->FindGui( "guis/map/loading.gui", true, false, true );
-#if defined(STANDALONE)
-	guiLoading->SetStateString( "demo", common->GetLanguageDict()->GetString( "#str_idSessionLocal_StartPlayingRenderDemo_Loading" ) );
-#else
 	guiLoading->SetStateString( "demo", common->GetLanguageDict()->GetString( "#str_02087" ) );
-#endif
 	readDemo = new idDemoFile;
 	demoName.DefaultFileExtension( ".demo" );
 	if( !readDemo->OpenForReading( demoName ) )
@@ -1424,16 +1411,19 @@ void idSessionLocal::MoveToNewMap( const char* mapName )
 {
 	mapSpawnData.serverInfo.Set( "si_map", mapName );
 
-#if defined(__ANDROID__)
-	//ji.ShowProgressDialog( mapName );
-#endif
-
 	ExecuteMapChange();
 
 	if( !mapSpawnData.serverInfo.GetBool( "devmap" ) )
 	{
 		// Autosave at the beginning of the level
-		SaveGame( GetAutoSaveName( mapName ), true );
+
+		// DG: set an explicit savename to avoid problems with autosave names
+		//     (they were translated which caused problems like all alpha labs parts
+		//      getting the same filename in spanish, probably because the strings contained
+		//      dots and everything behind them was cut off as "file extension".. see #305)
+		idStr saveFileName = "Autosave_";
+		saveFileName += mapName;
+		SaveGame( GetAutoSaveName( mapName ), true, saveFileName );
 	}
 
 	SetGUI( NULL, NULL );
@@ -1672,7 +1662,7 @@ void idSessionLocal::LoadLoadingGui( const char* mapName )
 	stripped.StripPath();
 
 	char guiMap[ MAX_STRING_CHARS ];
-	strncpy( guiMap, va( "guis/map/%s.gui", stripped.c_str() ), MAX_STRING_CHARS );
+	idStr::Copynz( guiMap, va( "guis/map/%s.gui", stripped.c_str() ), MAX_STRING_CHARS );
 	// give the gamecode a chance to override
 	game->GetMapLoadingGUI( guiMap );
 
@@ -1896,6 +1886,8 @@ void idSessionLocal::ExecuteMapChange( bool noFadeWipe )
 			fileSystem->CloseFile( savegameFile );
 			savegameFile = NULL;
 
+			common->Warning( "WARNING: Loading savegame failed, will restart the map with the player persistent data!" );
+
 			game->SetServerInfo( mapSpawnData.serverInfo );
 			game->InitFromNewMap( fullMapName + ".map", rw, sw, idAsyncNetwork::server.IsActive(), idAsyncNetwork::client.IsActive(), Sys_Milliseconds() );
 		}
@@ -2017,8 +2009,7 @@ void LoadGame_f( const idCmdArgs& args )
 	console->Close();
 	if( args.Argc() < 2 || idStr::Icmp( args.Argv( 1 ), "quick" ) == 0 )
 	{
-		idStr saveName = common->GetLanguageDict()->GetString( "#str_07178" );
-		sessLocal.LoadGame( saveName );
+		sessLocal.QuickLoad();
 	}
 	else
 	{
@@ -2035,11 +2026,7 @@ void SaveGame_f( const idCmdArgs& args )
 {
 	if( args.Argc() < 2 || idStr::Icmp( args.Argv( 1 ), "quick" ) == 0 )
 	{
-		idStr saveName = common->GetLanguageDict()->GetString( "#str_07178" );
-		if( sessLocal.SaveGame( saveName ) )
-		{
-			common->Printf( "%s\n", saveName.c_str() );
-		}
+		sessLocal.QuickSave();
 	}
 	else
 	{
@@ -2204,14 +2191,16 @@ void idSessionLocal::ScrubSaveGameFileName( idStr& saveFileName ) const
 idSessionLocal::SaveGame
 ===============
 */
-bool idSessionLocal::SaveGame( const char* saveName, bool autosave )
+bool idSessionLocal::SaveGame( const char* saveName, bool autosave, const char* saveFileName )
 {
 #ifdef	ID_DEDICATED
 	common->Printf( "Dedicated servers cannot save games.\n" );
 	return false;
 #else
 	int i;
-	idStr gameFile, previewFile, descriptionFile, mapName;
+	idStr previewFile, descriptionFile, mapName;
+	// DG: support setting an explicit savename to avoid problems with autosave names
+	idStr gameFile = ( saveFileName != NULL ) ? saveFileName : saveName;
 
 	if( !mapSpawned )
 	{
@@ -2247,7 +2236,6 @@ bool idSessionLocal::SaveGame( const char* saveName, bool autosave )
 	}
 
 	// setup up filenames and paths
-	gameFile = saveName;
 	ScrubSaveGameFileName( gameFile );
 
 	gameFile = "savegames/" + gameFile;
@@ -2412,7 +2400,7 @@ bool idSessionLocal::LoadGame( const char* saveName )
 	savegameFile->ReadString( gamename );
 
 	// if this isn't a savegame for the correct game, abort loadgame
-	if( gamename != GAME_NAME )
+	if( !( gamename == GAME_NAME || gamename == "DOOM 3" ) )
 	{
 		common->Warning( "Attempted to load an invalid savegame: %s", in.c_str() );
 
@@ -2482,6 +2470,119 @@ bool idSessionLocal::LoadGame( const char* saveName )
 #endif
 }
 
+bool idSessionLocal::QuickSave()
+{
+	idStr saveName = common->GetLanguageDict()->GetString( "#str_07178" );
+
+	idStr saveFilePathBase = saveName;
+	ScrubSaveGameFileName( saveFilePathBase );
+	saveFilePathBase = "savegames/" + saveFilePathBase;
+
+	const char* game = cvarSystem->GetCVarString( "fs_game" );
+	if( game != NULL && game[0] == '\0' )
+	{
+		game = NULL;
+	}
+
+	const int maxNum = com_numQuicksaves.GetInteger();
+	int indexToUse = 1;
+	ID_TIME_T oldestTime = 0;
+	for( int i = 1; i <= maxNum; ++i )
+	{
+		idStr saveFilePath = saveFilePathBase;
+		if( i > 1 )
+		{
+			// the first one is just called "QuickSave" without a number, like before.
+			// the others are called "QuickSave2" "QuickSave3" etc
+			saveFilePath += i;
+		}
+		saveFilePath.SetFileExtension( ".save" );
+
+		idFile* f = fileSystem->OpenFileRead( saveFilePath, true, game );
+		if( f == NULL )
+		{
+			// this savegame doesn't exist yet => we can use this index for the name
+			indexToUse = i;
+			break;
+		}
+		else
+		{
+			ID_TIME_T ts = f->Timestamp();
+			assert( ts != 0 );
+			if( ts < oldestTime || oldestTime == 0 )
+			{
+				// this is the oldest quicksave we found so far => a candidate to be overwritten
+				indexToUse = i;
+				oldestTime = ts;
+			}
+			delete f;
+		}
+	}
+
+	if( indexToUse > 1 )
+	{
+		saveName += indexToUse;
+	}
+
+	if( SaveGame( saveName ) )
+	{
+		common->Printf( "%s\n", saveName.c_str() );
+		return true;
+	}
+	return false;
+}
+
+bool idSessionLocal::QuickLoad()
+{
+	idStr saveName = common->GetLanguageDict()->GetString( "#str_07178" );
+
+	idStr saveFilePathBase = saveName;
+	ScrubSaveGameFileName( saveFilePathBase );
+	saveFilePathBase = "savegames/" + saveFilePathBase;
+
+	const char* game = cvarSystem->GetCVarString( "fs_game" );
+	if( game != NULL && game[0] == '\0' )
+	{
+		game = NULL;
+	}
+
+	// find the newest QuickSave (or QuickSave2, QuickSave3, ...)
+	const int maxNum = com_numQuicksaves.GetInteger();
+	int indexToUse = 1;
+	ID_TIME_T newestTime = 0;
+	for( int i = 1; i <= maxNum; ++i )
+	{
+		idStr saveFilePath = saveFilePathBase;
+		if( i > 1 )
+		{
+			// the first one is just called "QuickSave" without a number, like before.
+			// the others are called "QuickSave2" "QuickSave3" etc
+			saveFilePath += i;
+		}
+		saveFilePath.SetFileExtension( ".save" );
+
+		idFile* f = fileSystem->OpenFileRead( saveFilePath, true, game );
+		if( f != NULL )
+		{
+			ID_TIME_T ts = f->Timestamp();
+			assert( ts != 0 );
+			if( ts > newestTime )
+			{
+				indexToUse = i;
+				newestTime = ts;
+			}
+			delete f;
+		}
+	}
+
+	if( indexToUse > 1 )
+	{
+		saveName += indexToUse;
+	}
+
+	return sessLocal.LoadGame( saveName );
+}
+
 /*
 ===============
 idSessionLocal::ProcessEvent
@@ -2490,10 +2591,10 @@ idSessionLocal::ProcessEvent
 bool idSessionLocal::ProcessEvent( const sysEvent_t* event )
 {
 	// hitting escape anywhere brings up the menu
-// RB begin - Xbox 360 controller support
-	if( !guiActive && event->evType == SE_KEY && event->evValue2 == 1 && ( event->evValue == K_ESCAPE || event->evValue == K_JOY9 ) )
+	// DG: but shift-escape should bring up console instead so ignore that
+	if( !guiActive && event->evType == SE_KEY && event->evValue2 == 1
+			&& event->evValue == K_ESCAPE && ( !idKeyInput::IsDown( K_LSHIFT ) || !idKeyInput::IsDown( K_RSHIFT ) ) )
 	{
-// RB end
 		console->Close();
 		if( game )
 		{
@@ -2524,9 +2625,7 @@ bool idSessionLocal::ProcessEvent( const sysEvent_t* event )
 	if( guiTest )
 	{
 		// hitting escape exits the testgui
-
-		// RB: added joystick start button
-		if( event->evType == SE_KEY && event->evValue2 == 1 && ( event->evValue == K_ESCAPE || event->evValue == K_JOY9 ) )
+		if( event->evType == SE_KEY && event->evValue2 == 1 && event->evValue == K_ESCAPE )
 		{
 			guiTest = NULL;
 			return true;
@@ -2892,7 +2991,7 @@ void idSessionLocal::UpdateScreen( bool captureToImage, bool outOfSequence, bool
 	if( insideUpdateScreen )
 	{
 		return;
-		//common->FatalError( "idSessionLocal::UpdateScreen: recursively called" );
+//		common->FatalError( "idSessionLocal::UpdateScreen: recursively called" );
 	}
 
 	insideUpdateScreen = true;
@@ -2965,16 +3064,19 @@ void idSessionLocal::UpdateScreen( bool captureToImage, bool outOfSequence, bool
 idSessionLocal::Frame
 ===============
 */
+extern bool CheckOpenALDeviceAndRecoverIfNeeded();
 void idSessionLocal::Frame()
 {
+
 	if( com_asyncSound.GetInteger() == 0 )
 	{
-#if defined(__ANDROID__)
 		soundSystem->AsyncUpdateWrite( Sys_Milliseconds() );
-#else
-		soundSystem->AsyncUpdate( Sys_Milliseconds() );
-#endif
 	}
+
+	// DG: periodically check if sound device is still there and try to reset it if not
+	//     (calling this from idSoundSystem::AsyncUpdate(), which runs in a separate thread
+	//      by default, causes a deadlock when calling idCommon->Warning())
+	CheckOpenALDeviceAndRecoverIfNeeded();
 
 	// Editors that completely take over the game
 	if( com_editorActive && ( com_editors & ( EDITOR_RADIANT | EDITOR_GUI ) ) )
@@ -3195,8 +3297,6 @@ void idSessionLocal::Frame()
 		minTic = latchedTicNumber;
 	}
 
-// RB begin
-#if !defined(USE_QT_WINDOWING)
 	// FIXME: deserves a cleanup and abstraction
 #if defined( _WIN32 )
 	// Spin in place if needed.  The game should yield the cpu if
@@ -3223,8 +3323,6 @@ void idSessionLocal::Frame()
 	}
 #endif
 
-#endif // #if !defined(USE_QT_WINDOWING)
-// RB end
 
 #endif
 
@@ -3371,13 +3469,11 @@ void idSessionLocal::Frame()
 	for( int i = 0; i < numGameFrames; i++ )
 	{
 		RunGameTic();
-
 		if( !mapSpawned )
 		{
 			// exited game play
 			break;
 		}
-
 		if( syncNextGameFrame )
 		{
 			// long game frame, so break out and continue executing as if there was no hitch
@@ -3417,7 +3513,7 @@ void idSessionLocal::RunGameTic()
 		{
 			cmd = logCmd.cmd;
 			cmd.ByteSwap();
-			logCmd.consistencyHash = LittleLong( logCmd.consistencyHash );
+			logCmd.consistencyHash = LittleInt( logCmd.consistencyHash );
 		}
 	}
 
@@ -3441,7 +3537,7 @@ void idSessionLocal::RunGameTic()
 
 	// run the game logic every player move
 	int	start = Sys_Milliseconds();
-	gameReturn_t ret = game->RunFrame( &cmd );
+	gameReturn_t	ret = game->RunFrame( &cmd );
 
 	int end = Sys_Milliseconds();
 	time_gameFrame += end - start;	// note time used for com_speeds
@@ -3511,10 +3607,6 @@ void idSessionLocal::RunGameTic()
 		{
 			cmdSystem->BufferCommandText( CMD_EXEC_INSERT, "stoprecording ; disconnect" );
 		}
-		else if( !idStr::Icmp( args.Argv( 0 ), "endOfDemo" ) )
-		{
-			cmdSystem->BufferCommandText( CMD_EXEC_NOW, "endOfDemo" );
-		}
 	}
 }
 
@@ -3556,10 +3648,6 @@ void idSessionLocal::Init()
 
 	cmdSystem->AddCommand( "disconnect", Session_Disconnect_f, CMD_FL_SYSTEM, "disconnects from a game" );
 
-#ifdef ID_DEMO_BUILD
-	cmdSystem->AddCommand( "endOfDemo", Session_EndOfDemo_f, CMD_FL_SYSTEM, "ends the demo version of the game" );
-#endif
-
 	cmdSystem->AddCommand( "demoShot", Session_DemoShot_f, CMD_FL_SYSTEM, "writes a screenshot for a demo" );
 	cmdSystem->AddCommand( "testGUI", Session_TestGUI_f, CMD_FL_SYSTEM, "tests a gui" );
 
@@ -3586,32 +3674,30 @@ void idSessionLocal::Init()
 	menuSoundWorld = soundSystem->AllocSoundWorld( rw );
 
 	// we have a single instance of the main menu
-#ifndef ID_DEMO_BUILD
 	guiMainMenu = uiManager->FindGui( "guis/mainmenu.gui", true, false, true );
-#else
-	guiMainMenu = uiManager->FindGui( "guis/demo_mainmenu.gui", true, false, true );
-#endif
+	if( !guiMainMenu )
+	{
+		guiMainMenu = uiManager->FindGui( "guis/demo_mainmenu.gui", true, false, true );
+		demoversion = ( guiMainMenu != NULL );
+	}
 	guiMainMenu_MapList = uiManager->AllocListGUI();
 	guiMainMenu_MapList->Config( guiMainMenu, "mapList" );
 	idAsyncNetwork::client.serverList.GUIConfig( guiMainMenu, "serverList" );
 	guiRestartMenu = uiManager->FindGui( "guis/restart.gui", true, false, true );
-#if !defined(STANDALONE)
 	guiGameOver = uiManager->FindGui( "guis/gameover.gui", true, false, true );
-#endif
 	guiMsg = uiManager->FindGui( "guis/msg.gui", true, false, true );
 	guiTakeNotes = uiManager->FindGui( "guis/takeNotes.gui", true, false, true );
 	guiIntro = uiManager->FindGui( "guis/intro.gui", true, false, true );
 
 	whiteMaterial = declManager->FindMaterial( "_white" );
 
+	guiInGame = NULL;
 	guiTest = NULL;
 
 	guiActive = NULL;
 	guiHandle = NULL;
 
-#if defined(USE_CDKEY)
 	ReadCDKey();
-#endif
 
 	common->Printf( "session initialized\n" );
 	common->Printf( "--------------------------------------\n" );
@@ -3684,7 +3770,6 @@ void idSessionLocal::TimeHitch( int msec )
 idSessionLocal::ReadCDKey
 =================
 */
-#if defined(USE_CDKEY)
 void idSessionLocal::ReadCDKey()
 {
 	idStr filename;
@@ -3693,8 +3778,15 @@ void idSessionLocal::ReadCDKey()
 
 	cdkey_state = CDKEY_UNKNOWN;
 
-	filename = "../" BASE_GAMEDIR "/" CDKEY_FILE;
-	f = fileSystem->OpenExplicitFileRead( fileSystem->RelativePathToOSPath( filename, "fs_savepath" ) );
+	filename = CDKEY_FILEPATH;
+	f = fileSystem->OpenExplicitFileRead( fileSystem->RelativePathToOSPath( filename, "fs_configpath" ) );
+
+	// try the install path, which is where the cd installer and steam put it
+	if( !f )
+	{
+		f = fileSystem->OpenExplicitFileRead( fileSystem->RelativePathToOSPath( filename, "fs_basepath" ) );
+	}
+
 	if( !f )
 	{
 		common->Printf( "Couldn't read %s.\n", filename.c_str() );
@@ -3710,8 +3802,15 @@ void idSessionLocal::ReadCDKey()
 
 	xpkey_state = CDKEY_UNKNOWN;
 
-	filename = "../" BASE_GAMEDIR "/" XPKEY_FILE;
-	f = fileSystem->OpenExplicitFileRead( fileSystem->RelativePathToOSPath( filename, "fs_savepath" ) );
+	filename = XPKEY_FILEPATH;
+	f = fileSystem->OpenExplicitFileRead( fileSystem->RelativePathToOSPath( filename, "fs_configpath" ) );
+
+	// try the install path, which is where the cd installer and steam put it
+	if( !f )
+	{
+		f = fileSystem->OpenExplicitFileRead( fileSystem->RelativePathToOSPath( filename, "fs_basepath" ) );
+	}
+
 	if( !f )
 	{
 		common->Printf( "Couldn't read %s.\n", filename.c_str() );
@@ -3725,26 +3824,24 @@ void idSessionLocal::ReadCDKey()
 		idStr::Copynz( xpkey, buffer, CDKEY_BUF_LEN );
 	}
 }
-#endif // #if defined(USE_CDKEY)
 
 /*
 ================
 idSessionLocal::WriteCDKey
 ================
 */
-#if defined(USE_CDKEY)
 void idSessionLocal::WriteCDKey()
 {
 	idStr filename;
 	idFile* f;
 	const char* OSPath;
 
-	filename = "../" BASE_GAMEDIR "/" CDKEY_FILE;
+	filename = CDKEY_FILEPATH;
 	// OpenFileWrite advertises creating directories to the path if needed, but that won't work with a '..' in the path
-	// occasionally on windows, but mostly on Linux and OSX, the fs_savepath/base may not exist in full
-	OSPath = fileSystem->BuildOSPath( cvarSystem->GetCVarString( "fs_savepath" ), BASE_GAMEDIR, CDKEY_FILE );
+	// occasionally on windows, but mostly on Linux and OSX, the fs_configpath/base may not exist in full
+	OSPath = fileSystem->BuildOSPath( cvarSystem->GetCVarString( "fs_configpath" ), BASE_GAMEDIR, CDKEY_FILE );
 	fileSystem->CreateOSPath( OSPath );
-	f = fileSystem->OpenFileWrite( filename );
+	f = fileSystem->OpenFileWrite( filename, "fs_configpath" );
 	if( !f )
 	{
 		common->Printf( "Couldn't write %s.\n", filename.c_str() );
@@ -3753,8 +3850,8 @@ void idSessionLocal::WriteCDKey()
 	f->Printf( "%s%s", cdkey, CDKEY_TEXT );
 	fileSystem->CloseFile( f );
 
-	filename = "../" BASE_GAMEDIR "/" XPKEY_FILE;
-	f = fileSystem->OpenFileWrite( filename );
+	filename = XPKEY_FILEPATH;
+	f = fileSystem->OpenFileWrite( filename, "fs_configpath" );
 	if( !f )
 	{
 		common->Printf( "Couldn't write %s.\n", filename.c_str() );
@@ -3763,14 +3860,12 @@ void idSessionLocal::WriteCDKey()
 	f->Printf( "%s%s", xpkey, CDKEY_TEXT );
 	fileSystem->CloseFile( f );
 }
-#endif // #if defined(USE_CDKEY)
 
 /*
 ===============
 idSessionLocal::ClearKey
 ===============
 */
-#if defined(USE_CDKEY)
 void idSessionLocal::ClearCDKey( bool valid[ 2 ] )
 {
 	if( !valid[ 0 ] )
@@ -3794,14 +3889,12 @@ void idSessionLocal::ClearCDKey( bool valid[ 2 ] )
 	}
 	WriteCDKey( );
 }
-#endif // #if defined(USE_CDKEY)
 
 /*
 ================
 idSessionLocal::GetCDKey
 ================
 */
-#if defined(USE_CDKEY)
 const char* idSessionLocal::GetCDKey( bool xp )
 {
 	if( !xp )
@@ -3817,7 +3910,6 @@ const char* idSessionLocal::GetCDKey( bool xp )
 
 // digits to letters table
 #define CDKEY_DIGITS "TWSBJCGD7PA23RLH"
-#endif // #if defined(USE_CDKEY)
 
 /*
 ===============
@@ -3825,7 +3917,6 @@ idSessionLocal::EmitGameAuth
 we toggled some key state to CDKEY_CHECKING. send a standalone auth packet to validate
 ===============
 */
-#if defined(USE_CDKEY)
 void idSessionLocal::EmitGameAuth()
 {
 	// make sure the auth reply is empty, we use it to indicate an auth reply
@@ -3849,7 +3940,6 @@ void idSessionLocal::EmitGameAuth()
 		}
 	}
 }
-#endif // #if defined(USE_CDKEY)
 
 /*
 ================
@@ -3858,7 +3948,6 @@ the function will only modify keys to _OK or _CHECKING if the offline checks are
 if the function returns false, the offline checks failed, and offline_valid holds which keys are bad
 ================
 */
-#if defined(USE_CDKEY)
 bool idSessionLocal::CheckKey( const char* key, bool netConnect, bool offline_valid[ 2 ] )
 {
 	char lkey[ 2 ][ CDKEY_BUF_LEN ];
@@ -3946,7 +4035,6 @@ bool idSessionLocal::CheckKey( const char* key, bool netConnect, bool offline_va
 
 	return true;
 }
-#endif // #if defined(USE_CDKEY)
 
 /*
 ===============
@@ -3956,7 +4044,6 @@ if d3xp is installed, check for a valid xpkey as well
 emit an auth packet to the master if possible and needed
 ===============
 */
-#if defined(USE_CDKEY)
 bool idSessionLocal::CDKeysAreValid( bool strict )
 {
 	int i;
@@ -4029,7 +4116,6 @@ bool idSessionLocal::CDKeysAreValid( bool strict )
 		return ( cdkey_state == CDKEY_OK || cdkey_state == CDKEY_CHECKING ) && ( xpkey_state == CDKEY_OK || xpkey_state == CDKEY_CHECKING || xpkey_state == CDKEY_NA );
 	}
 }
-#endif // #if defined(USE_CDKEY)
 
 /*
 ===============
@@ -4038,11 +4124,7 @@ idSessionLocal::WaitingForGameAuth
 */
 bool idSessionLocal::WaitingForGameAuth()
 {
-#if defined(USE_CDKEY)
 	return authEmitTimeout != 0;
-#else
-	return true;
-#endif
 }
 
 /*
@@ -4050,10 +4132,9 @@ bool idSessionLocal::WaitingForGameAuth()
 idSessionLocal::CDKeysAuthReply
 ===============
 */
-#if defined(USE_CDKEY)
 void idSessionLocal::CDKeysAuthReply( bool valid, const char* auth_msg )
 {
-	assert( authEmitTimeout > 0 );
+	//assert( authEmitTimeout > 0 );
 	if( authWaitBox )
 	{
 		// close the wait box
@@ -4088,7 +4169,6 @@ void idSessionLocal::CDKeysAuthReply( bool valid, const char* auth_msg )
 	authEmitTimeout = 0;
 	SetCDKeyGuiVars();
 }
-#endif // #if defined(USE_CDKEY)
 
 /*
 ===============
@@ -4115,9 +4195,7 @@ int idSessionLocal::GetSaveGameVersion()
 idSessionLocal::GetAuthMsg
 ===============
 */
-#if defined(USE_CDKEY)
 const char* idSessionLocal::GetAuthMsg()
 {
 	return authMsg.c_str();
 }
-#endif

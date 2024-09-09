@@ -51,12 +51,7 @@ idCVar joy_deltaPerMSLook( "joy_deltaPerMSLook", "0.003", CVAR_FLOAT | CVAR_ARCH
 idCVar in_mouseSpeed( "in_mouseSpeed", "1",	CVAR_ARCHIVE | CVAR_FLOAT, "speed at which the mouse moves", 0.25f, 4.0f );
 idCVar in_alwaysRun( "in_alwaysRun", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "always run (reverse _speed button) - only in MP" );
 
-#if defined(__ANDROID__)
-	idCVar in_useJoystick( "in_useJoystick", "1", CVAR_BOOL, "enables/disables the gamepad for PC use" );
-#else
-	idCVar in_useJoystick( "in_useJoystick", "0", CVAR_ARCHIVE | CVAR_BOOL, "enables/disables the gamepad for PC use" );
-#endif
-
+idCVar in_useJoystick( "in_useJoystick", "0", CVAR_ARCHIVE | CVAR_BOOL, "enables/disables the gamepad for PC use" );
 idCVar in_joystickRumble( "in_joystickRumble", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "enable joystick rumble" );
 idCVar in_invertLook( "in_invertLook", "0", CVAR_ARCHIVE | CVAR_BOOL, "inverts the look controls so the forward looks up (flight controls) - the proper way to play games!" );
 idCVar in_mouseInvertLook( "in_mouseInvertLook", "0", CVAR_ARCHIVE | CVAR_BOOL, "inverts the look controls so the forward looks up (flight controls) - the proper way to play games!" );
@@ -71,7 +66,7 @@ void usercmd_t::ByteSwap()
 	angles[0] = LittleShort( angles[0] );
 	angles[1] = LittleShort( angles[1] );
 	angles[2] = LittleShort( angles[2] );
-	sequence = LittleLong( sequence );
+	sequence = LittleInt( sequence );
 }
 
 /*
@@ -299,9 +294,6 @@ private:
 	void			Mouse();
 	void			Keyboard();
 	void			Joystick( int deviceNum );
-// RB begin
-	void			TouchScreen();
-// RB end
 
 	void			Key( int keyNum, bool down );
 
@@ -335,16 +327,6 @@ private:
 	int				lastPollTime;
 	float			lastLookValuePitch;
 	float			lastLookValueYaw;
-
-	// RB: rectangles for touch screen interfaces
-	idRectangle		touchMove;
-	idRectangle		touchAttack;
-	idRectangle		touchJump;
-	idRectangle		touchCrouch;
-	idRectangle		touchNextWeapon;
-	idRectangle		touchPrevWeapon;
-	idRectangle		touchFlashLight;
-	// RB end
 
 	static idCVar	in_yawSpeed;
 	static idCVar	in_pitchSpeed;
@@ -514,6 +496,45 @@ void idUsercmdGenLocal::KeyMove()
 	cmd.forwardmove += idMath::ClampChar( forward );
 	cmd.rightmove += idMath::ClampChar( side );
 	cmd.upmove += idMath::ClampChar( up );
+}
+
+/*
+================
+idUsercmdGenLocal::UsercmdInterrupt
+
+Called asyncronously
+================
+*/
+void idUsercmdGenLocal::UsercmdInterrupt( int deviceNum )
+{
+	// dedicated servers won't create usercmds
+	if( !initialized )
+	{
+		return;
+	}
+
+	// init the usercmd for com_ticNumber+1
+	InitCurrent();
+
+	// process the system mouse events
+	Mouse();
+
+	// process the system keyboard events
+	Keyboard();
+
+	// process the system joystick events
+	if( deviceNum >= 0 && in_useJoystick.GetBool() )
+	{
+		Joystick( deviceNum );
+	}
+
+	// create the usercmd for com_ticNumber+1
+	MakeCurrent();
+
+	// save a number for debugging cmdDemos and networking
+	cmd.sequence = com_ticNumber + 1;
+
+	buffered[( com_ticNumber + 1 ) & ( MAX_BUFFERED_USERCMD - 1 )] = cmd;
 }
 
 /*
@@ -1433,6 +1454,16 @@ void idUsercmdGenLocal::Mouse()
 			case M_ACTION6:
 			case M_ACTION7:
 			case M_ACTION8:
+
+			// DG: support some more mouse buttons
+			case M_ACTION9:
+			case M_ACTION10:
+			case M_ACTION11:
+			case M_ACTION12:
+			case M_ACTION13:
+			case M_ACTION14:
+			case M_ACTION15:
+			case M_ACTION16: // DG end
 				mouseButton = K_MOUSE1 + ( action - M_ACTION1 );
 				mouseDown = ( value != 0 );
 				Key( mouseButton, mouseDown );
@@ -1497,9 +1528,9 @@ void idUsercmdGenLocal::Joystick( int deviceNum )
 {
 	int numEvents = Sys_PollJoystickInputEvents( deviceNum );
 
-#if 0 //defined(__ANDROID__)
-	common->Printf( "idUsercmdGenLocal::Joystick: events = %i\n", numEvents );
-#endif
+//	if(numEvents) {
+//		common->Printf("idUsercmdGenLocal::Joystick: numEvents = %i\n", numEvents);
+//	}
 
 	// Study each of the buffer elements and process them.
 	for( int i = 0; i < numEvents; i++ )
@@ -1508,9 +1539,7 @@ void idUsercmdGenLocal::Joystick( int deviceNum )
 		int value;
 		if( Sys_ReturnJoystickInputEvent( i, action, value ) )
 		{
-#if 0 //defined(__ANDROID__)
-			common->Printf( " action = %i, value = %i\n", action, value );
-#endif
+//		common->Printf("idUsercmdGenLocal::Joystick: i = %i / action = %i / value = %i\n", i, action, value);
 
 			if( action >= J_ACTION1 && action <= J_ACTION_MAX )
 			{
@@ -1534,202 +1563,6 @@ void idUsercmdGenLocal::Joystick( int deviceNum )
 	}
 
 	Sys_EndJoystickInputEvents();
-}
-
-void idUsercmdGenLocal::TouchScreen()
-{
-	int numEvents = Sys_PollTouchScreenInputEvents();
-
-	if( numEvents && ( session != NULL && !session->IsMenuActive() ) )
-	{
-		int sysWidth = glConfig.nativeScreenWidth;
-		int sysHeight = glConfig.nativeScreenHeight;
-
-		touchMove.x = 0;
-		touchMove.y = sysHeight - 400;
-		touchMove.w = 400;
-		touchMove.h = 400;
-
-		touchAttack.x = sysWidth / 2 - 150;
-		touchAttack.y = sysHeight - 300;
-		touchAttack.w = 300;
-		touchAttack.h = 300;
-
-		touchJump.x = sysWidth - 200;
-		touchJump.y = sysHeight - 400;
-		touchJump.w = 200;
-		touchJump.h = 200;
-
-		touchCrouch.x = sysWidth - 200;
-		touchCrouch.y = sysHeight - 200;
-		touchCrouch.w = 200;
-		touchCrouch.h = 200;
-
-		touchNextWeapon.x = sysWidth - 200;
-		touchNextWeapon.y = 0;
-		touchNextWeapon.w = 200;
-		touchNextWeapon.h = 200;
-
-		touchPrevWeapon.x = sysWidth - 400;
-		touchPrevWeapon.y = 0;
-		touchPrevWeapon.w = 200;
-		touchPrevWeapon.h = 200;
-
-		touchFlashLight.x = sysWidth - 600;
-		touchFlashLight.y = 0;
-		touchFlashLight.w = 200;
-		touchFlashLight.h = 200;
-
-		//common->Printf( "idUsercmdGenLocal::TouchScreen() touchAttack: %s\n", touchAttack.String() );
-
-		static int lastAction = -1;
-
-		for( int i = 0; i < numEvents; i++ )
-		{
-			int action, value, value2, value3, value4;
-
-			if( Sys_ReturnTouchScreenInputEvent( i, action, value, value2, value3, value4 ) )
-			{
-				if( action == TOUCH_MOTION_DOWN || action == TOUCH_MOTION_UP )
-				{
-					float x = idMath::ClampFloat( 0, sysWidth - 1, value * 0.001f * sysWidth );
-					float y = idMath::ClampFloat( 0, sysHeight - 1, value2 * 0.001f * sysHeight );
-
-					if( touchAttack.Contains( x, y ) )
-					{
-						//common->Printf( "idUsercmdGenLocal::TouchScreen() ( %i , %i ) inside touchAttack %s\n", ( int ) x, ( int ) y, touchAttack.String() );
-
-						mouseButton = K_MOUSE1;
-						mouseDown = ( action == TOUCH_MOTION_DOWN );
-						Key( mouseButton, mouseDown );
-					}
-					else if( touchJump.Contains( x, y ) )
-					{
-						//common->Printf( "idUsercmdGenLocal::TouchScreen() ( %i , %i ) inside touchJump %s\n", ( int ) x, ( int ) y, touchJump.String() );
-
-						Key( K_SPACE, action == TOUCH_MOTION_DOWN );
-					}
-					else if( touchCrouch.Contains( x, y ) )
-					{
-						//common->Printf( "idUsercmdGenLocal::TouchScreen() ( %i , %i ) inside touchCrouch %s\n", ( int ) x, ( int ) y, touchCrouch.String() );
-
-						Key( K_C , action == TOUCH_MOTION_DOWN );
-					}
-					else if( touchNextWeapon.Contains( x, y ) )
-					{
-						//common->Printf( "idUsercmdGenLocal::TouchScreen() ( %i , %i ) inside touchNextWeapon %s\n", ( int ) x, ( int ) y, touchNextWeapon.String() );
-
-						Key( K_MWHEELDOWN , action == TOUCH_MOTION_DOWN );
-					}
-					else if( touchPrevWeapon.Contains( x, y ) )
-					{
-						//common->Printf( "idUsercmdGenLocal::TouchScreen() ( %i , %i ) inside touchPrevWeapon %s\n", ( int ) x, ( int ) y, touchPrevWeapon.String() );
-
-						Key( K_MWHEELUP, action == TOUCH_MOTION_DOWN );
-					}
-					else if( touchFlashLight.Contains( x, y ) )
-					{
-						//common->Printf( "idUsercmdGenLocal::TouchScreen() ( %i , %i ) inside touchFlashLight %s\n", ( int ) x, ( int ) y, touchFlashLight.String() );
-
-						Key( K_F , action == TOUCH_MOTION_DOWN );
-					}
-					else if( action == TOUCH_MOTION_UP )
-					{
-						// reset all keys
-						mouseButton = K_MOUSE1;
-						mouseDown = false;
-						Key( mouseButton, mouseDown );
-
-						Key( K_SPACE , false );
-						Key( K_C , false );
-						Key( K_MWHEELDOWN , false );
-						Key( K_MWHEELUP , false );
-						Key( K_F , false );
-					}
-				}
-				else if( action == TOUCH_MOTION_DELTA_XY )
-				{
-					float x = idMath::ClampFloat( 0, sysWidth - 1, value * 0.001f * sysWidth );
-					float y = idMath::ClampFloat( 0, sysHeight - 1, value2 * 0.001f * sysHeight );
-
-					/*
-					if( lastAction == TOUCH_MOTION_DOWN )
-					{
-						if( touchAttack.Contains( x, y ) )
-						{
-							common->Printf( "idUsercmdGenLocal::TouchScreen() ( %i , %i ) inside touchAttack %s\n", ( int ) x, ( int ) y, touchAttack.String() );
-
-							mouseButton = K_MOUSE1;
-							mouseDown = true; // continue fire ( action == TOUCH_MOTION_DOWN );
-							Key( mouseButton, mouseDown );
-						}
-					}
-					else
-					*/
-					{
-						if( !touchMove.Contains( x, y ) ) //&& !touchJump.Contains( x, y ) && !touchCrouch.Contains( x, y ) && )
-						{
-							mouseDx += value3 * 4.0f;
-							continuousMouseX += value3 * 4.0f;
-
-							mouseDy += value4 * 4.0f;
-							continuousMouseY += value4 * 4.0f;
-						}
-					}
-				}
-
-				lastAction = action;
-			}
-		}
-	}
-
-	Sys_EndTouchScreenInputEvents();
-}
-// RB end
-
-/*
-================
-idUsercmdGenLocal::UsercmdInterrupt
-
-Called asyncronously
-================
-*/
-void idUsercmdGenLocal::UsercmdInterrupt( int deviceNum )
-{
-	// dedicated servers won't create usercmds
-	if( !initialized )
-	{
-		return;
-	}
-
-	// init the usercmd for com_ticNumber+1
-	InitCurrent();
-
-	// process the system mouse events
-	Mouse();
-
-	// process the system keyboard events
-	Keyboard();
-
-	// process the system joystick events
-#if !defined(__ANDROID__)
-	if( deviceNum >= 0 && in_useJoystick.GetBool() )
-#endif
-	{
-		Joystick( deviceNum );
-	}
-
-	// RB begin
-	TouchScreen();
-	// RB end
-
-	// create the usercmd for com_ticNumber+1
-	MakeCurrent();
-
-	// save a number for debugging cmdDemos and networking
-	cmd.sequence = com_ticNumber + 1;
-
-	buffered[( com_ticNumber + 1 ) & ( MAX_BUFFERED_USERCMD - 1 )] = cmd;
 }
 
 /*
@@ -1769,16 +1602,10 @@ void idUsercmdGenLocal::BuildCurrentUsercmd( int deviceNum )
 	Keyboard();
 
 	// process the system joystick events
-#if !defined(__ANDROID__)
 	if( deviceNum >= 0 && in_useJoystick.GetBool() )
-#endif
 	{
 		Joystick( deviceNum );
 	}
-
-	// RB begin
-	TouchScreen();
-	// RB end
 
 	// create the usercmd
 	MakeCurrent();

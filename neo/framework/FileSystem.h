@@ -52,9 +52,14 @@ If you have questions concerning this license or the applicable additional terms
 ===============================================================================
 */
 
-static const ID_TIME_T		FILE_NOT_FOUND_TIMESTAMP	= 0xFFFFFFFF;
+// FIXME: DG: this assumes 32bit time_t, but it's 64bit now, at least on some platforms incl. Win32 in modern VS
+//            => change it (to -1?) or does that break anything?
+static const ID_TIME_T	FILE_NOT_FOUND_TIMESTAMP	= 0xFFFFFFFF;
 static const int		MAX_PURE_PAKS				= 128;
-static const int		MAX_OSPATH					= 256;
+// DG: https://www.gnu.org/software/libc/manual/html_node/Limits-for-Files.html says
+//     that FILENAME_MAX can be *really* big on some systems and thus is not suitable
+//     for buffer lengths. So limit it to prevent stack overflow/out of memory issues
+static const int		MAX_OSPATH					= ( FILENAME_MAX < 32000 ) ? FILENAME_MAX : 32000;
 
 // modes for OpenFileByMode. used as bit mask internally
 typedef enum
@@ -89,8 +94,8 @@ typedef enum
 
 typedef enum
 {
-	FILE_EXEC,
-	FILE_OPEN
+	DL_FILE_EXEC,
+	DL_FILE_OPEN
 } dlMime_t;
 
 typedef enum
@@ -117,15 +122,15 @@ typedef struct fileDownload_s
 	void* 				buffer;
 } fileDownload_t;
 
-typedef struct backgroundDownload_s
+struct backgroundDownload_t
 {
-	struct backgroundDownload_s*	next;	// set by the fileSystem
+	backgroundDownload_t*	next;	// set by the fileSystem
 	dlType_t			opcode;
 	idFile* 			f;
 	fileDownload_t		file;
 	urlDownload_t		url;
 	volatile bool		completed;
-} backgroundDownload_t;
+};
 
 // file list for directory listings
 class idFileList
@@ -181,69 +186,50 @@ class idFileSystem
 {
 public:
 	virtual					~idFileSystem() {}
-
 	// Initializes the file system.
 	virtual void			Init() = 0;
-
 	// Restarts the file system.
 	virtual void			Restart() = 0;
-
 	// Shutdown the file system.
 	virtual void			Shutdown( bool reloading ) = 0;
-
 	// Returns true if the file system is initialized.
 	virtual bool			IsInitialized() const = 0;
-
 	// Returns true if we are doing an fs_copyfiles.
 	virtual bool			PerformingCopyFiles() const = 0;
-
 	// Returns a list of mods found along with descriptions
 	// 'mods' contains the directory names to be passed to fs_game
 	// 'descriptions' contains a free form string to be used in the UI
 	virtual idModList* 		ListMods() = 0;
-
 	// Frees the given mod list
 	virtual void			FreeModList( idModList* modList ) = 0;
-
 	// Lists files with the given extension in the given directory.
 	// Directory should not have either a leading or trailing '/'
 	// The returned files will not include any directories or '/' unless fullRelativePath is set.
 	// The extension must include a leading dot and may not contain wildcards.
 	// If extension is "/", only subdirectories will be returned.
 	virtual idFileList* 	ListFiles( const char* relativePath, const char* extension, bool sort = false, bool fullRelativePath = false, const char* gamedir = NULL ) = 0;
-
 	// Lists files in the given directory and all subdirectories with the given extension.
 	// Directory should not have either a leading or trailing '/'
 	// The returned files include a full relative path.
 	// The extension must include a leading dot and may not contain wildcards.
 	virtual idFileList* 	ListFilesTree( const char* relativePath, const char* extension, bool sort = false, const char* gamedir = NULL ) = 0;
-
 	// Frees the given file list.
 	virtual void			FreeFileList( idFileList* fileList ) = 0;
-
-
-	// Converts a full OS path to a relative path.
-	virtual const char* 	OSPathToRelativePath( const char* OSPath ) = 0;
-
 	// Converts a relative path to a full OS path.
+	virtual const char* 	OSPathToRelativePath( const char* OSPath ) = 0;
+	// Converts a full OS path to a relative path.
 	virtual const char* 	RelativePathToOSPath( const char* relativePath, const char* basePath = "fs_devpath" ) = 0;
-
 	// Builds a full OS path from the given components.
 	virtual const char* 	BuildOSPath( const char* base, const char* game, const char* relativePath ) = 0;
-
 	// Creates the given OS path for as far as it doesn't exist already.
 	virtual void			CreateOSPath( const char* OSPath ) = 0;
-
 	// Returns true if a file is in a pak file.
 	virtual bool			FileIsInPAK( const char* relativePath ) = 0;
-
 	// Returns a space separated string containing the checksums of all referenced pak files.
 	// will call SetPureServerChecksums internally to restrict itself
 	virtual void			UpdatePureServerChecksums() = 0;
-
 	// setup the mapping of OS -> game pak checksum
 	virtual bool			UpdateGamePakChecksums() = 0;
-
 	// 0-terminated list of pak checksums
 	// if pureChecksums[ 0 ] == 0, all data sources will be allowed
 	// otherwise, only pak files that match one of the checksums will be checked for files
@@ -252,21 +238,16 @@ public:
 	// it returns wether the switch was successfull, and sets the missing checksums
 	// the process is verbosive when fs_debug 1
 	virtual fsPureReply_t	SetPureServerChecksums( const int pureChecksums[ MAX_PURE_PAKS ], int gamePakChecksum, int missingChecksums[ MAX_PURE_PAKS ], int* missingGamePakChecksum ) = 0;
-
 	// fills a 0-terminated list of pak checksums for a client
 	// if OS is -1, give the current game pak checksum. if >= 0, lookup the game pak table (server only)
 	virtual void			GetPureServerChecksums( int checksums[ MAX_PURE_PAKS ], int OS, int* gamePakChecksum ) = 0;
-
 	// before doing a restart, force the pure list and the search order
 	// if the given checksum list can't be completely processed and set, will error out
 	virtual void			SetRestartChecksums( const int pureChecksums[ MAX_PURE_PAKS ], int gamePakChecksum ) = 0;
-
 	// equivalent to calling SetPureServerChecksums with an empty list
 	virtual	void			ClearPureChecksums() = 0;
-
 	// get a mask of supported OSes. if not pure, returns -1
 	virtual int				GetOSMask() = 0;
-
 	// Reads a complete file.
 	// Returns the length of the file, or -1 on failure.
 	// A null buffer will just return the file length without loading.
@@ -275,58 +256,41 @@ public:
 	// A 0 byte will always be appended at the end, so string ops are safe.
 	// The buffer should be considered read-only, because it may be cached for other uses.
 	virtual int				ReadFile( const char* relativePath, void** buffer, ID_TIME_T* timestamp = NULL ) = 0;
-
 	// Frees the memory allocated by ReadFile.
 	virtual void			FreeFile( void* buffer ) = 0;
-
 	// Writes a complete file, will create any needed subdirectories.
 	// Returns the length of the file, or -1 on failure.
 	virtual int				WriteFile( const char* relativePath, const void* buffer, int size, const char* basePath = "fs_savepath" ) = 0;
-
 	// Removes the given file.
 	virtual void			RemoveFile( const char* relativePath ) = 0;
-
 	// Opens a file for reading.
 	virtual idFile* 		OpenFileRead( const char* relativePath, bool allowCopyFiles = true, const char* gamedir = NULL ) = 0;
-
 	// RB: from BFG code
 	// Opens a file for reading, reads the file completely in memory and returns an idFile_Memory obj.
 	virtual idFile* 		OpenFileReadMemory( const char* relativePath, bool allowCopyFiles = true, const char* gamedir = NULL ) = 0;
 	// RB end
-
 	// Opens a file for writing, will create any needed subdirectories.
 	virtual idFile* 		OpenFileWrite( const char* relativePath, const char* basePath = "fs_savepath" ) = 0;
-
 	// Opens a file for writing at the end.
 	virtual idFile* 		OpenFileAppend( const char* filename, bool sync = false, const char* basePath = "fs_basepath" ) = 0;
-
 	// Opens a file for reading, writing, or appending depending on the value of mode.
 	virtual idFile* 		OpenFileByMode( const char* relativePath, fsMode_t mode ) = 0;
-
 	// Opens a file for reading from a full OS path.
 	virtual idFile* 		OpenExplicitFileRead( const char* OSPath ) = 0;
-
 	// Opens a file for writing to a full OS path.
 	virtual idFile* 		OpenExplicitFileWrite( const char* OSPath ) = 0;
-
 	// Closes a file.
 	virtual void			CloseFile( idFile* f ) = 0;
-
 	// Returns immediately, performing the read from a background thread.
 	virtual void			BackgroundDownload( backgroundDownload_t* bgl ) = 0;
-
 	// resets the bytes read counter
 	virtual void			ResetReadCount() = 0;
-
 	// retrieves the current read count
 	virtual int				GetReadCount() = 0;
-
 	// adds to the read count
 	virtual void			AddToReadCount( int c ) = 0;
-
 	// look for a dynamic module
 	virtual void			FindDLL( const char* basename, char dllPath[ MAX_OSPATH ], bool updateChecksum ) = 0;
-
 	// case sensitive filesystems use an internal directory cache
 	// the cache is cleared when calling OpenFileWrite and RemoveFile
 	// in some cases you may need to use this directly

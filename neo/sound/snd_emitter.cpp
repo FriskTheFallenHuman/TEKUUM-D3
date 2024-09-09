@@ -200,6 +200,7 @@ void idSoundChannel::Clear()
 	diversity = 0.0f;
 	leadinSample = NULL;
 	trigger44kHzTime = 0;
+	stopped = false;
 	for( j = 0; j < 6; j++ )
 	{
 		lastV[j] = 0.0f;
@@ -207,15 +208,11 @@ void idSoundChannel::Clear()
 	memset( &parms, 0, sizeof( parms ) );
 
 	triggered = false;
-
-	// RB begin
-#if defined(USE_OPENAL)
-	openalSource = NULL;
+	paused = false;
+	openalSource = 0;
 	openalStreamingOffset = 0;
 	openalStreamingBuffer[0] = openalStreamingBuffer[1] = openalStreamingBuffer[2] = 0;
 	lastopenalStreamingBuffer[0] = lastopenalStreamingBuffer[1] = lastopenalStreamingBuffer[2] = 0;
-#endif
-	// RB end
 }
 
 /*
@@ -240,6 +237,7 @@ idSoundChannel::Stop
 void idSoundChannel::Stop()
 {
 	triggerState = false;
+	stopped = true;
 	if( decoder != NULL )
 	{
 		idSampleDecoder::Free( decoder );
@@ -254,41 +252,35 @@ idSoundChannel::ALStop
 */
 void idSoundChannel::ALStop()
 {
-
-	// RB begin
-#if defined(USE_OPENAL)
-	if( idSoundSystemLocal::useOpenAL )
+	if( alIsSource( openalSource ) )
 	{
+		alSourceStop( openalSource );
+		alSourcei( openalSource, AL_BUFFER, 0 );
+		// unassociate effect slot from source, so the effect slot can be deleted on shutdown
+		// even though the source itself is deleted later (in idSoundSystemLocal::Shutdown())
+		alSource3i( openalSource, AL_AUXILIARY_SEND_FILTER, AL_EFFECTSLOT_NULL, 0, AL_FILTER_NULL );
+		soundSystemLocal.FreeOpenALSource( openalSource );
+	}
 
-		if( alIsSource( openalSource ) )
+	if( openalStreamingBuffer[0] && openalStreamingBuffer[1] && openalStreamingBuffer[2] )
+	{
+		alGetError();
+		alDeleteBuffers( 3, &openalStreamingBuffer[0] );
+		if( alGetError() == AL_NO_ERROR )
 		{
-			alSourceStop( openalSource );
-			alSourcei( openalSource, AL_BUFFER, 0 );
-			soundSystemLocal.FreeOpenALSource( openalSource );
-		}
-
-		if( openalStreamingBuffer[0] && openalStreamingBuffer[1] && openalStreamingBuffer[2] )
-		{
-			alGetError();
-			alDeleteBuffers( 3, &openalStreamingBuffer[0] );
-			if( alGetError() == AL_NO_ERROR )
-			{
-				openalStreamingBuffer[0] = openalStreamingBuffer[1] = openalStreamingBuffer[2] = 0;
-			}
-		}
-
-		if( lastopenalStreamingBuffer[0] && lastopenalStreamingBuffer[1] && lastopenalStreamingBuffer[2] )
-		{
-			alGetError();
-			alDeleteBuffers( 3, &lastopenalStreamingBuffer[0] );
-			if( alGetError() == AL_NO_ERROR )
-			{
-				lastopenalStreamingBuffer[0] = lastopenalStreamingBuffer[1] = lastopenalStreamingBuffer[2] = 0;
-			}
+			openalStreamingBuffer[0] = openalStreamingBuffer[1] = openalStreamingBuffer[2] = 0;
 		}
 	}
-#endif
-	// RB end
+
+	if( lastopenalStreamingBuffer[0] && lastopenalStreamingBuffer[1] && lastopenalStreamingBuffer[2] )
+	{
+		alGetError();
+		alDeleteBuffers( 3, &lastopenalStreamingBuffer[0] );
+		if( alGetError() == AL_NO_ERROR )
+		{
+			lastopenalStreamingBuffer[0] = lastopenalStreamingBuffer[1] = lastopenalStreamingBuffer[2] = 0;
+		}
+	}
 }
 
 /*
@@ -530,18 +522,12 @@ void idSoundEmitterLocal::CheckForCompletion( int current44kHzTime )
 			// see if this channel has completed
 			if( !( chan->parms.soundShaderFlags & SSF_LOOPING ) )
 			{
-
-				// RB begin
-#if defined(USE_OPENAL)
 				ALint state = AL_PLAYING;
 
-				if( idSoundSystemLocal::useOpenAL && alIsSource( chan->openalSource ) )
+				if( alIsSource( chan->openalSource ) )
 				{
 					alGetSourcei( chan->openalSource, AL_SOURCE_STATE, &state );
 				}
-#endif
-				// RB end
-
 				idSlowChannel slow = GetSlowChannel( chan );
 
 				if( soundWorld->slowmoActive && slow.IsActive() )
@@ -554,16 +540,9 @@ void idSoundEmitterLocal::CheckForCompletion( int current44kHzTime )
 						{
 							chan->leadinSample->PurgeSoundSample();
 						}
-						continue;
 					}
 				}
-				else if( ( chan->trigger44kHzTime + chan->leadinSample->LengthIn44kHzSamples() < current44kHzTime )
-						 // RB begin
-#if defined(USE_OPENAL)
-						 || ( state == AL_STOPPED )
-#endif
-						 // RB end
-					   )
+				else if( ( chan->trigger44kHzTime + chan->leadinSample->LengthIn44kHzSamples() < current44kHzTime ) || ( chan->stopped ) )
 				{
 					chan->Stop();
 
@@ -575,7 +554,6 @@ void idSoundEmitterLocal::CheckForCompletion( int current44kHzTime )
 					{
 						chan->leadinSample->PurgeSoundSample();
 					}
-					continue;
 				}
 			}
 
@@ -616,7 +594,6 @@ Called once each sound frame by the main thread from idSoundWorldLocal::PlaceOri
 void idSoundEmitterLocal::Spatialize( idVec3 listenerPos, int listenerArea, idRenderWorld* rw )
 {
 	int			i;
-	bool		hasActive = false;
 
 	//
 	// work out the maximum distance of all the playing channels
@@ -996,18 +973,13 @@ int idSoundEmitterLocal::StartSound( const idSoundShader* shader, const s_channe
 
 	// the sound will start mixing in the next async mix block
 	chan->triggered = true;
-
-	// RB begin
-#if defined(USE_OPENAL)
 	chan->openalStreamingOffset = 0;
-#endif
-	// RB end
-
 	chan->trigger44kHzTime = start44kHz;
 	chan->parms = chanParms;
 	chan->triggerGame44kHzTime = soundWorld->game44kHz;
 	chan->soundShader = shader;
 	chan->triggerChannel = channel;
+	chan->stopped = false;
 	chan->Start();
 
 	// we need to start updating the def and mixing it in
@@ -1140,15 +1112,64 @@ void idSoundEmitterLocal::StopSound( const s_channelType channel )
 		chan->ALStop();
 
 		// if this was an onDemand sound, purge the sample now
-		// RB: added missing chan->leadinSample != NULL test
 		if( chan->leadinSample != NULL && chan->leadinSample->onDemand )
 		{
-			// RB end
 			chan->leadinSample->PurgeSoundSample();
 		}
 
 		chan->leadinSample = NULL;
 		chan->soundShader = NULL;
+	}
+
+	Sys_LeaveCriticalSection();
+}
+
+// DG: to pause active OpenAL sources when entering menu etc
+void idSoundEmitterLocal::PauseAll()
+{
+
+	Sys_EnterCriticalSection();
+
+	for( int i = 0; i < SOUND_MAX_CHANNELS; i++ )
+	{
+		idSoundChannel*	chan = &channels[i];
+
+		if( !chan->triggerState )
+		{
+			continue;
+		}
+
+		if( alIsSource( chan->openalSource ) )
+		{
+			alSourcePause( chan->openalSource );
+			chan->paused = true;
+		}
+	}
+
+	Sys_LeaveCriticalSection();
+}
+
+
+// DG: to resume active OpenAL sources when leaving menu etc
+void idSoundEmitterLocal::UnPauseAll()
+{
+
+	Sys_EnterCriticalSection();
+
+	for( int i = 0; i < SOUND_MAX_CHANNELS; i++ )
+	{
+		idSoundChannel*	chan = &channels[i];
+
+		if( !chan->triggerState )
+		{
+			continue;
+		}
+
+		if( alIsSource( chan->openalSource ) && chan->paused )
+		{
+			alSourcePlay( chan->openalSource );
+			chan->paused = false;
+		}
 	}
 
 	Sys_LeaveCriticalSection();
@@ -1367,7 +1388,7 @@ void idSlowChannel::GenerateSlowChannel( FracTime& playPos, int sampleCount44k, 
 {
 	idSoundWorldLocal* sw = static_cast<idSoundWorldLocal*>( soundSystemLocal.GetPlayingSoundWorld() );
 	float in[MIXBUFFER_SAMPLES + 3], out[MIXBUFFER_SAMPLES + 3], *src, *spline, slowmoSpeed;
-	int i, neededSamples, orgTime, zeroedPos, count = 0;
+	int i, neededSamples, zeroedPos, count = 0;
 
 	src = in + 2;
 	spline = out + 2;
@@ -1382,7 +1403,6 @@ void idSlowChannel::GenerateSlowChannel( FracTime& playPos, int sampleCount44k, 
 	}
 
 	neededSamples = sampleCount44k * slowmoSpeed + 4;
-	orgTime = playPos.time;
 
 	// get the channel's samples
 	chan->GatherChannelSamples( playPos.time * 2, neededSamples, src );

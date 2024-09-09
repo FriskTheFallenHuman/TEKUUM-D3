@@ -35,28 +35,29 @@ If you have questions concerning this license or the applicable additional terms
 ===============================================================================
 */
 
-#define GAME_NAME						"DOOM 3"		// appears on window titles and errors
+#define GAME_NAME						"DOOM 3"		/// appears in errors
 #define GAME_NAME_LOWER					"rbdoom3"		// appears in screenshot names
 
-#define ENGINE_VERSION					"RBDOOM 3 0.4.0"	// printed in console
+#define ENGINE_VERSION					"RBDOOM 3 0.4.0"	// printed in console, used for window title
 
-// paths
-#define	CD_BASEDIR						"Doom"
-#if defined(STANDALONE)
-	#if !defined(BASE_GAMEDIR)
-		#define	BASE_GAMEDIR					"assets"
-	#endif
-#else
-	#ifdef ID_DEMO_BUILD
-		#define BASE_GAMEDIR					"demo"
-	#else
-		#define	BASE_GAMEDIR					"base"
-	#endif
+#ifdef ID_REPRODUCIBLE_BUILD
+	// for reproducible builds we hardcode values that would otherwise come from __DATE__ and __TIME__
+	// NOTE: remember to update esp. the date for (pre-) releases and RCs and the like
+	#define ID__DATE__  "Aug 15 2024"
+	#define ID__TIME__  "13:37:42"
+
+#else // not reproducible build, use __DATE__ and __TIME__ macros
+	#define ID__DATE__  __DATE__
+	#define ID__TIME__  __TIME__
 #endif
 
+// paths
+#define	BASE_GAMEDIR					"base"
+
 // filenames
-#define	CD_EXE							"doom.exe"
-#define CONFIG_FILE						"DoomConfig.cfg"
+#ifndef CONFIG_FILE
+	#define CONFIG_FILE						"DoomConfig.cfg"
+#endif
 
 // base folder where the source code lives
 #define SOURCE_CODE_BASE_FOLDER			"neo"
@@ -64,17 +65,17 @@ If you have questions concerning this license or the applicable additional terms
 
 // default idnet host address
 #ifndef IDNET_HOST
-	#define IDNET_HOST						"idnet.ua-corp.com"
+	#define IDNET_HOST					"idnet.ua-corp.com"
 #endif
 
 // default idnet master port
 #ifndef IDNET_MASTER_PORT
-	#define IDNET_MASTER_PORT				"27650"
+	#define IDNET_MASTER_PORT			"27650"
 #endif
 
 // default network server port
 #ifndef PORT_SERVER
-	#define	PORT_SERVER						27666
+	#define	PORT_SERVER					27666
 #endif
 
 // broadcast scan this many ports after PORT_SERVER so a single machine can run multiple servers
@@ -93,7 +94,6 @@ If you have questions concerning this license or the applicable additional terms
 
 // <= Doom v1.1: 1. no DS_VERSION token ( default )
 // Doom v1.2: 2
-// RB: Tekuum uses a different renderdemo version because of some 64 bit fixes
 #define RENDERDEMO_VERSION				3
 
 // editor info
@@ -107,10 +107,8 @@ If you have questions concerning this license or the applicable additional terms
 #define	WIN32_FAKE_WINDOW_CLASS_NAME	"DOOM3_WGL_FAKE"
 
 // Linux info
-#ifdef ID_DEMO_BUILD
-	#define LINUX_DEFAULT_PATH			"/usr/local/games/doom3-demo"
-#else
-	#define LINUX_DEFAULT_PATH			"/usr/local/games/doom3"
+#ifndef LINUX_DEFAULT_PATH // allow overriding it from the build system with -DLINUX_DEFAULT_PATH="/bla/foo/whatever"
+	#define LINUX_DEFAULT_PATH				"/usr/local/games/doom3"
 #endif
 
 // CD Key file info

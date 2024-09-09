@@ -73,7 +73,7 @@ void idSIMD::InitProcessor( const char* module, bool forceGeneric )
 
 		if( processor == NULL )
 		{
-#if defined(USE_INTRINSICS)
+#if defined(USE_INTRINSICS_SSE)
 			if( ( cpuid & CPUID_MMX ) && ( cpuid & CPUID_SSE ) )
 			{
 				processor = new idSIMD_SSE;
@@ -167,19 +167,7 @@ long saved_ebx = 0;
 	__asm xor eax, eax						\
 	__asm cpuid
 
-#elif MACOS_X // DG: versions for OSX and others from dhewm3
-
-double ticksPerNanosecond;
-
-#define TIME_TYPE uint64_t
-
-#define StartRecordTime( start )			\
-	start = mach_absolute_time();
-
-#define StopRecordTime( end )				\
-	end = mach_absolute_time();
-
-#else // not _MSC_VER and _M_IX86 or MACOS_X
+#else // not _MSC_VER and _M_IX86 or __APPLE__
 // FIXME: meaningful values/functions here for Linux?
 #define TIME_TYPE int
 
@@ -281,8 +269,8 @@ void TestMinMax()
 	bestClocksGeneric = 0;
 	for( i = 0; i < NUMTESTS; i++ )
 	{
-		min = idMath::INFINITY;
-		max = -idMath::INFINITY;
+		min = idMath::INFINITUM;
+		max = -idMath::INFINITUM;
 		StartRecordTime( start );
 		p_generic->MinMax( min, max, fsrc0, COUNT );
 		StopRecordTime( end );
@@ -1385,7 +1373,7 @@ void idSIMD::Test_f( const idCmdArgs& args )
 
 		argString.Replace( " ", "" );
 
-#if defined(USE_INTRINSICS)
+#if defined(USE_INTRINSICS_SSE)
 		if( idStr::Icmp( argString, "SSE" ) == 0 )
 		{
 			if( !( cpuid & CPUID_MMX ) || !( cpuid & CPUID_SSE ) )

@@ -30,15 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __SYS_PUBLIC__
 #define __SYS_PUBLIC__
 
-//#include "../framework/BuildDefines.h"
-
-/*
-===============================================================================
-
-	Non-portable system services.
-
-===============================================================================
-*/
+class idStr;
 
 enum cpuid_t
 {
@@ -61,31 +53,6 @@ enum cpuid_t
 	CPUID_CELL							= 0x20000	// PS3
 };
 
-enum fpuExceptions_t
-{
-	FPU_EXCEPTION_INVALID_OPERATION		= 1,
-	FPU_EXCEPTION_DENORMALIZED_OPERAND	= 2,
-	FPU_EXCEPTION_DIVIDE_BY_ZERO		= 4,
-	FPU_EXCEPTION_NUMERIC_OVERFLOW		= 8,
-	FPU_EXCEPTION_NUMERIC_UNDERFLOW		= 16,
-	FPU_EXCEPTION_INEXACT_RESULT		= 32
-};
-
-enum fpuPrecision_t
-{
-	FPU_PRECISION_SINGLE				= 0,
-	FPU_PRECISION_DOUBLE				= 1,
-	FPU_PRECISION_DOUBLE_EXTENDED		= 2
-};
-
-enum fpuRounding_t
-{
-	FPU_ROUNDING_TO_NEAREST				= 0,
-	FPU_ROUNDING_DOWN					= 1,
-	FPU_ROUNDING_UP						= 2,
-	FPU_ROUNDING_TO_ZERO				= 3
-};
-
 enum joystickAxis_t
 {
 	AXIS_LEFT_X,
@@ -106,11 +73,6 @@ enum sysEventType_t
 //	SE_MOUSE_ABSOLUTE,		// evValue and evValue2 are absolute coordinates in the window's client area.
 //	SE_MOUSE_LEAVE,			// evValue and evValue2 are meaninless, this indicates the mouse has left the client area.
 	SE_JOYSTICK,			// evValue is an axis number and evValue2 is the current state (-127 to 127)
-	// RB begin
-	SE_TOUCH_MOTION_DOWN,
-	SE_TOUCH_MOTION_UP,
-	SE_TOUCH_MOTION_MOVE,
-	// RB end
 	SE_CONSOLE				// evPtr is a char*, from typing something at a non-game console
 };
 
@@ -124,6 +86,16 @@ enum sys_mEvents
 	M_ACTION6,
 	M_ACTION7,
 	M_ACTION8,
+	// DG: support some more mouse buttons
+	M_ACTION9,
+	M_ACTION10,
+	M_ACTION11,
+	M_ACTION12,
+	M_ACTION13,
+	M_ACTION14,
+	M_ACTION15,
+	M_ACTION16,
+	// DG end
 	M_DELTAX,
 	M_DELTAY,
 	M_DELTAZ,
@@ -183,15 +155,6 @@ enum sys_jEvents
 
 	MAX_JOY_EVENT
 };
-
-// RB begin
-enum sysTouchScreenEvent_t
-{
-	TOUCH_MOTION_DOWN,
-	TOUCH_MOTION_UP,
-	TOUCH_MOTION_DELTA_XY,
-};
-// RB end
 
 /*
 ================================================
@@ -286,17 +249,20 @@ enum keyNum_t
 	K_KP_3,
 	K_KP_0,
 	K_KP_DOT,
+	K_OEM_102		= 0x56, // from dinput: < > | on UK/German keyboards
 	K_F11			= 0x57,
 	K_F12			= 0x58,
 	K_F13			= 0x64,
 	K_F14			= 0x65,
 	K_F15			= 0x66,
 	K_KANA			= 0x70,
+	K_ABNT_C1		= 0x7E, // from dinput: ? on Portugese (Brazilian) keyboards
 	K_CONVERT		= 0x79,
 	K_NOCONVERT		= 0x7B,
 	K_YEN			= 0x7D,
 	K_KP_EQUALS		= 0x8D,
-	K_CIRCUMFLEX	= 0x90,
+	K_CIRCUMFLEX	= 0x90, // this is circumflex on japanese keyboards, ..
+	K_PREVTRACK		= 0x90, // from dinput: .. but also "Previous Track"
 	K_AT			= 0x91,
 	K_COLON			= 0x92,
 	K_UNDERLINE		= 0x93,
@@ -304,11 +270,21 @@ enum keyNum_t
 	K_STOP			= 0x95,
 	K_AX			= 0x96,
 	K_UNLABELED		= 0x97,
+	K_NEXTTRACK		= 0x99, // from dinput
 	K_KP_ENTER		= 0x9C,
 	K_RCTRL			= 0x9D,
+	// some more from dinput:
+	K_MUTE          = 0xA0,
+	K_CALCULATOR    = 0xA1,
+	K_PLAYPAUSE     = 0xA2,
+	K_MEDIASTOP     = 0xA4,
+	K_VOLUMEDOWN    = 0xAE,
+	K_VOLUMEUP      = 0xB0,
+	K_WEBHOME       = 0xB2,
+
 	K_KP_COMMA		= 0xB3,
 	K_KP_SLASH		= 0xB5,
-	K_PRINTSCREEN	= 0xB7,
+	K_PRINTSCREEN	= 0xB7, // aka SysRq
 	K_RALT			= 0xB8,
 	K_PAUSE			= 0xC5,
 	K_HOME			= 0xC7,
@@ -326,6 +302,18 @@ enum keyNum_t
 	K_APPS			= 0xDD,
 	K_POWER			= 0xDE,
 	K_SLEEP			= 0xDF,
+
+	// DG: dinput has some more buttons, let's support them as well
+	K_WAKE			= 0xE3,
+	K_WEBSEARCH		= 0xE5,
+	K_WEBFAVORITES	= 0xE6,
+	K_WEBREFRESH	= 0xE7,
+	K_WEBSTOP		= 0xE8,
+	K_WEBFORWARD	= 0xE9,
+	K_WEBBACK		= 0xEA,
+	K_MYCOMPUTER	= 0xEB,
+	K_MAIL			= 0xEC,
+	K_MEDIASELECT	= 0xED,
 
 	//------------------------
 	// K_JOY codes must be contiguous, too
@@ -379,6 +367,17 @@ enum keyNum_t
 	K_MOUSE7,
 	K_MOUSE8,
 
+	// DG: add some more mouse buttons
+	K_MOUSE9,
+	K_MOUSE10,
+	K_MOUSE11,
+	K_MOUSE12,
+	K_MOUSE13,
+	K_MOUSE14,
+	K_MOUSE15,
+	K_MOUSE16,
+	// DG end
+
 	K_MWHEELDOWN,
 	K_MWHEELUP,
 
@@ -428,16 +427,12 @@ struct sysEvent_t
 	}
 };
 
-struct sysMemoryStats_t
+enum sysPath_t
 {
-	int memoryLoad;
-	int totalPhysical;
-	int availPhysical;
-	int totalPageFile;
-	int availPageFile;
-	int totalVirtual;
-	int availVirtual;
-	int availExtendedVirtual;
+	PATH_BASE,
+	PATH_CONFIG,
+	PATH_SAVE,
+	PATH_EXE
 };
 
 typedef unsigned int address_t;
@@ -449,8 +444,6 @@ void			Sys_Init();
 void			Sys_Shutdown();
 void			Sys_Error( const char* error, ... );
 void			Sys_Quit();
-
-bool			Sys_AlreadyRunning();
 
 // note that this isn't journaled...
 char* 			Sys_GetClipboardData();
@@ -482,25 +475,9 @@ double			Sys_ClockTicksPerSecond();
 
 // returns a selection of the CPUID_* flags
 cpuid_t			Sys_GetProcessorId();
-const char* 	Sys_GetProcessorString();
-
-// returns true if the FPU stack is empty
-bool			Sys_FPU_StackIsEmpty();
-
-// empties the FPU stack
-void			Sys_FPU_ClearStack();
-
-// returns the FPU state as a string
-const char* 	Sys_FPU_GetState();
-
-// enables the given FPU exceptions
-void			Sys_FPU_EnableExceptions( int exceptions );
 
 // sets the FPU precision
-void			Sys_FPU_SetPrecision( int precision );
-
-// sets the FPU rounding mode
-void			Sys_FPU_SetRounding( int rounding );
+void			Sys_FPU_SetPrecision();
 
 // sets Flush-To-Zero mode (only available when CPUID_FTZ is set)
 void			Sys_FPU_SetFTZ( bool enable );
@@ -511,15 +488,8 @@ void			Sys_FPU_SetDAZ( bool enable );
 // returns amount of system ram
 int				Sys_GetSystemRam();
 
-// returns amount of video ram
-int				Sys_GetVideoRam();
-
 // returns amount of drive space in path
 int				Sys_GetDriveFreeSpace( const char* path );
-
-// returns memory stats
-void			Sys_GetCurrentMemoryStatus( sysMemoryStats_t& stats );
-void			Sys_GetExeLaunchMemoryStatus( sysMemoryStats_t& stats );
 
 // lock and unlock memory
 bool			Sys_LockMemory( void* ptr, int bytes );
@@ -529,12 +499,9 @@ bool			Sys_UnlockMemory( void* ptr, int bytes );
 void			Sys_SetPhysicalWorkMemory( int minBytes, int maxBytes );
 
 // DLL loading, the path should be a fully qualified OS path to the DLL file to be loaded
-
-// RB: 64 bit fixes, changed int to intptr_t
-intptr_t		Sys_DLL_Load( const char* dllName );
-void* 			Sys_DLL_GetProcAddress( intptr_t dllHandle, const char* procName );
-void			Sys_DLL_Unload( intptr_t dllHandle );
-// RB end
+uintptr_t		Sys_DLL_Load( const char* dllName );
+void* 			Sys_DLL_GetProcAddress( uintptr_t dllHandle, const char* procName );
+void			Sys_DLL_Unload( uintptr_t dllHandle );
 
 // event generation
 void			Sys_GenerateEvents();
@@ -561,13 +528,6 @@ int				Sys_PollJoystickInputEvents( int deviceNum );
 int				Sys_ReturnJoystickInputEvent( const int n, int& action, int& value );
 void			Sys_EndJoystickInputEvents();
 
-// RB begin
-// touch screen input polling
-int				Sys_PollTouchScreenInputEvents();
-int				Sys_ReturnTouchScreenInputEvent( const int n, int& action, int& value, int& value2, int& value3, int& value4 );
-void			Sys_EndTouchScreenInputEvents();
-// RB end
-
 // when the console is down, or the game is about to perform a lengthy
 // operation like map loading, the system can release the mouse cursor
 // when in windowed mode
@@ -592,20 +552,12 @@ void			Sys_ShowConsole( int visLevel, bool quitOnClose );
 ID_TIME_T		Sys_FileTimeStamp( idFileHandle fp );
 // NOTE: do we need to guarantee the same output on all platforms?
 const char* 	Sys_TimeStampToStr( ID_TIME_T timeStamp );
-const char* 	Sys_DefaultCDPath();
-const char* 	Sys_DefaultBasePath();
-const char* 	Sys_DefaultSavePath();
-const char* 	Sys_EXEPath();
+
+bool			Sys_GetPath( sysPath_t type, idStr& path );
 
 // use fs_debug to verbose Sys_ListFiles
 // returns -1 if directory was not found (the list is cleared)
 int				Sys_ListFiles( const char* directory, const char* extension, idList<class idStr>& list );
-
-// know early if we are performing a fatal error shutdown so the error message doesn't get lost
-void			Sys_SetFatalError( const char* error );
-
-// display perference dialog
-void			Sys_DoPreferences();
 
 /*
 ==============================================================
@@ -825,22 +777,15 @@ public:
 	virtual double			GetClockTicks() = 0;
 	virtual double			ClockTicksPerSecond() = 0;
 	virtual cpuid_t			GetProcessorId() = 0;
-	virtual const char* 	GetProcessorString() = 0;
-	virtual const char* 	FPU_GetState() = 0;
-	virtual bool			FPU_StackIsEmpty() = 0;
 	virtual void			FPU_SetFTZ( bool enable ) = 0;
 	virtual void			FPU_SetDAZ( bool enable ) = 0;
-
-	virtual void			FPU_EnableExceptions( int exceptions ) = 0;
 
 	virtual bool			LockMemory( void* ptr, int bytes ) = 0;
 	virtual bool			UnlockMemory( void* ptr, int bytes ) = 0;
 
-	// RB: 64 bit fixes, changed int to intptr_t
-	virtual intptr_t		DLL_Load( const char* dllName ) = 0;
-	virtual void* 			DLL_GetProcAddress( intptr_t dllHandle, const char* procName ) = 0;
-	virtual void			DLL_Unload( intptr_t dllHandle ) = 0;
-	// RB end
+	virtual uintptr_t		DLL_Load( const char* dllName ) = 0;
+	virtual void* 			DLL_GetProcAddress( uintptr_t dllHandle, const char* procName ) = 0;
+	virtual void			DLL_Unload( uintptr_t dllHandle ) = 0;
 	virtual void			DLL_GetFileName( const char* baseName, char* dllName, int maxLength ) = 0;
 
 	virtual sysEvent_t		GenerateMouseButtonEvent( int button, bool down ) = 0;
@@ -851,17 +796,5 @@ public:
 };
 
 extern idSys* 				sys;
-
-bool Sys_LoadOpenAL();
-void Sys_FreeOpenAL();
-
-// RB begin
-#if defined(__ANDROID__) && !defined(USE_NATIVE_ACTIVITY)
-	#include "../../android/jni/tekuumjni_public.h"
-
-	extern jniImport_t			ji;
-	// RB end
-
-#endif
 
 #endif /* !__SYS_PUBLIC__ */

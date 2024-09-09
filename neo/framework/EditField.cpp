@@ -316,7 +316,7 @@ void idEditField::AutoComplete()
 		autoComplete = globalAutoComplete;
 
 		// and print it
-		idStr::snPrintf( buffer, sizeof( buffer ), autoComplete.currentMatch );
+		idStr::snPrintf( buffer, sizeof( buffer ), "%s", autoComplete.currentMatch );
 		if( autoComplete.length > ( int )strlen( buffer ) )
 		{
 			autoComplete.length = strlen( buffer );
@@ -680,7 +680,7 @@ void idEditField::Draw( int x, int y, int width, bool showCursor )
 		return;
 	}
 
-	if( ( int )( com_ticNumber >> 4 ) & 1 )
+	if( ( int )( idLib::frameNumber >> 4 ) & 1 )
 	{
 		return;		// off blink
 	}

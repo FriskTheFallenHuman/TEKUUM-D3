@@ -68,9 +68,6 @@ public:
 typedef enum
 {
 	EDITOR_NONE					= 0,
-
-// RB begin
-//#if defined(USE_MFC_TOOLS)
 	EDITOR_RADIANT				= BIT( 1 ),
 	EDITOR_GUI					= BIT( 2 ),
 	EDITOR_DEBUGGER				= BIT( 3 ),
@@ -83,19 +80,6 @@ typedef enum
 	EDITOR_PDA					= BIT( 10 ),
 	EDITOR_AAS					= BIT( 11 ),
 	EDITOR_MATERIAL				= BIT( 12 ),
-//#endif
-
-#if defined(USE_GTK_TOOLS)
-	EDITOR_GTKTEST				= BIT( 13 ),
-#endif
-
-#if defined(USE_QT_TOOLS)
-	EDITOR_QTRADIANT			= BIT( 14 ),
-	EDITOR_QTSTRING				= BIT( 15 ),
-#endif
-
-// RB end
-
 } toolFlag_t;
 
 #define STRTABLE_ID				"#str_"
@@ -176,7 +160,7 @@ public:
 	// Initialize everything.
 	// if the OS allows, pass argc/argv directly (without executable name)
 	// otherwise pass the command line in a single string (without executable name)
-	virtual void				Init( int argc, const char* const* argv, const char* cmdline ) = 0;
+	virtual void				Init( int argc, char** argv ) = 0;
 
 	// Shuts down everything.
 	virtual void				Shutdown() = 0;
@@ -214,6 +198,7 @@ public:
 
 	// Writes cvars with the given flags to a file.
 	virtual void				WriteFlaggedCVarsToFile( const char* filename, int flags, const char* setCmd ) = 0;
+
 
 	// Begins redirection of console output to the given buffer.
 	virtual void				BeginRedirect( char* buffer, int buffersize, void ( *flush )( const char* ) ) = 0;

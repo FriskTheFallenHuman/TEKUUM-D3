@@ -356,7 +356,7 @@ idRenderSystemLocal::SetColor
 void idRenderSystemLocal::SetColor( const idVec4& rgba )
 {
 	currentColor = rgba;
-	currentColorNativeBytesOrder = LittleLong( PackColor( rgba ) );
+	currentColorNativeBytesOrder = LittleInt( PackColor( rgba ) );
 }
 
 /*
@@ -376,7 +376,7 @@ idRenderSystemLocal::GetColorPacked
 */
 uint32 idRenderSystemLocal::GetColorPacked()
 {
-	return LittleLong( currentColorNativeBytesOrder );
+	return LittleInt( currentColorNativeBytesOrder );
 }
 // RB end
 
