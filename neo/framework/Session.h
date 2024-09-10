@@ -63,6 +63,10 @@ typedef enum
 
 typedef const char* ( *HandleGuiCommand_t )( const char* );
 
+#ifdef MessageBox
+	#undef MessageBox
+#endif
+
 class idSession
 {
 public:

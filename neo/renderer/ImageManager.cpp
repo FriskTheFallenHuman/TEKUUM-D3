@@ -976,24 +976,6 @@ void idImageManager::EndLevelLoad()
 
 /*
 ===============
-idImageManager::StartBuild
-===============
-*/
-void idImageManager::StartBuild()
-{
-}
-
-/*
-===============
-idImageManager::FinishBuild
-===============
-*/
-void idImageManager::FinishBuild( bool removeDups )
-{
-}
-
-/*
-===============
 idImageManager::PrintMemInfo
 ===============
 */

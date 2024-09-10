@@ -219,7 +219,6 @@ include_directories( ${FREETYPE_INCLUDE_DIR} )
 set( FREETYPE_LIBRARY Freetype::Freetype )
 
 add_subdirectory(game)
-add_subdirectory(d3xp)
 add_subdirectory(idlib)
 add_subdirectory(libs)
 
@@ -786,7 +785,6 @@ elseif( UNIX )
 	endif()
 
 	add_definitions( -DUSE_SDL )
-	add_definitions( -DUSE_SDL_ASYNC )
 	add_definitions( -DUSE_SOUND_PULSE )
 	add_definitions( -DUSE_EXCEPTIONS )
 

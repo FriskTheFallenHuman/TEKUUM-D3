@@ -325,10 +325,6 @@ public:
 	// Loads unloaded level images
 	int					LoadLevelImages( bool pacifier );
 
-	// used to clear and then write the dds conversion batch file
-	void				StartBuild();
-	void				FinishBuild( bool removeDups = false );
-
 	void				PrintMemInfo( MemInfo_t* mi );
 
 	// built-in images
