@@ -1041,7 +1041,7 @@ bool idClass::ProcessEvent( const idEventDef* ev, idEventArg arg1, idEventArg ar
 idClass::ProcessEventArgPtr
 ================
 */
-bool idClass::ProcessEventArgPtr( const idEventDef* ev, int* data )
+bool idClass::ProcessEventArgPtr( const idEventDef* ev, intptr_t* data )
 {
 	idTypeInfo*	c;
 	int			num;
