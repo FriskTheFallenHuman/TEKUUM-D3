@@ -37,23 +37,23 @@ If you have questions concerning this license or the applicable additional terms
 ===============================================================================
 */
 
-const int64 com_engineHz_numerator = 100LL * 1000LL;
-const int64 com_engineHz_denominator = 100LL * 60LL;
+const int64_t com_engineHz_numerator = 100LL * 1000LL;
+const int64_t com_engineHz_denominator = 100LL * 60LL;
 
 // Returns the msec the frame starts on
-ID_INLINE int FRAME_TO_MSEC( int64 frame )
+ID_INLINE int FRAME_TO_MSEC( int64_t frame )
 {
 	return ( int )( ( frame * com_engineHz_numerator ) / com_engineHz_denominator );
 }
 // Rounds DOWN to the nearest frame
 ID_INLINE int MSEC_TO_FRAME_FLOOR( int msec )
 {
-	return ( int )( ( ( ( int64 )msec * com_engineHz_denominator ) + ( com_engineHz_denominator - 1 ) ) / com_engineHz_numerator );
+	return ( int )( ( ( ( int64_t )msec * com_engineHz_denominator ) + ( com_engineHz_denominator - 1 ) ) / com_engineHz_numerator );
 }
 // Rounds UP to the nearest frame
 ID_INLINE int MSEC_TO_FRAME_CEIL( int msec )
 {
-	return ( int )( ( ( ( int64 )msec * com_engineHz_denominator ) + ( com_engineHz_numerator - 1 ) ) / com_engineHz_numerator );
+	return ( int )( ( ( ( int64_t )msec * com_engineHz_denominator ) + ( com_engineHz_numerator - 1 ) ) / com_engineHz_numerator );
 }
 // Aligns msec so it starts on a frame bondary
 ID_INLINE int MSEC_ALIGN_TO_FRAME( int msec )

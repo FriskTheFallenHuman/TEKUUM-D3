@@ -67,17 +67,17 @@ int Sys_Milliseconds()
 Sys_Microseconds
 ========================
 */
-uint64 Sys_Microseconds()
+uint64_t Sys_Microseconds()
 {
-	static uint64 ticksPerMicrosecondTimes1024 = 0;
+	static uint64_t ticksPerMicrosecondTimes1024 = 0;
 
 	if( ticksPerMicrosecondTimes1024 == 0 )
 	{
-		ticksPerMicrosecondTimes1024 = ( ( uint64 )Sys_ClockTicksPerSecond() << 10 ) / 1000000;
+		ticksPerMicrosecondTimes1024 = ( ( uint64_t )Sys_ClockTicksPerSecond() << 10 ) / 1000000;
 		assert( ticksPerMicrosecondTimes1024 > 0 );
 	}
 
-	return ( ( uint64 )( ( int64 )Sys_GetClockTicks() << 10 ) ) / ticksPerMicrosecondTimes1024;
+	return ( ( uint64_t )( ( int64_t )Sys_GetClockTicks() << 10 ) ) / ticksPerMicrosecondTimes1024;
 }
 
 /*

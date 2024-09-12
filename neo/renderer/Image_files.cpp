@@ -415,7 +415,7 @@ void LoadSTB_RGBA8( const char* filename, unsigned char** pic, int* width, int* 
 		return;
 	}
 
-	int32 numChannels;
+	int32_t numChannels;
 
 	byte* rgba = stbi_load_from_memory( ( stbi_uc const* ) fbuffer, fileSize, width, height, &numChannels, 4 );
 
@@ -438,7 +438,7 @@ void LoadSTB_RGBA8( const char* filename, unsigned char** pic, int* width, int* 
 	// so the decoded data must be copied once
 	if( rgba )
 	{
-		int32 pixelCount = *width * *height;
+		int32_t pixelCount = *width * *height;
 		byte* out = ( byte* )R_StaticAlloc( pixelCount * 4 );
 
 		*pic = out;

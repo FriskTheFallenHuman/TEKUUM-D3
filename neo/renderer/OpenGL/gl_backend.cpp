@@ -206,9 +206,9 @@ const void GL_BlockingSwapBuffers()
 		common->Printf( "%i msec to wait on fence\n", afterFence - beforeFence );
 	}
 
-	const int64 exitBlockTime = Sys_Microseconds();
+	const int64_t exitBlockTime = Sys_Microseconds();
 
-	static int64 prevBlockTime;
+	static int64_t prevBlockTime;
 	if( r_showSwapBuffers.GetBool() && prevBlockTime )
 	{
 		const int delta = ( int )( exitBlockTime - prevBlockTime );
@@ -241,7 +241,7 @@ Renders the draw list twice, with slight modifications for left eye / right eye
 */
 void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t* const allCmds )
 {
-	uint64 backEndStartTime = Sys_Microseconds();
+	uint64_t backEndStartTime = Sys_Microseconds();
 
 	// If we are in a monoscopic context, this draws to the only buffer, and is
 	// the same as GL_BACK.  In a quad-buffer stereo context, this is necessary
@@ -544,7 +544,7 @@ void RB_StereoRenderExecuteBackEndCommands( const emptyCommand_t* const allCmds 
 	// we may choose to sync to the swapbuffers before the next frame
 
 	// stop rendering on this thread
-	uint64 backEndFinishTime = Sys_Microseconds();
+	uint64_t backEndFinishTime = Sys_Microseconds();
 	backEnd.pc.totalMicroSec = backEndFinishTime - backEndStartTime;
 }
 
@@ -582,7 +582,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t* cmds )
 		return;
 	}
 
-	uint64 backEndStartTime = Sys_Microseconds();
+	uint64_t backEndStartTime = Sys_Microseconds();
 
 	// needed for editor rendering
 	GL_SetDefaultState();
@@ -637,7 +637,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t* cmds )
 	glFlush();
 
 	// stop rendering on this thread
-	uint64 backEndFinishTime = Sys_Microseconds();
+	uint64_t backEndFinishTime = Sys_Microseconds();
 	backEnd.pc.totalMicroSec = backEndFinishTime - backEndStartTime;
 
 	if( r_debugRenderToTexture.GetInteger() == 1 )

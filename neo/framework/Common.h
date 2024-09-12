@@ -38,7 +38,7 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 
-ID_INLINE void BeginProfileNamedEventColor( uint32 color, VERIFY_FORMAT_STRING const char* szName )
+ID_INLINE void BeginProfileNamedEventColor( uint32_t color, VERIFY_FORMAT_STRING const char* szName )
 {
 }
 ID_INLINE void EndProfileNamedEvent()
@@ -47,7 +47,7 @@ ID_INLINE void EndProfileNamedEvent()
 
 ID_INLINE void BeginProfileNamedEvent( VERIFY_FORMAT_STRING const char* szName )
 {
-	BeginProfileNamedEventColor( ( uint32 ) 0xFF00FF00, szName );
+	BeginProfileNamedEventColor( ( uint32_t ) 0xFF00FF00, szName );
 }
 
 class idScopedProfileEvent
@@ -114,10 +114,10 @@ extern int			time_gameDraw;			// game present time
 extern int			time_lastGameFrame;		// game logic time of last frame
 extern int			time_lastGameDraw;		// game present time of last frame
 
-extern uint64		time_frontend;			// renderer frontend time
-extern uint64		time_backend;			// renderer backend time
-extern uint64		time_shadows;			// renderer backend waiting for shadow volumes to be created
-extern uint64		time_gpu;				// total gpu time, at least for PC
+extern uint64_t		time_frontend;			// renderer frontend time
+extern uint64_t		time_backend;			// renderer backend time
+extern uint64_t		time_shadows;			// renderer backend waiting for shadow volumes to be created
+extern uint64_t		time_gpu;				// total gpu time, at least for PC
 // RB end
 
 extern int			com_frameTime;			// time for the current frame in milliseconds

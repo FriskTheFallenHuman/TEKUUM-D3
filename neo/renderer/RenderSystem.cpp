@@ -374,7 +374,7 @@ const idVec4& idRenderSystemLocal::GetColor()
 idRenderSystemLocal::GetColorPacked
 =============
 */
-uint32 idRenderSystemLocal::GetColorPacked()
+uint32_t idRenderSystemLocal::GetColorPacked()
 {
 	return LittleInt( currentColorNativeBytesOrder );
 }
@@ -385,7 +385,7 @@ uint32 idRenderSystemLocal::GetColorPacked()
 idRenderSystemLocal::SetGLState
 =============
 */
-void idRenderSystemLocal::SetGLState( const uint64 glState )
+void idRenderSystemLocal::SetGLState( const uint64_t glState )
 {
 	currentGLState = glState;
 }
@@ -791,10 +791,10 @@ with the rendering of the closed off command buffers by RenderCommandBuffers()
 ====================
 */
 const emptyCommand_t* idRenderSystemLocal::SwapCommandBuffers(
-	uint64* frontEndMicroSec,
-	uint64* backEndMicroSec,
-	uint64* shadowMicroSec,
-	uint64* gpuMicroSec,
+	uint64_t* frontEndMicroSec,
+	uint64_t* backEndMicroSec,
+	uint64_t* shadowMicroSec,
+	uint64_t* gpuMicroSec,
 	bool swapBuffers )
 {
 
@@ -809,10 +809,10 @@ idRenderSystemLocal::SwapCommandBuffers_FinishRendering
 =====================
 */
 void idRenderSystemLocal::SwapCommandBuffers_FinishRendering(
-	uint64* frontEndMicroSec,
-	uint64* backEndMicroSec,
-	uint64* shadowMicroSec,
-	uint64* gpuMicroSec,
+	uint64_t* frontEndMicroSec,
+	uint64_t* backEndMicroSec,
+	uint64_t* shadowMicroSec,
+	uint64_t* gpuMicroSec,
 	bool swapBuffers )
 {
 	SCOPED_PROFILE_EVENT( "SwapCommandBuffers" );
@@ -840,7 +840,7 @@ void idRenderSystemLocal::SwapCommandBuffers_FinishRendering(
 	// read back the start and end timer queries from the previous frame
 	if( glConfig.timerQueryAvailable )
 	{
-		// RB: 64 bit fixes, changed int64 to GLuint64EXT
+		// RB: 64 bit fixes, changed int64_t to GLuint64EXT
 		GLuint64EXT drawingTimeNanoseconds = 0;
 		// RB end
 

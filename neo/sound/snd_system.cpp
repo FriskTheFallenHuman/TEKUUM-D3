@@ -1002,7 +1002,7 @@ int idSoundSystemLocal::AsyncUpdateWrite( int inTime )
 	}
 
 	// inTime is in milliseconds and if running for long enough that overflows,
-	// when multiplying with 44.1 it overflows even sooner, so use int64 at first
+	// when multiplying with 44.1 it overflows even sooner, so use int64_t at first
 	// (and double because float doesn't have good precision at bigger numbers)
 	// and then manually truncate to regular int afterwards - this should at least
 	// prevent sampleTime becoming negative (as long as inTime is not)

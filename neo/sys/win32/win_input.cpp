@@ -773,8 +773,8 @@ static int	threadCount;
 void JoystickSamplingThread( void* data )
 {
 	static int prevTime = 0;
-	static uint64 nextCheck[MAX_JOYSTICKS] = { 0 };
-	const uint64 waitTime = 5000000; // poll every 5 seconds to see if a controller was connected
+	static uint64_t nextCheck[MAX_JOYSTICKS] = { 0 };
+	const uint64_t waitTime = 5000000; // poll every 5 seconds to see if a controller was connected
 	while( 1 )
 	{
 		// hopefully we see close to 4000 usec each loop

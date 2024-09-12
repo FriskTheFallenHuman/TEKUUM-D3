@@ -287,12 +287,12 @@ void	idBoundsTrack::Test()
 	FindBoundsIntersectionsSimSIMD( shortTestBounds, boundsList, maxIndex, intersectedIndexes2 );
 
 	// timing
-	const int64 start = Sys_Microseconds();
+	const int64_t start = Sys_Microseconds();
 	for( int i = 0 ; i < 40 ; i++ )
 	{
 		FindBoundsIntersectionsSimSIMD( shortTestBounds, boundsList, maxIndex, intersectedIndexes2 );
 	}
-	const int64 stop = Sys_Microseconds();
+	const int64_t stop = Sys_Microseconds();
 	idLib::Printf( "%lli microseconds for 40 itterations\n", stop - start );
 }
 

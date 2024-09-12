@@ -30,7 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 struct guiModelSurface_t
 {
 	const idMaterial* 		material;
-	uint64					glState;
+	uint64_t					glState;
 
 	// RB: added alternative interface for no glMapBuffer support
 #if defined(NO_GL_MAPBUFFER)
@@ -67,10 +67,10 @@ public:
 	// RB: added alternative interface for no glMapBuffer support
 #if defined(NO_GL_MAPBUFFER)
 	void	AllocTris( const idDrawVert* verts, int numVerts, const triIndex_t* indexes, int numIndexes, const idMaterial* material,
-					   const uint64 glState, const stereoDepthType_t stereoType );
+					   const uint64_t glState, const stereoDepthType_t stereoType );
 #else
 	idDrawVert* AllocTris( int numVerts, const triIndex_t* indexes, int numIndexes, const idMaterial* material,
-						   const uint64 glState, const stereoDepthType_t stereoType );
+						   const uint64_t glState, const stereoDepthType_t stereoType );
 #endif
 	// RB end
 

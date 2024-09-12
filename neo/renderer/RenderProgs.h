@@ -617,7 +617,7 @@ protected:
 	const char*	GetGLSLMacroName( shaderFeature_t sf ) const;
 
 	bool	CompileGLSL( GLenum target, const char* name );
-	GLuint	LoadGLSLShader( GLenum target, const char* name, const char* nameOutSuffix, uint32 shaderFeatures, bool builtin, idList<int>& uniforms );
+	GLuint	LoadGLSLShader( GLenum target, const char* name, const char* nameOutSuffix, uint32_t shaderFeatures, bool builtin, idList<int>& uniforms );
 	void	LoadGLSLProgram( const int programIndex, const int vertexShaderIndex, const int fragmentShaderIndex );
 
 	static const GLuint INVALID_PROGID = 0xFFFFFFFF;
@@ -630,7 +630,7 @@ protected:
 		GLuint		progId;
 		bool		usesJoints;
 		bool		optionalSkinning;
-		uint32		shaderFeatures;		// RB: Cg compile macros
+		uint32_t		shaderFeatures;		// RB: Cg compile macros
 		bool		builtin;			// RB: part of the core shaders built into the executable
 		idList<int>	uniforms;
 	};
@@ -640,7 +640,7 @@ protected:
 		idStr		name;
 		idStr		nameOutSuffix;
 		GLuint		progId;
-		uint32		shaderFeatures;
+		uint32_t		shaderFeatures;
 		bool		builtin;
 		idList<int>	uniforms;
 	};

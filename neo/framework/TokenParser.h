@@ -66,7 +66,7 @@ public:
 		inFile->WriteBig( linesCrossed );
 	}
 	idStr token;
-	int8  tokenType;
+	int8_t  tokenType;
 	short tokenSubType;
 	int   linesCrossed;
 };

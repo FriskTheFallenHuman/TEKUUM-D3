@@ -100,10 +100,10 @@ int				time_gameDraw;
 int				time_lastGameFrame;
 int				time_lastGameDraw;
 
-uint64			time_frontend;			// renderSystem frontend time
-uint64			time_backend;			// renderSystem backend time
-uint64			time_shadows;			// renderer backend waiting for shadow volumes to be created
-uint64			time_gpu;				// total gpu time, at least for PC in microseconds
+uint64_t			time_frontend;			// renderSystem frontend time
+uint64_t			time_backend;			// renderSystem backend time
+uint64_t			time_shadows;			// renderer backend waiting for shadow volumes to be created
+uint64_t			time_gpu;				// total gpu time, at least for PC in microseconds
 
 int				com_frameTime;			// time for the current frame in milliseconds
 int				com_frameNumber;		// variable frame number
@@ -634,11 +634,11 @@ static void Com_MaterialEditor_f( const idCmdArgs& args )
 CONSOLE_COMMAND( testFormattingSizes, "test printf format security", 0 )
 {
 #ifdef _MSC_VER
-	common->Printf( " sizeof( int32 ): %Iu bytes\n", sizeof( int32 ) );
-	common->Printf( " sizeof( int64 ): %Iu bytes\n", sizeof( int64 ) );
+	common->Printf( " sizeof( int32_t ): %Iu bytes\n", sizeof( int32_t ) );
+	common->Printf( " sizeof( int64_t ): %Iu bytes\n", sizeof( int64_t ) );
 #else
-	common->Printf( " sizeof( int32 ): %zu bytes\n", sizeof( int32 ) );
-	common->Printf( " sizeof( int64 ): %zu bytes\n", sizeof( int64 ) );
+	common->Printf( " sizeof( int32_t ): %zu bytes\n", sizeof( int32_t ) );
+	common->Printf( " sizeof( int64_t ): %zu bytes\n", sizeof( int64_t ) );
 #endif
 }
 

@@ -86,7 +86,7 @@ void idRenderProgManager::Init()
 		int			index;
 		const char* name;
 		const char* nameOutSuffix;
-		uint32		shaderFeatures;
+		uint32_t		shaderFeatures;
 		bool		requireGPUSkinningSupport;
 	} builtins[] =
 	{

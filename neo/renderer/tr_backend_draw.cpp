@@ -149,7 +149,7 @@ void RB_DrawElementsWithCounters( const drawSurf_t* surf )
 	}
 	else
 	{
-		const uint64 frameNum = ( int )( vbHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
+		const uint64_t frameNum = ( int )( vbHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
 		if( frameNum != ( ( vertexCache.currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) )
 		{
 			idLib::Warning( "RB_DrawElementsWithCounters, vertexBuffer == NULL" );
@@ -169,7 +169,7 @@ void RB_DrawElementsWithCounters( const drawSurf_t* surf )
 	}
 	else
 	{
-		const uint64 frameNum = ( int )( ibHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
+		const uint64_t frameNum = ( int )( ibHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
 		if( frameNum != ( ( vertexCache.currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) )
 		{
 			idLib::Warning( "RB_DrawElementsWithCounters, indexBuffer == NULL" );
@@ -734,7 +734,7 @@ static void RB_FillDepthBufferGeneric( const drawSurf_t* const* drawSurfs, int n
 			backEnd.currentSpace = drawSurf->space;
 		}
 
-		uint64 surfGLState = 0;
+		uint64_t surfGLState = 0;
 
 		// set polygon offset if necessary
 		if( shader->TestMaterialFlag( MF_POLYGONOFFSET ) )
@@ -805,7 +805,7 @@ static void RB_FillDepthBufferGeneric( const drawSurf_t* const* drawSurfs, int n
 					continue;
 				}
 
-				uint64 stageGLState = surfGLState;
+				uint64_t stageGLState = surfGLState;
 
 				// set privatePolygonOffset if necessary
 				if( pStage->privatePolygonOffset )
@@ -1264,12 +1264,12 @@ static void RB_RenderInteractions( const drawSurf_t* surfList, const viewLight_t
 		{
 			assert( walk->shadowVolumeState == SHADOWVOLUME_UNFINISHED || walk->shadowVolumeState == SHADOWVOLUME_DONE );
 
-			uint64 start = Sys_Microseconds();
+			uint64_t start = Sys_Microseconds();
 			while( walk->shadowVolumeState == SHADOWVOLUME_UNFINISHED )
 			{
 				Sys_Yield();
 			}
-			uint64 end = Sys_Microseconds();
+			uint64_t end = Sys_Microseconds();
 
 			backEnd.pc.shadowMicroSec += end - start;
 		}
@@ -1893,7 +1893,7 @@ static void RB_AmbientPass( const drawSurf_t* const* drawSurfs, int numDrawSurfs
 		}
 
 		/*
-		uint64 surfGLState = 0;
+		uint64_t surfGLState = 0;
 
 		// set polygon offset if necessary
 		if( surfaceMaterial->TestMaterialFlag( MF_POLYGONOFFSET ) )
@@ -2030,7 +2030,7 @@ static void RB_AmbientPass( const drawSurf_t* const* drawSurfs, int numDrawSurfs
 						continue;
 					}
 
-					uint64 stageGLState = surfGLState;
+					uint64_t stageGLState = surfGLState;
 
 					// set privatePolygonOffset if necessary
 					if( pStage->privatePolygonOffset )
@@ -2239,7 +2239,7 @@ static void RB_StencilShadowPass( const drawSurf_t* drawSurfs, const viewLight_t
 	GL_SelectTexture( 0 );
 	globalImages->BindNull();
 
-	uint64 glState = 0;
+	uint64_t glState = 0;
 
 	// for visualizing the shadows
 	if( r_showShadows.GetInteger() )
@@ -2291,12 +2291,12 @@ static void RB_StencilShadowPass( const drawSurf_t* drawSurfs, const viewLight_t
 		{
 			assert( drawSurf->shadowVolumeState == SHADOWVOLUME_UNFINISHED || drawSurf->shadowVolumeState == SHADOWVOLUME_DONE );
 
-			uint64 start = Sys_Microseconds();
+			uint64_t start = Sys_Microseconds();
 			while( drawSurf->shadowVolumeState == SHADOWVOLUME_UNFINISHED )
 			{
 				Sys_Yield();
 			}
-			uint64 end = Sys_Microseconds();
+			uint64_t end = Sys_Microseconds();
 
 			backEnd.pc.shadowMicroSec += end - start;
 		}
@@ -2401,7 +2401,7 @@ static void RB_StencilShadowPass( const drawSurf_t* drawSurfs, const viewLight_t
 		}
 		else
 		{
-			const uint64 frameNum = ( int )( vbHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
+			const uint64_t frameNum = ( int )( vbHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
 			if( frameNum != ( ( vertexCache.currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) )
 			{
 				idLib::Warning( "RB_DrawElementsWithCounters, vertexBuffer == NULL" );
@@ -2420,7 +2420,7 @@ static void RB_StencilShadowPass( const drawSurf_t* drawSurfs, const viewLight_t
 		}
 		else
 		{
-			const uint64 frameNum = ( int )( ibHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
+			const uint64_t frameNum = ( int )( ibHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
 			if( frameNum != ( ( vertexCache.currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) )
 			{
 				idLib::Warning( "RB_DrawElementsWithCounters, indexBuffer == NULL" );
@@ -2428,7 +2428,7 @@ static void RB_StencilShadowPass( const drawSurf_t* drawSurfs, const viewLight_t
 			}
 			indexBuffer = &vertexCache.frameData[vertexCache.drawListNum].indexBuffer;
 		}
-		const uint64 indexOffset = ( int )( ibHandle >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
+		const uint64_t indexOffset = ( int )( ibHandle >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
 
 		RENDERLOG_PRINTF( "Binding Buffers: %p %p\n", vertexBuffer, indexBuffer );
 
@@ -2601,7 +2601,7 @@ static void RB_StencilSelectLight( const viewLight_t* vLight )
 	}
 
 	// clear stencil buffer to 0 (not drawable)
-	uint64 glStateMinusStencil = GL_GetCurrentStateMinusStencil();
+	uint64_t glStateMinusStencil = GL_GetCurrentStateMinusStencil();
 	GL_State( glStateMinusStencil | GLS_STENCIL_FUNC_ALWAYS | GLS_STENCIL_MAKE_REF( STENCIL_SHADOW_TEST_VALUE ) | GLS_STENCIL_MAKE_MASK( STENCIL_SHADOW_MASK_VALUE ) );	// make sure stencil mask passes for the clear
 	GL_Clear( false, false, true, 0, 0.0f, 0.0f, 0.0f, 0.0f, false );	// clear to 0 for stencil select
 
@@ -2761,7 +2761,7 @@ static void RB_ShadowMapPass( const drawSurf_t* drawSurfs, const viewLight_t* vL
 	GL_SelectTexture( 0 );
 	globalImages->BindNull();
 
-	uint64 glState = 0;
+	uint64_t glState = 0;
 
 	// the actual stencil func will be set in the draw code, but we need to make sure it isn't
 	// disabled here, and that the value will get reset for the interactions without looking
@@ -3111,12 +3111,12 @@ static void RB_ShadowMapPass( const drawSurf_t* drawSurfs, const viewLight_t* vL
 		{
 			assert( drawSurf->shadowVolumeState == SHADOWVOLUME_UNFINISHED || drawSurf->shadowVolumeState == SHADOWVOLUME_DONE );
 
-			uint64 start = Sys_Microseconds();
+			uint64_t start = Sys_Microseconds();
 			while( drawSurf->shadowVolumeState == SHADOWVOLUME_UNFINISHED )
 			{
 				Sys_Yield();
 			}
-			uint64 end = Sys_Microseconds();
+			uint64_t end = Sys_Microseconds();
 
 			backEnd.pc.shadowMicroSec += end - start;
 		}
@@ -3176,7 +3176,7 @@ static void RB_ShadowMapPass( const drawSurf_t* drawSurfs, const viewLight_t* vL
 		const float* regs = drawSurf->shaderRegisters;
 		idVec4 color( 0, 0, 0, 1 );
 
-		uint64 surfGLState = 0;
+		uint64_t surfGLState = 0;
 
 		// set polygon offset if necessary
 		if( shader && shader->TestMaterialFlag( MF_POLYGONOFFSET ) )
@@ -3217,7 +3217,7 @@ static void RB_ShadowMapPass( const drawSurf_t* drawSurfs, const viewLight_t* vL
 					continue;
 				}
 
-				uint64 stageGLState = surfGLState;
+				uint64_t stageGLState = surfGLState;
 
 				// set privatePolygonOffset if necessary
 				if( pStage->privatePolygonOffset )
@@ -3690,7 +3690,7 @@ static int RB_DrawShaderPasses( const drawSurf_t* const* const drawSurfs, const 
 			GL_Cull( shader->GetCullType() );
 		}
 
-		uint64 surfGLState = surf->extraGLState;
+		uint64_t surfGLState = surf->extraGLState;
 
 		// set polygon offset if necessary
 		if( shader->TestMaterialFlag( MF_POLYGONOFFSET ) )
@@ -3715,7 +3715,7 @@ static int RB_DrawShaderPasses( const drawSurf_t* const* const drawSurfs, const 
 				continue;
 			}
 
-			uint64 stageGLState = surfGLState;
+			uint64_t stageGLState = surfGLState;
 			if( ( surfGLState & GLS_OVERRIDE ) == 0 )
 			{
 				stageGLState |= pStage->drawStateBits;

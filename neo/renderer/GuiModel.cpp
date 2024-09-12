@@ -177,7 +177,7 @@ void idGuiModel::EmitSurfaces( float modelMatrix[16], float modelViewMatrix[16],
 #else
 		drawSurf->ambientCache = vertexBlock;
 		// build a vertCacheHandle_t that points inside the allocated block
-		drawSurf->indexCache = indexBlock + ( ( int64 )( guiSurf.firstIndex * sizeof( triIndex_t ) ) << VERTCACHE_OFFSET_SHIFT );
+		drawSurf->indexCache = indexBlock + ( ( int64_t )( guiSurf.firstIndex * sizeof( triIndex_t ) ) << VERTCACHE_OFFSET_SHIFT );
 #endif
 		drawSurf->shadowCache = 0;
 		drawSurf->jointCache = 0;
@@ -390,7 +390,7 @@ AllocTris
 */
 // RB: added alternative interface for no glMapBuffer support
 #if defined(NO_GL_MAPBUFFER)
-void idGuiModel::AllocTris( const idDrawVert* tempVerts, int vertCount, const triIndex_t* tempIndexes, int indexCount, const idMaterial* material, const uint64 glState, const stereoDepthType_t stereoType )
+void idGuiModel::AllocTris( const idDrawVert* tempVerts, int vertCount, const triIndex_t* tempIndexes, int indexCount, const idMaterial* material, const uint64_t glState, const stereoDepthType_t stereoType )
 {
 	if( material == NULL )
 	{
@@ -458,7 +458,7 @@ void idGuiModel::AllocTris( const idDrawVert* tempVerts, int vertCount, const tr
 	WriteDrawVerts16( &verts[startVert], tempVerts, vertCount );
 }
 #else
-idDrawVert* idGuiModel::AllocTris( int vertCount, const triIndex_t* tempIndexes, int indexCount, const idMaterial* material, const uint64 glState, const stereoDepthType_t stereoType )
+idDrawVert* idGuiModel::AllocTris( int vertCount, const triIndex_t* tempIndexes, int indexCount, const idMaterial* material, const uint64_t glState, const stereoDepthType_t stereoType )
 {
 	if( material == NULL )
 	{

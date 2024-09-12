@@ -83,7 +83,7 @@ const int MAX_EXPRESSION_REGISTERS = 4096;
 // everything that is needed by the backend needs
 // to be double buffered to allow it to run in
 // parallel on a dual cpu machine
-const uint32 NUM_FRAME_DATA = 2;
+const uint32_t NUM_FRAME_DATA = 2;
 
 #if defined(USE_VULKAN)
 	#include "../renderer/Vulkan/qvk.h"

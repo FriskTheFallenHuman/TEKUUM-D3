@@ -336,10 +336,10 @@ public:
 
 	// RB: separated GetColor and GetColorNativeOrder
 	virtual const idVec4&	GetColor() = 0;
-	virtual uint32			GetColorPacked() = 0;
+	virtual uint32_t			GetColorPacked() = 0;
 	// RB end
 
-	virtual void			SetGLState( const uint64 glState ) = 0;
+	virtual void			SetGLState( const uint64_t glState ) = 0;
 
 	virtual void			DrawFilled( const idVec4& color, float x, float y, float w, float h ) = 0;
 	virtual void			DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, const idMaterial* material ) = 0;
@@ -381,11 +381,11 @@ public:
 	//
 	// After this is called, new command buffers can be built up in parallel
 	// with the rendering of the closed off command buffers by RenderCommandBuffers()
-	virtual const emptyCommand_t* 	SwapCommandBuffers( uint64* frontEndMicroSec, uint64* backEndMicroSec, uint64* shadowMicroSec, uint64* gpuMicroSec, bool swapBuffers ) = 0;
+	virtual const emptyCommand_t* 	SwapCommandBuffers( uint64_t* frontEndMicroSec, uint64_t* backEndMicroSec, uint64_t* shadowMicroSec, uint64_t* gpuMicroSec, bool swapBuffers ) = 0;
 
 	// SwapCommandBuffers operation can be split in two parts for non-smp rendering
 	// where the GPU is idled intentionally for minimal latency.
-	virtual void			SwapCommandBuffers_FinishRendering( uint64* frontEndMicroSec, uint64* backEndMicroSec, uint64* shadowMicroSec, uint64* gpuMicroSec, bool swapBuffers ) = 0;
+	virtual void			SwapCommandBuffers_FinishRendering( uint64_t* frontEndMicroSec, uint64_t* backEndMicroSec, uint64_t* shadowMicroSec, uint64_t* gpuMicroSec, bool swapBuffers ) = 0;
 	virtual const emptyCommand_t* 	SwapCommandBuffers_FinishCommandBuffers() = 0;
 
 	// issues GPU commands to render a built up list of command buffers returned

@@ -42,15 +42,6 @@ typedef unsigned int		dword;		// 32 bits
 typedef unsigned int		uint;
 typedef unsigned long		ulong;
 
-typedef signed char			int8;
-typedef unsigned char		uint8;
-typedef short int			int16;
-typedef unsigned short int	uint16;
-typedef int					int32;
-typedef unsigned int		uint32;
-typedef long long			int64;
-typedef unsigned long long	uint64;
-
 // The C/C++ standard guarantees the size of an unsigned type is the same as the signed type.
 // The exact size in bytes of several types is guaranteed here.
 assert_sizeof( bool,	1 );
@@ -59,14 +50,14 @@ assert_sizeof( short,	2 );
 assert_sizeof( int,		4 );
 assert_sizeof( float,	4 );
 assert_sizeof( byte,	1 );
-assert_sizeof( int8,	1 );
-assert_sizeof( uint8,	1 );
-assert_sizeof( int16,	2 );
-assert_sizeof( uint16,	2 );
-assert_sizeof( int32,	4 );
-assert_sizeof( uint32,	4 );
-assert_sizeof( int64,	8 );
-assert_sizeof( uint64,	8 );
+assert_sizeof( int8_t,	1 );
+assert_sizeof( uint8_t,	1 );
+assert_sizeof( int16_t,	2 );
+assert_sizeof( uint16_t,2 );
+assert_sizeof( int32_t,	4 );
+assert_sizeof( uint32_t,4 );
+assert_sizeof( int64_t,	8 );
+assert_sizeof( uint64_t,8 );
 
 #define MAX_TYPE( x )			( ( ( ( 1 << ( ( sizeof( x ) - 1 ) * 8 - 1 ) ) - 1 ) << 8 ) | 255 )
 #define MIN_TYPE( x )			( - MAX_TYPE( x ) - 1 )

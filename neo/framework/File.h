@@ -315,7 +315,7 @@ public:
 	idFile_Cached();
 	virtual					~idFile_Cached();
 
-	void					CacheData( uint64 offset, uint64 length );
+	void					CacheData( uint64_t offset, uint64_t length );
 
 	virtual int				Read( void* buffer, int len );
 
@@ -323,9 +323,9 @@ public:
 	virtual int				Seek( long offset, fsOrigin_t origin );
 
 private:
-	uint64				internalFilePos;
-	uint64				bufferedStartOffset;
-	uint64				bufferedEndOffset;
+	uint64_t				internalFilePos;
+	uint64_t				bufferedStartOffset;
+	uint64_t				bufferedEndOffset;
 	byte* 				buffered;
 };
 
