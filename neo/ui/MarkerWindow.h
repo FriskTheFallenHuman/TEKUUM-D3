@@ -47,7 +47,6 @@ public:
 	{
 		return idWindow::Allocated();
 	};
-	virtual idWinVar* GetWinVarByName( const char* _name, bool winLookup = false );
 
 	virtual const char* HandleEvent( const sysEvent_t* event, bool* updateVisuals );
 	virtual void PostParse();

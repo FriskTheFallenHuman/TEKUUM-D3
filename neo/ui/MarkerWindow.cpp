@@ -85,11 +85,6 @@ bool idMarkerWindow::ParseInternalVar( const char* _name, idTokenParser* src )
 	return idWindow::ParseInternalVar( _name, src );
 }
 
-idWinVar* idMarkerWindow::GetWinVarByName( const char* _name, bool fixup )
-{
-	return idWindow::GetWinVarByName( _name, fixup );
-}
-
 const char* idMarkerWindow::HandleEvent( const sysEvent_t* event, bool* updateVisuals )
 {
 
@@ -372,7 +367,6 @@ void idMarkerWindow::Activate( bool activate, idStr& act )
 			fileSystem->FreeFileList( markers );
 			memset( imageBuff, 0, 512 * 64 * 4 );
 			float step = 511.0f / ( numStats - 1 );
-			float startX = 0;
 			float x1, y1, x2, y2;
 			x1 = 0 - step;
 			for( i = 0; i < numStats - 1; i++ )

@@ -68,7 +68,7 @@ int idDeviceContext::FindFont( const char* name )
 	idStr fileName = name;
 	fileName.Replace( "fonts", va( "fonts/%s", fontLang.c_str() ) );
 
-	fontInfoEx_t fontInfo;
+	fontInfoEx_t fontInfo = {}; // DG: initialize this
 	int index = fonts.Append( fontInfo );
 	if( renderSystem->RegisterFont( fileName, fonts[index] ) )
 	{
@@ -167,8 +167,8 @@ void idDeviceContext::Init()
 void idDeviceContext::Shutdown()
 {
 	fontName.Clear();
-	fonts.Clear();
 	clipRects.Clear();
+	fonts.Clear();
 	Clear();
 }
 
@@ -820,15 +820,15 @@ int idDeviceContext::CharWidth( const char c, float scale )
 
 int idDeviceContext::TextWidth( const char* text, float scale, int limit )
 {
-	if( text == NULL )
-	{
-		return 0;
-	}
-
 	int i, width;
 
 	SetFontByScale( scale );
 	const glyphInfo_t* glyphs = useFont->glyphs;
+
+	if( text == NULL )
+	{
+		return 0;
+	}
 
 	width = 0;
 	if( limit > 0 )

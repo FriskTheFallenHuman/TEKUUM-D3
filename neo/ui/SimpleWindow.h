@@ -52,7 +52,7 @@ public:
 	idStr			name;
 
 	idWinVar* 		GetWinVarByName( const char* _name );
-	int				GetWinVarOffset( idWinVar* wv, drawWin_t* owner );
+	intptr_t		GetWinVarOffset( idWinVar* wv, drawWin_t* owner );
 	size_t			Size();
 
 	idWindow*		GetParent()
@@ -75,15 +75,7 @@ protected:
 	idRectangle 	clientRect;			// client area
 	idRectangle 	textRect;
 	idVec2			origin;
-
-	// RB begin
-#if defined(USE_IDFONT)
-	class idFont* 	font;
-#else
 	int 			fontNum;
-#endif
-	// RB end
-
 	float 			matScalex;
 	float 			matScaley;
 	float 			borderSize;

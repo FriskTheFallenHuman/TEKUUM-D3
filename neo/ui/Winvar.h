@@ -56,7 +56,7 @@ public:
 	}
 	void SetName( const char* _name )
 	{
-		delete []name;
+		delete[] name;
 		name = NULL;
 		if( _name )
 		{
@@ -1107,4 +1107,3 @@ public:
 };
 
 #endif /* !__WINVAR_H__ */
-

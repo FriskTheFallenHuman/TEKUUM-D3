@@ -47,9 +47,6 @@ idCVar g_useNewGuiCode(	"g_useNewGuiCode",	"1", CVAR_GAME | CVAR_INTEGER, "use o
 
 extern idCVar sys_lang;
 
-
-
-
 /*
 ===============================================================================
 
@@ -463,13 +460,19 @@ bool idUserInterfaceLocal::InitFromFile( const char* qpath, bool rebuild, bool c
 		desktop->backColor = idVec4( 0.0f, 0.0f, 0.0f, 1.0f );
 		desktop->SetupFromState();
 		common->Warning( "Couldn't load gui: '%s'", source.c_str() );
+		loading = false;
+		return false;
 	}
+
 	interactive = desktop->Interactive();
+
 	if( uiManagerLocal.guis.Find( this ) == NULL )
 	{
 		uiManagerLocal.guis.Append( this );
 	}
+
 	loading = false;
+
 	return true;
 }
 
@@ -487,8 +490,27 @@ const char* idUserInterfaceLocal::HandleEvent( const sysEvent_t* event, int _tim
 
 	if( event->evType == SE_MOUSE )
 	{
-		cursorX += event->evValue;
-		cursorY += event->evValue2;
+		if( !desktop || ( desktop->GetFlags() & WIN_MENUGUI ) )
+		{
+			// DG: this is a fullscreen GUI, scale the mousedelta added to cursorX/Y
+			// by 640/w, because the GUI pretends that everything is 640x480
+			// even if the actual resolution is higher => mouse moved too fast
+			float w = renderSystem->GetWidth();
+			float h = renderSystem->GetHeight();
+			if( w <= 0.0f || h <= 0.0f )
+			{
+				w = 640.0f;
+				h = 480.0f;
+			}
+			cursorX += event->evValue * ( 640.0f / w );
+			cursorY += event->evValue2 * ( 480.0f / h );
+		}
+		else
+		{
+			// not a fullscreen GUI but some ingame thing - no scaling needed
+			cursorX += event->evValue;
+			cursorY += event->evValue2;
+		}
 
 		if( cursorX < 0 )
 		{
@@ -532,7 +554,7 @@ void idUserInterfaceLocal::DrawCursor()
 {
 	if( !desktop || desktop->GetFlags() & WIN_MENUGUI )
 	{
-		dc->DrawCursor( &cursorX, &cursorY, 32.0f );
+		dc->DrawCursor( &cursorX, &cursorY, 22.0f );
 	}
 	else
 	{
@@ -834,4 +856,3 @@ void idUserInterfaceLocal::SetCursor( float x, float y )
 	cursorX = x;
 	cursorY = y;
 }
-

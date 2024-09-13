@@ -42,7 +42,7 @@ idWinVar::idWinVar()
 
 idWinVar::~idWinVar()
 {
-	delete name;
+	delete[] name;
 	name = NULL;
 }
 
@@ -93,4 +93,3 @@ void idMultiWinVar::SetGuiInfo( idDict* dict )
 		( *this )[i]->SetGuiInfo( dict, ( *this )[i]->c_str() );
 	}
 }
-

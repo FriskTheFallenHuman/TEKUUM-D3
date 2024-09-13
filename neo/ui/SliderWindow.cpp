@@ -503,4 +503,3 @@ void idSliderWindow::RunNamedEvent( const char* eventName )
 		}
 	}
 }
-

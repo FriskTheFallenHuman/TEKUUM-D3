@@ -43,11 +43,7 @@ idSimpleWindow::idSimpleWindow( idWindow* win )
 	clientRect = win->clientRect;
 	textRect = win->textRect;
 	origin = win->origin;
-#if defined(USE_IDFONT)
-	font = win->font;
-#else
 	fontNum = win->fontNum;
-#endif
 	name = win->name;
 	matScalex = win->matScalex;
 	matScaley = win->matScaley;
@@ -141,12 +137,10 @@ idSimpleWindow::~idSimpleWindow()
 
 void idSimpleWindow::StateChanged( bool redraw )
 {
-#if 0
 	if( redraw && background && background->CinematicLength() )
 	{
 		background->UpdateCinematic( gui->GetTime() );
 	}
-#endif
 }
 
 void idSimpleWindow::SetupTransforms( float x, float y )
@@ -266,11 +260,7 @@ void idSimpleWindow::Redraw( float x, float y )
 	}
 
 	CalcClientRect( 0, 0 );
-#if defined(USE_IDFONT)
-	dc->SetFont( font );
-#else
 	dc->SetFont( fontNum );
-#endif
 	drawRect.Offset( x, y );
 	clientRect.Offset( x, y );
 	textRect.Offset( x, y );
@@ -303,46 +293,44 @@ void idSimpleWindow::Redraw( float x, float y )
 	textRect.Offset( -x, -y );
 }
 
-int idSimpleWindow::GetWinVarOffset( idWinVar* wv, drawWin_t* owner )
+intptr_t idSimpleWindow::GetWinVarOffset( idWinVar* wv, drawWin_t* owner )
 {
-	int ret = -1;
+	intptr_t ret = -1;
 
-	// RB: 64 bit fixes, changed oldschool offsets using ptrdiff_t
 	if( wv == &rect )
 	{
-		ret = ( ptrdiff_t )&rect - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->rect - ( ptrdiff_t )this;
 	}
 
 	if( wv == &backColor )
 	{
-		ret = ( ptrdiff_t )&backColor - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->backColor - ( ptrdiff_t )this;
 	}
 
 	if( wv == &matColor )
 	{
-		ret = ( ptrdiff_t )&matColor - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->matColor - ( ptrdiff_t )this;
 	}
 
 	if( wv == &foreColor )
 	{
-		ret = ( ptrdiff_t )&foreColor - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->foreColor - ( ptrdiff_t )this;
 	}
 
 	if( wv == &borderColor )
 	{
-		ret = ( ptrdiff_t )&borderColor - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->borderColor - ( ptrdiff_t )this;
 	}
 
 	if( wv == &textScale )
 	{
-		ret = ( ptrdiff_t )&textScale - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->textScale - ( ptrdiff_t )this;
 	}
 
 	if( wv == &rotate )
 	{
-		ret = ( ptrdiff_t )&rotate - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->rotate - ( ptrdiff_t )this;
 	}
-	// RB end
 
 	if( ret != -1 )
 	{
@@ -414,10 +402,7 @@ void idSimpleWindow::WriteToSaveGame( idFile* savefile )
 	savefile->Write( &clientRect, sizeof( clientRect ) );
 	savefile->Write( &textRect, sizeof( textRect ) );
 	savefile->Write( &origin, sizeof( origin ) );
-
-#if !defined(USE_IDFONT)
 	savefile->Write( &fontNum, sizeof( fontNum ) );
-#endif
 	savefile->Write( &matScalex, sizeof( matScalex ) );
 	savefile->Write( &matScaley, sizeof( matScaley ) );
 	savefile->Write( &borderSize, sizeof( borderSize ) );
@@ -425,10 +410,6 @@ void idSimpleWindow::WriteToSaveGame( idFile* savefile )
 	savefile->Write( &textAlignx, sizeof( textAlignx ) );
 	savefile->Write( &textAligny, sizeof( textAligny ) );
 	savefile->Write( &textShadow, sizeof( textShadow ) );
-
-#if defined(USE_IDFONT)
-	savefile->WriteString( font->GetName() );
-#endif
 
 	text.WriteToSaveGame( savefile );
 	visible.WriteToSaveGame( savefile );
@@ -471,16 +452,7 @@ void idSimpleWindow::ReadFromSaveGame( idFile* savefile )
 	savefile->Read( &clientRect, sizeof( clientRect ) );
 	savefile->Read( &textRect, sizeof( textRect ) );
 	savefile->Read( &origin, sizeof( origin ) );
-
-#if !defined(USE_IDFONT)
 	savefile->Read( &fontNum, sizeof( fontNum ) );
-
-	/*	if ( savefile->GetFileVersion() < BUILD_NUMBER_8TH_ANNIVERSARY_1 ) {
-			int fontNum;
-			savefile->Read( &fontNum, sizeof( fontNum ) );
-			font = renderSystem->RegisterFont( "" );
-		} */
-#endif
 	savefile->Read( &matScalex, sizeof( matScalex ) );
 	savefile->Read( &matScaley, sizeof( matScaley ) );
 	savefile->Read( &borderSize, sizeof( borderSize ) );
@@ -488,14 +460,6 @@ void idSimpleWindow::ReadFromSaveGame( idFile* savefile )
 	savefile->Read( &textAlignx, sizeof( textAlignx ) );
 	savefile->Read( &textAligny, sizeof( textAligny ) );
 	savefile->Read( &textShadow, sizeof( textShadow ) );
-
-#if defined(USE_IDFONT)
-//	if ( savefile->GetFileVersion() >= BUILD_NUMBER_8TH_ANNIVERSARY_1 ) {
-	idStr fontName;
-	savefile->ReadString( fontName );
-	font = renderSystem->RegisterFont( fontName );
-//	}
-#endif
 
 	text.ReadFromSaveGame( savefile );
 	visible.ReadFromSaveGame( savefile );

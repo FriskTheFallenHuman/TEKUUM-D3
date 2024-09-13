@@ -46,7 +46,10 @@ void idChoiceWindow::InitVars( )
 		cvar = cvarSystem->Find( cvarStr );
 		if( !cvar )
 		{
-			common->Warning( "idChoiceWindow::InitVars: gui '%s' window '%s' references undefined cvar '%s'", gui->GetSourceFile(), name.c_str(), cvarStr.c_str() );
+			if( strcmp( cvarStr.c_str(), "s_driver" ) && strcmp( cvarStr.c_str(), "net_serverAllowServerMod" ) )
+			{
+				common->Warning( "idChoiceWindow::InitVars: gui '%s' window '%s' references undefined cvar '%s'", gui->GetSourceFile(), name.c_str(), cvarStr.c_str() );
+			}
 			return;
 		}
 		updateStr.Append( &cvarStr );
@@ -475,7 +478,10 @@ void idChoiceWindow::Draw( int time, float x, float y )
 		color = hoverColor;
 	}
 
-	dc->DrawText( choices[currentChoice], textScale, textAlign, color, textRect, false, -1 );
+	if( choices.Num() > 0 )
+	{
+		dc->DrawText( choices[currentChoice], textScale, textAlign, color, textRect, false, -1 );
+	}
 }
 
 void idChoiceWindow::Activate( bool activate, idStr& act )

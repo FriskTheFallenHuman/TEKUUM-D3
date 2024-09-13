@@ -120,11 +120,7 @@ void idWindow::CommonInit()
 	flags = 0;
 	lastTimeRun = 0;
 	origin.Zero();
-#if defined(USE_IDFONT)
-	font = renderSystem->RegisterFont( "" );
-#else
 	fontNum = 0;
-#endif
 	timeLine = -1;
 	xOffset = yOffset = 0.0;
 	cursor = 0;
@@ -263,6 +259,11 @@ void idWindow::CleanUp()
 	// Cleanup the named events
 	namedEvents.DeleteContents( true );
 
+	// Cleanup the operations and update vars
+	// (if it is not fixed, orphane register references are possible)
+	ops.Clear();
+	updateVars.Clear();
+
 	drawWindows.Clear();
 	children.DeleteContents( true );
 	definedVars.DeleteContents( true );
@@ -309,11 +310,7 @@ idWindow::SetFont
 */
 void idWindow::SetFont()
 {
-#if defined(USE_IDFONT)
-	dc->SetFont( font );
-#else
 	dc->SetFont( fontNum );
-#endif
 }
 
 /*
@@ -598,6 +595,18 @@ void idWindow::StateChanged( bool redraw )
 		else
 		{
 			drawWindows[i].simp->StateChanged( redraw );
+		}
+	}
+
+	if( redraw )
+	{
+		if( flags & WIN_DESKTOP )
+		{
+			Redraw( 0.0f, 0.0f, false );
+		}
+		if( background && background->CinematicLength() )
+		{
+			background->UpdateCinematic( gui->GetTime() );
 		}
 	}
 }
@@ -1276,7 +1285,6 @@ void idWindow::Time()
 			}
 		}
 	}
-
 	if( gui->Active() )
 	{
 		if( gui->GetPendingCmd().Length() > 0 )
@@ -2041,59 +2049,47 @@ idWindow::GetWinVarOffset
 */
 intptr_t idWindow::GetWinVarOffset( idWinVar* wv, drawWin_t* owner )
 {
-	// RB: 64 bit fixes, changed oldschool offsets using ptrdiff_t
-	// DG: => also return intptr_t..
 	intptr_t ret = -1;
 
 	if( wv == &rect )
 	{
-		//ret = (intptr_t)&( ( idWindow * ) 0 )->rect;
-		//ret = offsetof( idWindow, rect );
-		ret = ( ptrdiff_t )&rect - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->rect - ( ptrdiff_t )this;
 	}
 
 	if( wv == &backColor )
 	{
-		//ret = (int)&( ( idWindow * ) 0 )->backColor;
-		ret = ( ptrdiff_t )&backColor - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->backColor - ( ptrdiff_t )this;
 	}
 
 	if( wv == &matColor )
 	{
-		//ret = (int)&( ( idWindow * ) 0 )->matColor;
-		ret = ( ptrdiff_t )&matColor - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->matColor - ( ptrdiff_t )this;
 	}
 
 	if( wv == &foreColor )
 	{
-		//ret = (int)&( ( idWindow * ) 0 )->foreColor;
-		ret = ( ptrdiff_t )&foreColor - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->foreColor - ( ptrdiff_t )this;
 	}
 
 	if( wv == &hoverColor )
 	{
-		//ret = (int)&( ( idWindow * ) 0 )->hoverColor;
-		ret = ( ptrdiff_t )&hoverColor - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->hoverColor - ( ptrdiff_t )this;
 	}
 
 	if( wv == &borderColor )
 	{
-		//ret = (int)&( ( idWindow * ) 0 )->borderColor;
-		ret = ( ptrdiff_t )&borderColor - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->borderColor - ( ptrdiff_t )this;
 	}
 
 	if( wv == &textScale )
 	{
-		//ret = (int)&( ( idWindow * ) 0 )->textScale;
-		ret = ( ptrdiff_t )&textScale - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->textScale - ( ptrdiff_t )this;
 	}
 
 	if( wv == &rotate )
 	{
-		//ret = (int)&( ( idWindow * ) 0 )->rotate;
-		ret = ( ptrdiff_t )&rotate - ( ptrdiff_t )this;
+		ret = ( ptrdiff_t )&this->rotate - ( ptrdiff_t )this;
 	}
-	// RB end
 
 	if( ret != -1 )
 	{
@@ -2458,13 +2454,9 @@ bool idWindow::ParseInternalVar( const char* _name, idTokenParser* src )
 	}
 	if( idStr::Icmp( _name, "font" ) == 0 )
 	{
-		idStr fontName;
-		ParseString( src, fontName );
-#if defined(USE_IDFONT)
-		font = renderSystem->RegisterFont( fontName );
-#else
-		fontNum = dc->FindFont( fontName );
-#endif
+		idStr fontStr;
+		ParseString( src, fontStr );
+		fontNum = dc->FindFont( fontStr );
 		return true;
 	}
 	return false;
@@ -2481,9 +2473,7 @@ bool idWindow::ParseRegEntry( const char* name, idTokenParser* src )
 	work = name;
 	work.ToLower();
 
-	// DG: second argument is a bool, so use false, not NULL
 	idWinVar* var = GetWinVarByName( work, false );
-	// DG end
 	if( var )
 	{
 		for( int i = 0; i < NumRegisterVars; i++ )
@@ -2595,9 +2585,7 @@ bool idWindow::Parse( idTokenParser* src, bool rebuild )
 	bool ret = true;
 
 	// attach a window wrapper to the window if the gui editor is running
-// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 	if( com_editors & EDITOR_GUI )
 	{
 		new rvGEWindowWrapper( this, rvGEWindowWrapper::WT_NORMAL );
@@ -2806,9 +2794,7 @@ bool idWindow::Parse( idTokenParser* src, bool rebuild )
 
 			// If we are in the gui editor then add the internal var to the
 			// the wrapper
-// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 			if( com_editors & EDITOR_GUI )
 			{
 				idStr str;
@@ -2850,9 +2836,7 @@ bool idWindow::Parse( idTokenParser* src, bool rebuild )
 			// add the script to the wrappers script list
 			// If we are in the gui editor then add the internal var to the
 			// the wrapper
-// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 			if( com_editors & EDITOR_GUI )
 			{
 				idStr str;
@@ -2890,9 +2874,7 @@ bool idWindow::Parse( idTokenParser* src, bool rebuild )
 			regList.AddReg( work, idRegister::FLOAT, src, this, varf );
 
 			// If we are in the gui editor then add the float to the defines
-// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 			if( com_editors & EDITOR_GUI )
 			{
 				idStr str;
@@ -2917,24 +2899,13 @@ bool idWindow::Parse( idTokenParser* src, bool rebuild )
 
 			// FIXME: how about we add the var to the desktop instead of this window so it won't get deleted
 			//        when this window is destoyed which even happens during parsing with simple windows ?
-
-			// RB: changed behavior to put the var into the vars list of this window
-#if defined(STANDALONE)
-			definedVars.Append( var );
-
-			// Read in the vec4
-			regList.AddReg( work, idRegister::VEC4, src, this, var );
-#else
+			//definedVars.Append(var);
 			gui->GetDesktop()->definedVars.Append( var );
 			gui->GetDesktop()->regList.AddReg( work, idRegister::VEC4, src, gui->GetDesktop(), var );
-#endif
-			// RB end
 
 			// store the original vec4 for the editor
 			// If we are in the gui editor then add the float to the defines
-// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 			if( com_editors & EDITOR_GUI )
 			{
 				idStr str;
@@ -2962,9 +2933,7 @@ bool idWindow::Parse( idTokenParser* src, bool rebuild )
 			regList.AddReg( work, idRegister::FLOAT, src, this, varf );
 
 			// If we are in the gui editor then add the float to the defines
-// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 			if( com_editors & EDITOR_GUI )
 			{
 				idStr str;
@@ -2980,9 +2949,7 @@ bool idWindow::Parse( idTokenParser* src, bool rebuild )
 			// add the script to the wrappers script list
 			// If we are in the gui editor then add the internal var to the
 			// the wrapper
-// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 			if( com_editors & EDITOR_GUI )
 			{
 				idStr str;
@@ -3005,9 +2972,7 @@ bool idWindow::Parse( idTokenParser* src, bool rebuild )
 			// gui editor support
 			// If we are in the gui editor then add the internal var to the
 			// the wrapper
-// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 			if( com_editors & EDITOR_GUI )
 			{
 				idStr str;
@@ -3022,9 +2987,7 @@ bool idWindow::Parse( idTokenParser* src, bool rebuild )
 			// hook into the main window parsing for the gui editor
 			// If we are in the gui editor then add the internal var to the
 			// the wrapper
-// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 			if( com_editors & EDITOR_GUI )
 			{
 				idStr str;
@@ -3052,9 +3015,7 @@ bool idWindow::Parse( idTokenParser* src, bool rebuild )
 	// hook into the main window parsing for the gui editor
 	// If we are in the gui editor then add the internal var to the
 	// the wrapper
-// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 	if( com_editors & EDITOR_GUI )
 	{
 		rvGEWindowWrapper::GetWrapper( this )->Finish( );
@@ -3316,10 +3277,9 @@ wexpOp_t* idWindow::ExpressionOp()
 idWindow::EmitOp
 ================
 */
-// DG: a, b and the return value are really pointers, so use intptr_t
+
 intptr_t idWindow::EmitOp( intptr_t a, intptr_t b, wexpOpType_t opType, wexpOp_t** opp )
 {
-	// DG end
 	wexpOp_t* op;
 	/*
 		// optimize away identity operations
@@ -3371,11 +3331,9 @@ intptr_t idWindow::EmitOp( intptr_t a, intptr_t b, wexpOpType_t opType, wexpOp_t
 idWindow::ParseEmitOp
 ================
 */
-// DG: a, b and the return value are really pointers, so use intptr_t
 intptr_t idWindow::ParseEmitOp( idTokenParser* src, intptr_t a, wexpOpType_t opType, int priority, wexpOp_t** opp )
 {
 	intptr_t b = ParseExpressionPriority( src, priority );
-// DG end
 	return EmitOp( a, b, opType, opp );
 }
 
@@ -3387,14 +3345,10 @@ idWindow::ParseTerm
 Returns a register index
 =================
 */
-// DG: component and the return value are really pointers, so use intptr_t
 intptr_t idWindow::ParseTerm( idTokenParser* src,	idWinVar* var, intptr_t component )
 {
-	// DG end
 	idToken token;
-	// RB: 64 bit fixes, changed int to intptr_t
-	intptr_t		a, b;
-	// RB end
+	intptr_t a, b;
 
 	src->ReadToken( &token );
 
@@ -3445,10 +3399,7 @@ intptr_t idWindow::ParseTerm( idTokenParser* src,	idWinVar* var, intptr_t compon
 	}
 	if( var )
 	{
-		// RB: 64 bit fixes, changed int to intptr_t
 		a = ( intptr_t )var;
-		// RB end
-
 		//assert(dynamic_cast<idWinVec4*>(var));
 		var->Init( token, this );
 		b = component;
@@ -3495,9 +3446,7 @@ intptr_t idWindow::ParseTerm( idTokenParser* src,	idWinVar* var, intptr_t compon
 		// ugly but used for post parsing to fixup named vars
 		char* p = new char[token.Length() + 1];
 		strcpy( p, token );
-		// RB: 64 bit fixes, changed int to intptr_t
 		a = ( intptr_t )p;
-		// RB: 64 bit fixes, changed int to intptr_t
 		b = -2;
 		return EmitOp( a, b, WOP_TYPE_VAR );
 	}
@@ -3512,7 +3461,6 @@ Returns a register index
 =================
 */
 #define	TOP_PRIORITY 4
-// DG: a, component and the return value are really pointers, so use intptr_t
 intptr_t idWindow::ParseExpressionPriority( idTokenParser* src, int priority, idWinVar* var, intptr_t component )
 {
 	idToken token;
@@ -3588,7 +3536,6 @@ intptr_t idWindow::ParseExpressionPriority( idTokenParser* src, int priority, id
 	{
 		wexpOp_t* oop = NULL;
 		intptr_t o = ParseEmitOp( src, a, WOP_TYPE_COND, priority, &oop );
-		// DG end
 		if( !src->ReadToken( &token ) )
 		{
 			return o;
@@ -3616,10 +3563,8 @@ idWindow::ParseExpression
 Returns a register index
 ================
 */
-// DG: component and the return value are really pointers, so use intptr_t
 intptr_t idWindow::ParseExpression( idTokenParser* src, idWinVar* var, intptr_t component )
 {
-	// DG end
 	return ParseExpressionPriority( src, TOP_PRIORITY, var );
 }
 
@@ -4159,11 +4104,7 @@ void idWindow::WriteToSaveGame( idFile* savefile )
 	savefile->Write( &drawRect, sizeof( drawRect ) );
 	savefile->Write( &clientRect, sizeof( clientRect ) );
 	savefile->Write( &origin, sizeof( origin ) );
-
-#if !defined(USE_IDFONT)
 	savefile->Write( &fontNum, sizeof( fontNum ) );
-#endif
-
 	savefile->Write( &timeLine, sizeof( timeLine ) );
 	savefile->Write( &xOffset, sizeof( xOffset ) );
 	savefile->Write( &yOffset, sizeof( yOffset ) );
@@ -4178,10 +4119,6 @@ void idWindow::WriteToSaveGame( idFile* savefile )
 	savefile->Write( &textAligny, sizeof( textAligny ) );
 	savefile->Write( &textShadow, sizeof( textShadow ) );
 	savefile->Write( &shear, sizeof( shear ) );
-
-#if defined(USE_IDFONT)
-	savefile->WriteString( font->GetName() );
-#endif
 
 	WriteSaveGameString( name, savefile );
 	WriteSaveGameString( comment, savefile );
@@ -4337,14 +4274,7 @@ void idWindow::ReadFromSaveGame( idFile* savefile )
 	savefile->Read( &drawRect, sizeof( drawRect ) );
 	savefile->Read( &clientRect, sizeof( clientRect ) );
 	savefile->Read( &origin, sizeof( origin ) );
-	/*	if ( savefile->GetFileVersion() < BUILD_NUMBER_8TH_ANNIVERSARY_1 ) {
-			unsigned char fontNum;
-			savefile->Read( &fontNum, sizeof( fontNum ) );
-			font = renderSystem->RegisterFont( "" );
-		}*/
-#if !defined(USE_IDFONT)
 	savefile->Read( &fontNum, sizeof( fontNum ) );
-#endif
 	savefile->Read( &timeLine, sizeof( timeLine ) );
 	savefile->Read( &xOffset, sizeof( xOffset ) );
 	savefile->Read( &yOffset, sizeof( yOffset ) );
@@ -4359,14 +4289,6 @@ void idWindow::ReadFromSaveGame( idFile* savefile )
 	savefile->Read( &textAligny, sizeof( textAligny ) );
 	savefile->Read( &textShadow, sizeof( textShadow ) );
 	savefile->Read( &shear, sizeof( shear ) );
-
-#if defined(USE_IDFONT)
-//	if ( savefile->GetFileVersion() >= BUILD_NUMBER_8TH_ANNIVERSARY_1 ) {
-	idStr fontName;
-	savefile->ReadString( fontName );
-	font = renderSystem->RegisterFont( fontName );
-//	}
-#endif
 
 	ReadSaveGameString( name, savefile );
 	ReadSaveGameString( comment, savefile );
@@ -4537,70 +4459,68 @@ void idWindow::FixupTransitions()
 		transitions[i].data = NULL;
 		if( dw != NULL && ( dw->win != NULL || dw->simp != NULL ) )
 		{
-			// RB: 64 bit fixes, changed oldschool offsets using ptrdiff_t
 			if( dw->win != NULL )
 			{
-				if( transitions[i].offset == ( ptrdiff_t )&rect - ( ptrdiff_t )this )
+				if( transitions[i].offset == ( ptrdiff_t )&this->rect - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->win->rect;
 				}
-				else if( transitions[i].offset == ( ptrdiff_t )&backColor - ( ptrdiff_t )this )
+				else if( transitions[i].offset == ( ptrdiff_t )&this->backColor - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->win->backColor;
 				}
-				else if( transitions[i].offset == ( ptrdiff_t )&matColor - ( ptrdiff_t )this )
+				else if( transitions[i].offset == ( ptrdiff_t )&this->matColor - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->win->matColor;
 				}
-				else if( transitions[i].offset == ( ptrdiff_t )&foreColor - ( ptrdiff_t )this )
+				else if( transitions[i].offset == ( ptrdiff_t )&this->foreColor - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->win->foreColor;
 				}
-				else if( transitions[i].offset == ( ptrdiff_t )&borderColor - ( ptrdiff_t )this )
+				else if( transitions[i].offset == ( ptrdiff_t )&this->borderColor - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->win->borderColor;
 				}
-				else if( transitions[i].offset == ( ptrdiff_t )&textScale - ( ptrdiff_t )this )
+				else if( transitions[i].offset == ( ptrdiff_t )&this->textScale - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->win->textScale;
 				}
-				else if( transitions[i].offset == ( ptrdiff_t )&rotate - ( ptrdiff_t )this )
+				else if( transitions[i].offset == ( ptrdiff_t )&this->rotate - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->win->rotate;
 				}
 			}
 			else
 			{
-				if( transitions[i].offset == ( ptrdiff_t )&rect - ( ptrdiff_t )this )
+				if( transitions[i].offset == ( ptrdiff_t )&this->rect - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->simp->rect;
 				}
-				else if( transitions[i].offset == ( ptrdiff_t )&backColor - ( ptrdiff_t )this )
+				else if( transitions[i].offset == ( ptrdiff_t )&this->backColor - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->simp->backColor;
 				}
-				else if( transitions[i].offset == ( ptrdiff_t )&matColor - ( ptrdiff_t )this )
+				else if( transitions[i].offset == ( ptrdiff_t )&this->matColor - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->simp->matColor;
 				}
-				else if( transitions[i].offset == ( ptrdiff_t )&foreColor - ( ptrdiff_t )this )
+				else if( transitions[i].offset == ( ptrdiff_t )&this->foreColor - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->simp->foreColor;
 				}
-				else if( transitions[i].offset == ( ptrdiff_t )&borderColor - ( ptrdiff_t )this )
+				else if( transitions[i].offset == ( ptrdiff_t )&this->borderColor - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->simp->borderColor;
 				}
-				else if( transitions[i].offset == ( ptrdiff_t )&textScale - ( ptrdiff_t )this )
+				else if( transitions[i].offset == ( ptrdiff_t )&this->textScale - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->simp->textScale;
 				}
-				else if( transitions[i].offset == ( ptrdiff_t )&rotate - ( ptrdiff_t )this )
+				else if( transitions[i].offset == ( ptrdiff_t )&this->rotate - ( ptrdiff_t )this )
 				{
 					transitions[i].data = &dw->simp->rotate;
 				}
 			}
-			// RB end
 		}
 		if( transitions[i].data == NULL )
 		{
@@ -4668,9 +4588,7 @@ void idWindow::FixupParms()
 			const char* p = ( const char* )( ops[i].a );
 			idWinVar* var = GetWinVarByName( p, true );
 			delete []p;
-			// RB: 64 bit fix, changed int to intptr_t
 			ops[i].a = ( intptr_t )var;
-			// RB end
 			ops[i].b = -1;
 		}
 	}
