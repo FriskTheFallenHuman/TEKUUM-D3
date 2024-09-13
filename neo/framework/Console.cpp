@@ -57,6 +57,7 @@ public:
 	virtual	bool		ProcessEvent( const sysEvent_t* event, bool forceAccept );
 	virtual	bool		Active();
 	virtual	void		ClearNotifyLines();
+	virtual void		Open();
 	virtual	void		Close();
 	virtual	void		Print( const char* text );
 	virtual	void		Draw( bool forceFullScreen );
@@ -155,7 +156,7 @@ idCVar idConsoleLocal::con_notifyTime( "con_notifyTime", "3", CVAR_SYSTEM, "time
 #ifdef DEBUG
 	idCVar idConsoleLocal::con_noPrint( "con_noPrint", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "print on the console but not onscreen when console is pulled up" );
 #else
-	idCVar idConsoleLocal::con_noPrint( "con_noPrint", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "print on the console but not onscreen when console is pulled up" );
+	idCVar idConsoleLocal::con_noPrint( "con_noPrint", "1", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "print on the console but not onscreen when console is pulled up" );
 #endif
 
 /*
@@ -536,6 +537,24 @@ void	idConsoleLocal::ClearNotifyLines()
 	{
 		times[i] = 0;
 	}
+}
+
+/*
+================
+idConsoleLocal::Open
+================
+*/
+void	idConsoleLocal::Open()
+{
+	if( keyCatching )
+	{
+		return;    // already open
+	}
+
+	consoleField.ClearAutoComplete();
+	consoleField.Clear();
+	keyCatching = true;
+	SetDisplayFraction( 0.5f );
 }
 
 /*
@@ -1405,11 +1424,11 @@ void idConsoleLocal::Draw( bool forceFullScreen )
 	float lefty = LOCALSAFE_TOP;
 	float righty = LOCALSAFE_TOP;
 	float centery = LOCALSAFE_TOP;
+
 	if( com_showFPS.GetBool() )
 	{
 		righty = DrawFPS( righty );
 	}
-
 	if( com_showMemoryUsage.GetBool() )
 	{
 		righty = DrawMemoryUsage( righty );

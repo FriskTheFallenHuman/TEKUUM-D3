@@ -37,7 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 	#include <jerror.h>
 #endif
 
-#include "tr_local.h"
+#include "RenderCommon.h"
 
 #define CIN_system	1
 #define CIN_loop	2
@@ -55,9 +55,12 @@ public:
 	virtual bool			InitFromFile( const char* qpath, bool looping );
 	virtual cinData_t		ImageForTime( int milliseconds );
 	virtual int				AnimationLength();
+	// RB begin
+	virtual bool			IsPlaying() const;
+	// RB end
 	virtual void			Close();
 	virtual void			ResetTime( int time );
-
+	virtual int             GetStartTime();
 	// RB begin
 	virtual bool			IsLooping();
 	// RB end
@@ -264,6 +267,16 @@ void idCinematic::ResetTime( int milliseconds )
 
 /*
 ==============
+idCinematic::GetStartTime
+==============
+*/
+int idCinematic::GetStartTime()
+{
+	return -1;
+}
+
+/*
+==============
 idCinematicLocal::ImageForTime
 ==============
 */
@@ -272,6 +285,16 @@ cinData_t idCinematic::ImageForTime( int milliseconds )
 	cinData_t c;
 	memset( &c, 0, sizeof( c ) );
 	return c;
+}
+
+/*
+==============
+idCinematicLocal::IsPlaying
+==============
+*/
+bool idCinematic::IsPlaying() const
+{
+	return false;
 }
 
 /*
@@ -422,12 +445,25 @@ int idCinematicLocal::AnimationLength()
 	return animationLength;
 }
 
-// RB begin
+/*
+==============
+idCinematicLocal::IsLooping
+==============
+*/
 bool idCinematicLocal::IsLooping()
 {
 	return looping;
 }
-// RB end
+
+/*
+==============
+idCinematicLocal::IsPlaying
+==============
+*/
+bool idCinematicLocal::IsPlaying() const
+{
+	return ( status == FMV_PLAY );
+}
 
 /*
 ==============
@@ -436,10 +472,21 @@ idCinematicLocal::ResetTime
 */
 void idCinematicLocal::ResetTime( int time )
 {
-	startTime = ( backEnd.viewDef ) ? backEnd.viewDef->renderView.time[0] : -1;
+	startTime = time; //originally this was: ( backEnd.viewDef ) ? 1000 * backEnd.viewDef->floatTime : -1;
 	//startTime = -1;
 	status = FMV_PLAY;
 }
+
+/*
+==============
+ idCinematicLocal::GetStartTime
+==============
+*/
+int idCinematicLocal::GetStartTime()
+{
+	return startTime;
+}
+
 
 /*
 ==============

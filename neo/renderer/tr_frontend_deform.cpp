@@ -30,7 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "tr_local.h"
+#include "RenderCommon.h"
 #include "Model_local.h"
 
 /*
@@ -48,8 +48,8 @@ R_FinishDeform
 */
 static drawSurf_t* R_FinishDeform( drawSurf_t* surf, srfTriangles_t* newTri, const idDrawVert* newVerts, const triIndex_t* newIndexes )
 {
-	newTri->ambientCache = vertexCache.AllocVertex( newVerts, ALIGN( newTri->numVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
-	newTri->indexCache = vertexCache.AllocIndex( newIndexes, ALIGN( newTri->numIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
+	newTri->ambientCache = vertexCache.AllocVertex( newVerts, newTri->numVerts );
+	newTri->indexCache = vertexCache.AllocIndex( newIndexes, newTri->numIndexes );
 
 	surf->frontEndGeo = newTri;
 	surf->numIndexes = newTri->numIndexes;
@@ -76,7 +76,9 @@ static drawSurf_t* R_AutospriteDeform( drawSurf_t* surf )
 
 	if( srcTri->numVerts & 3 )
 	{
+#if !defined( ID_RETAIL )
 		common->Warning( "R_AutospriteDeform: shader had odd vertex count" );
+#endif
 		return NULL;
 	}
 	if( srcTri->numIndexes != ( srcTri->numVerts >> 2 ) * 6 )
@@ -399,7 +401,9 @@ static drawSurf_t* R_FlareDeform( drawSurf_t* surf )
 	if( srcTri->numVerts != 4 || srcTri->numIndexes != 6 )
 	{
 		// FIXME: temp hack for flares on tripleted models
+#if !defined( ID_RETAIL )
 		common->Warning( "R_FlareDeform: not a single quad" );
+#endif
 		return NULL;
 	}
 
@@ -964,13 +968,7 @@ static drawSurf_t* R_ParticleDeform( drawSurf_t* surf, bool useArea )
 			idRandom steppingRandom;
 			idRandom steppingRandom2;
 
-// RB: timeGroup bugfix
-#if defined(STANDALONE)
 			int stageAge = g.renderView->time[renderEntity->timeGroup] + idMath::Ftoi( renderEntity->shaderParms[SHADERPARM_TIMEOFFSET] * 1000.0f - stage->timeOffset * 1000.0f );
-#else
-			int stageAge = g.renderView->time[0] + idMath::Ftoi( renderEntity->shaderParms[SHADERPARM_TIMEOFFSET] * 1000.0f - stage->timeOffset * 1000.0f );
-#endif
-// RB end
 			int stageCycle = stageAge / stage->cycleMsec;
 
 			// some particles will be in this cycle, some will be in the previous cycle
@@ -1003,13 +1001,8 @@ static drawSurf_t* R_ParticleDeform( drawSurf_t* surf, bool useArea )
 
 				int inCycleTime = particleAge - particleCycle * stage->cycleMsec;
 
-// RB: timeGroup bugfix
-#if defined(STANDALONE)
-				if( renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] != 0.0f && g.renderView->time[renderEntity->timeGroup] - inCycleTime >= renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] * 1000.0f )
-#else
-				if( renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] != 0.0f && g.renderView->time[0] - inCycleTime >= renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] * 1000.0f )
-#endif
-// RB end
+				if( renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] != 0.0f &&
+						g.renderView->time[renderEntity->timeGroup] - inCycleTime >= renderEntity->shaderParms[SHADERPARM_PARTICLE_STOPTIME] * 1000.0f )
 				{
 					// don't fire any more particles
 					continue;
@@ -1103,8 +1096,8 @@ static drawSurf_t* R_ParticleDeform( drawSurf_t* surf, bool useArea )
 		newTri->bounds = stage->bounds;		// just always draw the particles
 		newTri->numVerts = numVerts;
 		newTri->numIndexes = numIndexes;
-		newTri->ambientCache = vertexCache.AllocVertex( newVerts, ALIGN( numVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
-		newTri->indexCache = vertexCache.AllocIndex( newIndexes, ALIGN( numIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
+		newTri->ambientCache = vertexCache.AllocVertex( newVerts, numVerts );
+		newTri->indexCache = vertexCache.AllocIndex( newIndexes, numIndexes );
 
 		drawSurf_t* drawSurf = ( drawSurf_t* )R_FrameAlloc( sizeof( *drawSurf ), FRAME_ALLOC_DRAW_SURFACE );
 		drawSurf->frontEndGeo = newTri;

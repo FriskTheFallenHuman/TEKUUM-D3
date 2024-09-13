@@ -3,7 +3,8 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013 Robert Beckebans
+Copyright (C) 2014-2020 Robert Beckebans
+Copyright (C) 2014-2016 Kot in Action Creative Artel
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -30,6 +31,14 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __MATERIAL_H__
 #define __MATERIAL_H__
 
+
+// RB: define this to use the id Tech 4.5 UI interface for ImGui instead of OpenGL or Vulkan
+// this allows to have the com_showFPS stats in screenshots
+
+//#if defined( USE_VULKAN )
+#define IMGUI_BFGUI 1
+//#endif
+
 /*
 ===============================================================================
 
@@ -47,6 +56,7 @@ typedef enum
 {
 	TF_LINEAR,
 	TF_NEAREST,
+	TF_NEAREST_MIPMAP,		// RB: no linear interpolation but explicit mip-map levels for hierarchical depth buffer
 	TF_DEFAULT				// use the user-specified r_textureFilter
 } textureFilter_t;
 
@@ -280,8 +290,18 @@ typedef enum
 	MF_NOSHADOWS				= BIT( 2 ),
 	MF_FORCESHADOWS				= BIT( 3 ),
 	MF_NOSELFSHADOW				= BIT( 4 ),
-	MF_NOPORTALFOG				= BIT( 5 ),	// this fog volume won't ever consider a portal fogged out
-	MF_EDITOR_VISIBLE			= BIT( 6 )	// in use (visible) per editor
+	MF_NOPORTALFOG				= BIT( 5 ),	 // this fog volume won't ever consider a portal fogged out
+	MF_EDITOR_VISIBLE			= BIT( 6 ),	 // in use (visible) per editor
+	// motorsep 11-23-2014; material LOD keys that define what LOD iteration the surface falls into
+	MF_LOD1_SHIFT				= 7,
+	MF_LOD1						= BIT( 7 ),	 // motorsep 11-24-2014; material flag for LOD1 iteration
+	MF_LOD2						= BIT( 8 ),	 // motorsep 11-24-2014; material flag for LOD2 iteration
+	MF_LOD3						= BIT( 9 ),	 // motorsep 11-24-2014; material flag for LOD3 iteration
+	MF_LOD4						= BIT( 10 ), // motorsep 11-24-2014; material flag for LOD4 iteration
+	MF_LOD_PERSISTENT			= BIT( 11 ), // motorsep 11-24-2014; material flag for persistent LOD iteration
+	MF_GUITARGET				= BIT( 12 ), // Admer: this GUI surface is used to compute a GUI render map, but a GUI should NOT be drawn on it
+	MF_AUTOGEN_TEMPLATE			= BIT( 13 ), // Admer: this material is a template for auto-generated templates
+	MF_ORIGIN					= BIT( 14 ), // Admer: for origin brushes
 } materialFlags_t;
 
 // contents flags, NOTE: make sure to keep the defines in doom_defs.script up to date with these!
@@ -304,13 +324,10 @@ typedef enum
 	CONTENTS_AAS_OBSTACLE		= BIT( 14 ),	// used to compile an obstacle into AAS that can be enabled/disabled
 	CONTENTS_FLASHLIGHT_TRIGGER	= BIT( 15 ),	// used for triggers that are activated by the flashlight
 
-	// RB begin
-	CONTENTS_DYNAMICPORTAL		= BIT( 16 ),	// used for dynamic portals
-	// RB end
-
 	// contents used by utils
 	CONTENTS_AREAPORTAL			= BIT( 20 ),	// portal separating renderer areas
 	CONTENTS_NOCSG				= BIT( 21 ),	// don't cut this brush with CSG operations in the editor
+	CONTENTS_ORIGIN				= BIT( 22 ),
 
 	CONTENTS_REMOVE_UTIL		= ~( CONTENTS_AREAPORTAL | CONTENTS_NOCSG )
 } contentsFlags_t;
@@ -331,9 +348,6 @@ typedef enum
 	SURFTYPE_GLASS,
 	SURFTYPE_PLASTIC,
 	SURFTYPE_RICOCHET,
-	// RB begin
-	SURFTYPE_WALLWALK,
-	// RB end
 	SURFTYPE_10,
 	SURFTYPE_11,
 	SURFTYPE_12,
@@ -494,6 +508,14 @@ public:
 	bool				UseUnsmoothedTangents() const
 	{
 		return unsmoothedTangents;
+	}
+
+	// RB: characters and models that baked in Blender or Substance designer use the newer
+	// Mikkelsen tangent space standard.
+	// see: https://bgolus.medium.com/generating-perfect-normal-maps-for-unity-f929e673fc57
+	bool				UseMikkTSpace() const
+	{
+		return mikktspace;
 	}
 
 	// by default, monsters can have blood overlays placed on them, but this can
@@ -747,10 +769,15 @@ public:
 
 	void				UpdateCinematic( int time ) const;
 
+	// RB: added because we can't rely on the FFmpeg feedback how long a video really is
+	bool                CinematicIsPlaying() const;
+	// RB end
+
 	//------------------------------------------------------------------
 
 	// gets an image for the editor to use
 	idImage* 			GetEditorImage() const;
+	idImage* 			GetLightEditorImage() const; // RB
 	int					GetImageWidth() const;
 	int					GetImageHeight() const;
 
@@ -792,29 +819,47 @@ public:
 	};
 	void				AddReference();
 
+	// motorsep 11-23-2014; material LOD keys that define what LOD iteration the surface falls into
+	// lod1 - lod4 defines several levels of LOD
+	// persistentLOD specifies the LOD iteration that still being rendered, even after the camera is beyond the distance at which LOD iteration should not be rendered
+
+	bool				IsLOD() const
+	{
+		return ( materialFlags & ( MF_LOD1 | MF_LOD2 | MF_LOD3 | MF_LOD4 ) ) != 0;
+	}
+	// foresthale 2014-11-24: added IsLODVisibleForDistance method
+	bool				IsLODVisibleForDistance( float distance, float lodBase ) const
+	{
+		int bit = ( materialFlags & ( MF_LOD1 | MF_LOD2 | MF_LOD3 | MF_LOD4 ) ) >> MF_LOD1_SHIFT;
+		float m1 = lodBase * ( bit >> 1 );
+		float m2 = lodBase * bit;
+		return distance >= m1 && ( distance < m2 || ( materialFlags & ( MF_LOD_PERSISTENT ) ) );
+	}
+
+
 private:
 	// parse the entire material
 	void				CommonInit();
-	void				ParseMaterial( idTokenParser& src );
-	bool				MatchToken( idTokenParser& src, const char* match );
-	void				ParseSort( idTokenParser& src );
-	void				ParseStereoEye( idTokenParser& src );
-	void				ParseBlend( idTokenParser& src, shaderStage_t* stage );
-	void				ParseVertexParm( idTokenParser& src, newShaderStage_t* newStage );
-	void				ParseVertexParm2( idTokenParser& src, newShaderStage_t* newStage );
-	void				ParseFragmentMap( idTokenParser& src, newShaderStage_t* newStage );
-	void				ParseStage( idTokenParser& src, const textureRepeat_t trpDefault = TR_REPEAT );
-	void				ParseDeform( idTokenParser& src );
-	void				ParseDecalInfo( idTokenParser& src );
+	void				ParseMaterial( idLexer& src );
+	bool				MatchToken( idLexer& src, const char* match );
+	void				ParseSort( idLexer& src );
+	void				ParseStereoEye( idLexer& src );
+	void				ParseBlend( idLexer& src, shaderStage_t* stage );
+	void				ParseVertexParm( idLexer& src, newShaderStage_t* newStage );
+	void				ParseVertexParm2( idLexer& src, newShaderStage_t* newStage );
+	void				ParseFragmentMap( idLexer& src, newShaderStage_t* newStage );
+	void				ParseStage( idLexer& src, const textureRepeat_t trpDefault = TR_REPEAT );
+	void				ParseDeform( idLexer& src );
+	void				ParseDecalInfo( idLexer& src );
 	bool				CheckSurfaceParm( idToken* token );
 	int					GetExpressionConstant( float f );
 	int					GetExpressionTemporary();
-	expOp_t*				GetExpressionOp();
+	expOp_t*			GetExpressionOp();
 	int					EmitOp( int a, int b, expOpType_t opType );
-	int					ParseEmitOp( idTokenParser& src, int a, expOpType_t opType, int priority );
-	int					ParseTerm( idTokenParser& src );
-	int					ParseExpressionPriority( idTokenParser& src, int priority );
-	int					ParseExpression( idTokenParser& src );
+	int					ParseEmitOp( idLexer& src, int a, expOpType_t opType, int priority );
+	int					ParseTerm( idLexer& src );
+	int					ParseExpressionPriority( idLexer& src, int priority );
+	int					ParseExpression( idLexer& src );
 	void				ClearStage( shaderStage_t* ss );
 	int					NameToSrcBlendMode( const idStr& name );
 	int					NameToDstBlendMode( const idStr& name );
@@ -828,7 +873,7 @@ private:
 	idStr				desc;				// description
 	idStr				renderBump;			// renderbump command options, without the "renderbump" at the start
 
-	idImage*				lightFalloffImage;	// only for light shaders
+	idImage*			lightFalloffImage;	// only for light shaders
 
 	idImage* 			fastPathBumpImage;	// if any of these are set, they all will be
 	idImage* 			fastPathDiffuseImage;
@@ -850,7 +895,6 @@ private:
 
 	decalInfo_t			decalInfo;
 
-
 	mutable	float		sort;				// lower numbered shaders draw before higher numbered
 	int					stereoEye;
 	deform_t			deform;
@@ -867,6 +911,7 @@ private:
 	bool				blendLight;
 	bool				ambientLight;
 	bool				unsmoothedTangents;
+	bool				mikktspace;			// RB: use Mikkelsen tangent space standard for normal mapping
 	bool				hasSubview;			// mirror, remote render, etc
 	bool				allowOverlays;
 

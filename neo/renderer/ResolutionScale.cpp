@@ -1,25 +1,26 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Doom 3 BFG Edition GPL Source Code
+Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2014 Robert Beckebans
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
+Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
+Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
+along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
+In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
 
 If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
@@ -28,7 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "precompiled.h"
 #pragma hdrstop
-#include "tr_local.h"
+#include "RenderCommon.h"
 #include "ResolutionScale.h"
 
 
@@ -37,11 +38,9 @@ idResolutionScale	resolutionScale;
 static const float MINIMUM_RESOLUTION_SCALE = 0.5f;
 static const float MAXIMUM_RESOLUTION_SCALE = 1.0f;
 
-#if defined(__ANDROID__)
-	idCVar rs_enable( "rs_enable", "1", CVAR_INTEGER, "Enable dynamic resolution scaling, 0 - off, 1 - horz only, 2 - vert only, 3 - both" );
-#else
-	idCVar rs_enable( "rs_enable", "0", CVAR_INTEGER, "Enable dynamic resolution scaling, 0 - off, 1 - horz only, 2 - vert only, 3 - both" );
-#endif
+// RB: turned this off. It is only useful on mobile devices or consoles
+idCVar rs_enable( "rs_enable", "0", CVAR_INTEGER, "Enable dynamic resolution scaling, 0 - off, 1 - horz only, 2 - vert only, 3 - both" );
+// Rb end
 idCVar rs_forceFractionX( "rs_forceFractionX", "0", CVAR_FLOAT, "Force a specific 0.0 to 1.0 horizontal resolution scale" );
 idCVar rs_forceFractionY( "rs_forceFractionY", "0", CVAR_FLOAT, "Force a specific 0.0 to 1.0 vertical resolution scale" );
 idCVar rs_showResolutionChanges( "rs_showResolutionChanges", "0", CVAR_INTEGER, "1 = Print whenever the resolution scale changes, 2 = always" );
@@ -143,10 +142,10 @@ void idResolutionScale::GetCurrentResolutionScale( float& x, float& y )
 idResolutionScale::SetCurrentGPUFrameTime
 ========================
 */
-void idResolutionScale::SetCurrentGPUFrameTime( int milliseconds )
+void idResolutionScale::SetCurrentGPUFrameTime( int microseconds )
 {
 	float old = currentResolution;
-	//float milliseconds = microseconds * 0.001f;
+	float milliseconds = microseconds * 0.001f;
 
 	if( milliseconds > dropMilliseconds )
 	{
@@ -184,9 +183,10 @@ void idResolutionScale::SetCurrentGPUFrameTime( int milliseconds )
 		framesAboveRaise = 0;
 	}
 
-	if( rs_showResolutionChanges.GetInteger() > 1 || ( rs_showResolutionChanges.GetInteger() == 1 && currentResolution != old ) )
+	if( rs_showResolutionChanges.GetInteger() > 1 ||
+			( rs_showResolutionChanges.GetInteger() == 1 && currentResolution != old ) )
 	{
-		idLib::Printf( "GPU msec: %4.1f resolutionScale: %4.2f\n", ( float )milliseconds, currentResolution );
+		idLib::Printf( "GPU msec: %4.1f resolutionScale: %4.2f\n", milliseconds, currentResolution );
 	}
 }
 

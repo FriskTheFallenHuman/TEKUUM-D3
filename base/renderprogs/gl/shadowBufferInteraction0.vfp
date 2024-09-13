@@ -1,0 +1,244 @@
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+OPTION ARB_fragment_program_shadow;
+
+# local[2]	fragment.position to jitterTexture mapping
+# local[3]	jitterTexScale
+# local[4]	jitterTexOffset
+
+PARAM	jitterTexScale = program.local[3];
+PARAM	jitterTexOffset = program.local[4];
+
+# calculate the shadow buffer factor
+TEMP	flip, shadow, jitterTex, R0;
+PARAM	pointFive = { 0.5, 0.5, 0.5, 0.5 };
+
+# just do a single projected sample for the shadow
+TXP		shadow, fragment.texcoord[7], texture[7], SHADOW2D;
+
+# texture 0 is the cube map
+# texture 1 is the per-surface bump map
+# texture 2 is the light falloff texture
+# texture 3 is the light projection texture
+# texture 4 is the per-surface diffuse map
+# texture 5 is the per-surface specular map
+# texture 6 is the specular lookup table
+# texture 7 is the shadow depth buffer
+
+# env[0] is the diffuse modifier
+# env[1] is the specular modifier
+
+TEMP	light, color, R1, R2, localNormal, specular;
+
+PARAM	subOne = { -1, -1, -1, -1 };
+PARAM	scaleTwo = { 2, 2, 2, 2 };
+
+# load the specular half angle first, because
+# the ATI shader gives a "too many indirections" error
+# if this is done right before the texture indirection
+
+#-----------------
+#TEX	specular, fragment.texcoord[6], texture[0], CUBE;
+#MAD	specular, specular, scaleTwo, subOne;
+
+
+# instead of using the normalization cube map, normalize with math
+DP3		specular, fragment.texcoord[6],fragment.texcoord[6];
+RSQ		specular, specular.x;
+MUL		specular, specular.x, fragment.texcoord[6];
+#-----------------
+
+
+#
+# the amount of light contacting the fragment is the
+# product of the two light projections and the surface
+# bump mapping
+#
+
+# perform the diffuse bump mapping
+
+#-----------------
+TEX	light, fragment.texcoord[0], texture[0], CUBE;
+MAD	light, light, scaleTwo, subOne;
+
+# instead of using the normalization cube map, normalize with math
+#DP3		light, fragment.texcoord[0],fragment.texcoord[0];
+#RSQ		light, light.x;
+#MUL		light, light.x, fragment.texcoord[0];
+#-----------------
+
+TEX	localNormal, fragment.texcoord[1], texture[1], 2D;
+MOV localNormal.x, localNormal.a;
+MAD	localNormal, localNormal, scaleTwo, subOne;
+DP3	light, light, localNormal;
+
+# modulate by the light projection
+TXP	R1, fragment.texcoord[3], texture[3], 2D;
+MUL	light, light, R1;
+
+# modulate by the light falloff
+TXP	R1, fragment.texcoord[2], texture[2], 2D;
+MUL	light, light, R1;
+
+# calculate the shadow buffer factor
+MUL	light, light, shadow;
+
+#
+# the light will be modulated by the diffuse and
+# specular surface characteristics
+#
+
+# modulate by the diffuse map and constant diffuse factor
+TEX	R1, fragment.texcoord[4], texture[4], 2D;
+MUL	color, R1, program.env[0];
+
+# perform the specular bump mapping
+DP3	specular, specular, localNormal;
+
+# perform a dependent table read for the specular falloff
+TEX	R1, specular, texture[6], 2D;
+
+# modulate by the constant specular factor
+MUL	R1, R1, program.env[1];
+
+# modulate by the specular map * 2
+TEX	R2, fragment.texcoord[5], texture[5], 2D;
+ADD	R2, R2, R2;
+MAD	color, R1, R2, color;
+
+
+MUL	color, light, color;
+
+# modify by the vertex color
+
+MUL result.color, color, fragment.color;
+
+# this should be better on future hardware, but current drivers make it slower
+#MUL result.color.xyz, color, fragment.color;
+
+
+END
+
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+OPTION ARB_fragment_program_shadow;
+
+# local[2]	fragment.position to jitterTexture mapping
+# local[3]	jitterTexScale
+# local[4]	jitterTexOffset
+
+PARAM	jitterTexScale = program.local[3];
+PARAM	jitterTexOffset = program.local[4];
+
+# calculate the shadow buffer factor
+TEMP	flip, shadow, jitterTex, R0;
+PARAM	pointFive = { 0.5, 0.5, 0.5, 0.5 };
+
+# just do a single projected sample for the shadow
+TXP		shadow, fragment.texcoord[7], texture[7], SHADOW2D;
+
+# texture 0 is the cube map
+# texture 1 is the per-surface bump map
+# texture 2 is the light falloff texture
+# texture 3 is the light projection texture
+# texture 4 is the per-surface diffuse map
+# texture 5 is the per-surface specular map
+# texture 6 is the specular lookup table
+# texture 7 is the shadow depth buffer
+
+# env[0] is the diffuse modifier
+# env[1] is the specular modifier
+
+TEMP	light, color, R1, R2, localNormal, specular;
+
+PARAM	subOne = { -1, -1, -1, -1 };
+PARAM	scaleTwo = { 2, 2, 2, 2 };
+
+# load the specular half angle first, because
+# the ATI shader gives a "too many indirections" error
+# if this is done right before the texture indirection
+
+#-----------------
+#TEX	specular, fragment.texcoord[6], texture[0], CUBE;
+#MAD	specular, specular, scaleTwo, subOne;
+
+
+# instead of using the normalization cube map, normalize with math
+DP3		specular, fragment.texcoord[6],fragment.texcoord[6];
+RSQ		specular, specular.x;
+MUL		specular, specular.x, fragment.texcoord[6];
+#-----------------
+
+
+#
+# the amount of light contacting the fragment is the
+# product of the two light projections and the surface
+# bump mapping
+#
+
+# perform the diffuse bump mapping
+
+#-----------------
+TEX	light, fragment.texcoord[0], texture[0], CUBE;
+MAD	light, light, scaleTwo, subOne;
+
+# instead of using the normalization cube map, normalize with math
+#DP3		light, fragment.texcoord[0],fragment.texcoord[0];
+#RSQ		light, light.x;
+#MUL		light, light.x, fragment.texcoord[0];
+#-----------------
+
+TEX	localNormal, fragment.texcoord[1], texture[1], 2D;
+MOV localNormal.x, localNormal.a;
+MAD	localNormal, localNormal, scaleTwo, subOne;
+DP3	light, light, localNormal;
+
+# modulate by the light projection
+TXP	R1, fragment.texcoord[3], texture[3], 2D;
+MUL	light, light, R1;
+
+# modulate by the light falloff
+TXP	R1, fragment.texcoord[2], texture[2], 2D;
+MUL	light, light, R1;
+
+# calculate the shadow buffer factor
+MUL	light, light, shadow;
+
+#
+# the light will be modulated by the diffuse and
+# specular surface characteristics
+#
+
+# modulate by the diffuse map and constant diffuse factor
+TEX	R1, fragment.texcoord[4], texture[4], 2D;
+MUL	color, R1, program.env[0];
+
+# perform the specular bump mapping
+DP3	specular, specular, localNormal;
+
+# perform a dependent table read for the specular falloff
+TEX	R1, specular, texture[6], 2D;
+
+# modulate by the constant specular factor
+MUL	R1, R1, program.env[1];
+
+# modulate by the specular map * 2
+TEX	R2, fragment.texcoord[5], texture[5], 2D;
+ADD	R2, R2, R2;
+MAD	color, R1, R2, color;
+
+
+MUL	color, light, color;
+
+# modify by the vertex color
+
+MUL result.color, color, fragment.color;
+
+# this should be better on future hardware, but current drivers make it slower
+#MUL result.color.xyz, color, fragment.color;
+
+
+END
+

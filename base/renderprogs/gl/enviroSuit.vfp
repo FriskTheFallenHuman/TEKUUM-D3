@@ -1,0 +1,58 @@
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+MOV	result.texcoord[0], vertex.texcoord[0];
+MOV	result.color, program.local[1];
+
+END
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+# texture 0 is _currentRender
+# texture 1 is a normal map that we will use to deform texture 0
+
+TEMP R0, R1;
+
+TEX	R0, fragment.texcoord[0], texture[1], 2D;
+MUL R0, R0, fragment.color;
+SUB R0, 1, R0;
+
+ADD R1, fragment.texcoord[0], -0.5;
+MUL R1, R1, R0;
+ADD R1, R1, 0.5;
+
+TEX	result.color.xyz, R1, texture[0], 2D;
+
+END
+
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+MOV	result.texcoord[0], vertex.texcoord[0];
+MOV	result.color, program.local[1];
+
+END
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+# texture 0 is _currentRender
+# texture 1 is a normal map that we will use to deform texture 0
+
+TEMP R0, R1;
+
+TEX	R0, fragment.texcoord[0], texture[1], 2D;
+MUL R0, R0, fragment.color;
+SUB R0, 1, R0;
+
+ADD R1, fragment.texcoord[0], -0.5;
+MUL R1, R1, R0;
+ADD R1, R1, 0.5;
+
+TEX	result.color.xyz, R1, texture[0], 2D;
+
+END
+

@@ -1007,7 +1007,7 @@ void idGameBustOutWindow::LoadBoardFiles()
 		name += ( i + 1 );
 		name += ".tga";
 
-		R_LoadImage( name, &pic, &w, &h, &time, false );
+		R_LoadImage( name, &pic, &w, &h, &time, false, NULL );
 
 		if( pic != NULL )
 		{

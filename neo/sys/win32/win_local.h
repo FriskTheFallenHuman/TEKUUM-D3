@@ -39,6 +39,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "win_input.h"
 
+
 #define	WINDOW_STYLE	(WS_OVERLAPPED|WS_BORDER|WS_CAPTION|WS_VISIBLE | WS_THICKFRAME)
 
 void	Sys_QueEvent( sysEventType_t type, int value, int value2, int ptrLength, void* ptr, int inputDeviceNum );
@@ -129,7 +130,6 @@ struct Win32Vars_t
 	LPDIRECTINPUT8			g_pdi;
 	LPDIRECTINPUTDEVICE8	g_pMouse;
 	LPDIRECTINPUTDEVICE8	g_pKeyboard;
-
 	idJoystickWin32			g_Joystick;
 };
 

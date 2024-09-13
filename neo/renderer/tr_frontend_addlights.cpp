@@ -30,7 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "tr_local.h"
+#include "RenderCommon.h"
 
 extern idCVar r_useAreasConnectedForShadowCulling;
 extern idCVar r_useParallelAddShadows;
@@ -184,13 +184,6 @@ static void R_AddSingleLight( viewLight_t* vLight )
 			// create a shadow for it
 			return;
 		}
-
-		// RB: skip dynamic lights
-		if( r_usePrecomputedLight.GetBool() )
-		{
-			return;
-		}
-		// RB end
 	}
 
 
@@ -275,7 +268,6 @@ static void R_AddSingleLight( viewLight_t* vLight )
 		// RB: calculate shadow LOD similar to Q3A .md3 LOD code
 		vLight->shadowLOD = 0;
 
-#if !defined(USE_GLES2) && !defined(USE_GLES3)
 		if( r_useShadowMapping.GetBool() && lightCastsShadows )
 		{
 			float           flod, lodscale;
@@ -348,7 +340,6 @@ static void R_AddSingleLight( viewLight_t* vLight )
 
 			vLight->shadowLOD = lod;
 		}
-#endif // #if !defined(USE_GLES2) && !defined(USE_GLES3)
 		// RB end
 	}
 
@@ -416,10 +407,10 @@ static void R_AddSingleLight( viewLight_t* vLight )
 			// A more general solution would be to have an allowLightOnEntityID field.
 			// HACK: the armor-mounted flashlight is a private spot light, which is probably
 			// wrong -- you would expect to see them in multiplayer.
-			if( light->parms.allowLightInViewID && light->parms.pointLight && !eParms.weaponDepthHack )
-			{
-				continue;
-			}
+			//	if( light->parms.allowLightInViewID && light->parms.pointLight && !eParms.weaponDepthHack )
+			//	{
+			//		continue;
+			//	}
 
 			// non-shadow casting entities don't need to be added if they aren't
 			// directly visible
@@ -517,11 +508,7 @@ static void R_AddSingleLight( viewLight_t* vLight )
 	//--------------------------------------------
 	// add the prelight shadows for the static world geometry
 	//--------------------------------------------
-#if !defined(USE_GLES2) && !defined(USE_GLES3)
 	if( light->parms.prelightModel != NULL && !r_useShadowMapping.GetBool() )
-#else
-	if( light->parms.prelightModel != NULL )
-#endif
 	{
 		srfTriangles_t* tri = light->parms.prelightModel->Surface( 0 )->geometry;
 
@@ -576,13 +563,10 @@ static void R_AddSingleLight( viewLight_t* vLight )
 			shadowParms->shadowVolumeState = & shadowDrawSurf->shadowVolumeState;
 
 			// the pre-light shadow volume "_prelight_light_3297" in "d3xpdm2" is malformed in that it contains the light origin so the precise inside test always fails
-
-			// RB: no need to support D3XP hacks
-			//if( tr.primaryWorld->mapName.IcmpPath( "maps/game/mp/d3xpdm2.map" ) == 0 && idStr::Icmp( light->parms.prelightModel->Name(), "_prelight_light_3297" ) == 0 )
-			//{
-			//	shadowParms->useShadowPreciseInsideTest = false;
-			//}
-			// RB end
+			if( tr.primaryWorld->mapName.IcmpPath( "maps/game/mp/d3xpdm2.map" ) == 0 && idStr::Icmp( light->parms.prelightModel->Name(), "_prelight_light_3297" ) == 0 )
+			{
+				shadowParms->useShadowPreciseInsideTest = false;
+			}
 
 			shadowDrawSurf->shadowVolumeState = SHADOWVOLUME_UNFINISHED;
 
@@ -666,13 +650,6 @@ void R_AddLights()
 	// Add jobs to setup pre-light shadow volumes.
 	//-------------------------------------------------
 
-	// RB begin
-	if( r_usePrecomputedLight.GetBool() )
-	{
-		return;
-	}
-	// RB end
-
 	if( r_useParallelAddShadows.GetInteger() == 1 )
 	{
 		for( viewLight_t* vLight = tr.viewDef->viewLights; vLight != NULL; vLight = vLight->next )
@@ -698,7 +675,7 @@ void R_AddLights()
 		}
 
 		int end = Sys_Microseconds();
-		backEnd.pc.shadowMicroSec += end - start;
+		tr.backend.pc.cpuShadowMicroSec += end - start;
 	}
 }
 

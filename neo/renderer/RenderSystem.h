@@ -3,7 +3,8 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013-2014 Robert Beckebans
+Copyright (C) 2013-2016 Robert Beckebans
+Copyright (C) 2014-2016 Kot in Action Creative Artel
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -94,6 +95,75 @@ enum graphicsDriverType_t
 	GLDRV_OPENGL_ES2,
 	GLDRV_OPENGL_ES3,
 	GLDRV_OPENGL_MESA,						// fear this, it is probably the best to disable GPU skinning and run shaders in GLSL ES 1.0
+	GLDRV_OPENGL_MESA_CORE_PROFILE,
+
+	GLDRV_VULKAN
+};
+
+enum antiAliasingMode_t
+{
+	ANTI_ALIASING_NONE,
+	ANTI_ALIASING_SMAA_1X,
+	ANTI_ALIASING_MSAA_2X,
+	ANTI_ALIASING_MSAA_4X,
+	ANTI_ALIASING_MSAA_8X
+};
+
+// CPU counters and timers
+struct performanceCounters_t
+{
+	int		c_box_cull_in;
+	int		c_box_cull_out;
+	int		c_createInteractions;	// number of calls to idInteraction::CreateInteraction
+	int		c_createShadowVolumes;
+	int		c_generateMd5;
+	int		c_entityDefCallbacks;
+	int		c_alloc;			// counts for R_StaticAllc/R_StaticFree
+	int		c_free;
+	int		c_visibleViewEntities;
+	int		c_shadowViewEntities;
+	int		c_viewLights;
+	int		c_numViews;			// number of total views rendered
+	int		c_deformedSurfaces;	// idMD5Mesh::GenerateSurface
+	int		c_deformedVerts;	// idMD5Mesh::GenerateSurface
+	int		c_deformedIndexes;	// idMD5Mesh::GenerateSurface
+	int		c_tangentIndexes;	// R_DeriveTangents()
+	int		c_entityUpdates;
+	int		c_lightUpdates;
+	int		c_envprobeUpdates;
+	int		c_entityReferences;
+	int		c_lightReferences;
+	int		c_guiSurfs;
+
+	uint64_t	frontEndMicroSec;	// sum of time in all RE_RenderScene's in a frame
+};
+
+// CPU & GPU counters and timers
+struct backEndCounters_t
+{
+	int		c_surfaces;
+	int		c_shaders;
+
+	int		c_drawElements;
+	int		c_drawIndexes;
+
+	int		c_shadowElements;
+	int		c_shadowIndexes;
+
+	int		c_copyFrameBuffer;
+
+	float	c_overDraw;
+
+	uint64_t	cpuTotalMicroSec;		// total microseconds for backend run
+	uint64_t	cpuShadowMicroSec;
+	uint64_t	gpuDepthMicroSec;
+	uint64_t	gpuScreenSpaceAmbientOcclusionMicroSec;
+	uint64_t	gpuScreenSpaceReflectionsMicroSec;
+	uint64_t	gpuAmbientPassMicroSec;
+	uint64_t	gpuInteractionsMicroSec;
+	uint64_t	gpuShaderPassMicroSec;
+	uint64_t	gpuPostProcessingMicroSec;
+	uint64_t	gpuMicroSec;
 };
 // RB end
 
@@ -101,6 +171,9 @@ enum graphicsDriverType_t
 // These are constant once the OpenGL subsystem is initialized.
 struct glconfig_t
 {
+	graphicsVendor_t	vendor;
+	graphicsDriverType_t driverType;
+
 	const char* 		renderer_string;
 	const char* 		vendor_string;
 	const char* 		version_string;
@@ -109,10 +182,6 @@ struct glconfig_t
 	const char* 		shading_language_string;
 
 	float				glVersion;				// atof( version_string )
-	graphicsVendor_t	vendor;
-	// RB begin
-	graphicsDriverType_t driverType;
-	// RB end
 
 	int					maxTextureSize;			// queried from GL
 	int					maxTextureCoords;
@@ -130,7 +199,6 @@ struct glconfig_t
 	bool				anisotropicFilterAvailable;
 	bool				textureLODBiasAvailable;
 	bool				seamlessCubeMapAvailable;
-	bool				sRGBFramebufferAvailable;
 	bool				vertexBufferObjectAvailable;
 	bool				mapBufferRangeAvailable;
 	bool				vertexArrayObjectAvailable;
@@ -148,6 +216,7 @@ struct glconfig_t
 
 	// RB begin
 	bool				gremedyStringMarkerAvailable;
+	bool				khronosDebugAvailable;
 	bool				vertexHalfFloatAvailable;
 
 	bool				framebufferObjectAvailable;
@@ -179,7 +248,7 @@ struct glconfig_t
 	float				pixelAspect;
 
 	// RB begin
-#if !defined(__ANDROID__)
+#if !defined(__ANDROID__) && !defined(USE_VULKAN)
 	GLuint				global_vao;
 #endif
 	// RB end
@@ -191,8 +260,6 @@ struct emptyCommand_t;
 
 bool R_IsInitialized();
 
-
-// RB: legacy font support
 const int GLYPH_START			= 0;
 const int GLYPH_END				= 255;
 const int GLYPH_CHARSTART		= 32;
@@ -238,7 +305,6 @@ typedef struct
 	int					maxWidthLarge;
 	char				name[64];
 } fontInfoEx_t;
-// RB end
 
 const int SMALLCHAR_WIDTH		= 8;
 const int SMALLCHAR_HEIGHT		= 16;
@@ -249,13 +315,6 @@ const int BIGCHAR_HEIGHT		= 16;
 // and will be automatically scaled to the real resolution
 const int SCREEN_WIDTH			= 640;
 const int SCREEN_HEIGHT			= 480;
-
-const int TITLESAFE_LEFT		= 32;
-const int TITLESAFE_RIGHT		= 608;
-const int TITLESAFE_TOP			= 24;
-const int TITLESAFE_BOTTOM		= 456;
-const int TITLESAFE_WIDTH		= TITLESAFE_RIGHT - TITLESAFE_LEFT;
-const int TITLESAFE_HEIGHT		= TITLESAFE_BOTTOM - TITLESAFE_TOP;
 
 class idRenderWorld;
 
@@ -272,6 +331,8 @@ public:
 
 	// only called before quitting
 	virtual void			Shutdown() = 0;
+
+	virtual bool			IsInitialized() const = 0;
 
 	virtual void			ResetGuiModels() = 0;
 
@@ -319,14 +380,7 @@ public:
 	virtual bool			AreAutomaticBackgroundSwapsRunning( autoRenderIconType_t* icon = NULL ) const = 0;
 
 	// font support
-	// RB begin
-#if defined(USE_IDFONT)
-	virtual class idFont* 	RegisterFont( const char* fontName ) = 0;
-	virtual void			ResetFonts() = 0;
-#else
 	virtual bool			RegisterFont( const char* fontName, fontInfoEx_t& font ) = 0;
-#endif
-	// RB end
 
 	virtual void			SetColor( const idVec4& rgba ) = 0;
 	virtual void			SetColor4( float r, float g, float b, float a )
@@ -334,10 +388,7 @@ public:
 		SetColor( idVec4( r, g, b, a ) );
 	}
 
-	// RB: separated GetColor and GetColorNativeOrder
-	virtual const idVec4&	GetColor() = 0;
-	virtual uint32_t			GetColorPacked() = 0;
-	// RB end
+	virtual uint32_t			GetColor() = 0;
 
 	virtual void			SetGLState( const uint64_t glState ) = 0;
 
@@ -349,14 +400,7 @@ public:
 	}
 	virtual void			DrawStretchPic( const idVec4& topLeft, const idVec4& topRight, const idVec4& bottomRight, const idVec4& bottomLeft, const idMaterial* material ) = 0;
 	virtual void			DrawStretchTri( const idVec2& p1, const idVec2& p2, const idVec2& p3, const idVec2& t1, const idVec2& t2, const idVec2& t3, const idMaterial* material ) = 0;
-
-	// RB: added alternative interface for no glMapBuffer support
-#if defined(NO_GL_MAPBUFFER)
-	virtual void			AllocTris( const idDrawVert* verts, int numVerts, const triIndex_t* indexes, int numIndexes, const idMaterial* material, const stereoDepthType_t stereoType = STEREO_DEPTH_TYPE_NONE ) = 0;
-#else
 	virtual idDrawVert* 	AllocTris( int numVerts, const triIndex_t* indexes, int numIndexes, const idMaterial* material, const stereoDepthType_t stereoType = STEREO_DEPTH_TYPE_NONE ) = 0;
-#endif
-	// RB end
 
 	virtual void			PrintMemInfo( MemInfo_t* mi ) = 0;
 
@@ -367,6 +411,7 @@ public:
 
 	// dump all 2D drawing so far this frame to the demo file
 	virtual void			WriteDemoPics() = 0;
+	virtual void			WriteEndFrame() = 0;
 
 	// draw the 2D pics that were saved out with the current demo frame
 	virtual void			DrawDemoPics() = 0;
@@ -381,11 +426,11 @@ public:
 	//
 	// After this is called, new command buffers can be built up in parallel
 	// with the rendering of the closed off command buffers by RenderCommandBuffers()
-	virtual const emptyCommand_t* 	SwapCommandBuffers( uint64_t* frontEndMicroSec, uint64_t* backEndMicroSec, uint64_t* shadowMicroSec, uint64_t* gpuMicroSec, bool swapBuffers ) = 0;
+	virtual const emptyCommand_t* 	SwapCommandBuffers( uint64_t* frontEndMicroSec, uint64_t* backEndMicroSec, uint64_t* shadowMicroSec, uint64_t* gpuMicroSec, backEndCounters_t* bc, performanceCounters_t* pc ) = 0;
 
 	// SwapCommandBuffers operation can be split in two parts for non-smp rendering
 	// where the GPU is idled intentionally for minimal latency.
-	virtual void			SwapCommandBuffers_FinishRendering( uint64_t* frontEndMicroSec, uint64_t* backEndMicroSec, uint64_t* shadowMicroSec, uint64_t* gpuMicroSec, bool swapBuffers ) = 0;
+	virtual void			SwapCommandBuffers_FinishRendering( uint64_t* frontEndMicroSec, uint64_t* backEndMicroSec, uint64_t* shadowMicroSec, uint64_t* gpuMicroSec, backEndCounters_t* bc, performanceCounters_t* pc ) = 0;
 	virtual const emptyCommand_t* 	SwapCommandBuffers_FinishCommandBuffers() = 0;
 
 	// issues GPU commands to render a built up list of command buffers returned
@@ -400,7 +445,10 @@ public:
 	// This will perform swapbuffers, so it is NOT an approppriate way to
 	// generate image files that happen during gameplay, as for savegame
 	// markers.  Use WriteRender() instead.
-	virtual void			TakeScreenshot( int width, int height, const char* fileName, int samples, struct renderView_s* ref ) = 0;
+	virtual void			TakeScreenshot( int width, int height, const char* fileName, int samples, struct renderView_s* ref, int exten ) = 0;
+
+	// RB
+	virtual byte*			CaptureRenderToBuffer( int width, int height, renderView_t* ref ) = 0;
 
 	// the render output can be cropped down to a subset of the real screen, as
 	// for save-game reviews and split-screen multiplayer.  Users of the renderer
@@ -411,7 +459,7 @@ public:
 	// to render to a texture, first set the crop size with makePowerOfTwo = true,
 	// then perform all desired rendering, then capture to an image
 	// if the specified physical dimensions are larger than the current cropped region, they will be cut down to fit
-	virtual void			CropRenderSize( int width, int height, bool unused_makePowerOfTwo = false ) = 0;
+	virtual void			CropRenderSize( int width, int height ) = 0;
 	virtual void			CaptureRenderToImage( const char* imageName, bool clearColorAfterCopy = false ) = 0;
 	// fixAlpha will set all the alpha channel values to 0xff, which allows screen captures
 	// to use the default tga loading code without having dimmed down areas in many places
@@ -425,6 +473,8 @@ public:
 
 	// consoles switch stereo 3D eye views each 60 hz frame
 	virtual int				GetFrameCount() const = 0;
+
+	virtual void			OnFrame() = 0;
 };
 
 extern idRenderSystem* 			renderSystem;

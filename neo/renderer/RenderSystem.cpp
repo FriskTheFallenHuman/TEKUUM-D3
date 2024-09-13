@@ -3,7 +3,8 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013 Robert Beckebans
+Copyright (C) 2013-2020 Robert Beckebans
+Copyright (C) 2014-2016 Kot in Action Creative Artel
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -30,7 +31,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "tr_local.h"
+#include "RenderCommon.h"
+#include "../framework/Common_local.h"
+//#include "../imgui/BFGimgui.h"
 
 idRenderSystemLocal	tr;
 idRenderSystem* renderSystem = &tr;
@@ -43,56 +46,56 @@ This prints both front and back end counters, so it should
 only be called when the back end thread is idle.
 =====================
 */
-static void R_PerformanceCounters()
+void idRenderSystemLocal::PrintPerformanceCounters()
 {
 	if( r_showPrimitives.GetInteger() != 0 )
 	{
 		common->Printf( "views:%i draws:%i tris:%i (shdw:%i)\n",
-						tr.pc.c_numViews,
-						backEnd.pc.c_drawElements + backEnd.pc.c_shadowElements,
-						( backEnd.pc.c_drawIndexes + backEnd.pc.c_shadowIndexes ) / 3,
-						backEnd.pc.c_shadowIndexes / 3
+						pc.c_numViews,
+						backend.pc.c_drawElements + backend.pc.c_shadowElements,
+						( backend.pc.c_drawIndexes + backend.pc.c_shadowIndexes ) / 3,
+						backend.pc.c_shadowIndexes / 3
 					  );
 	}
 
 	if( r_showDynamic.GetBool() )
 	{
 		common->Printf( "callback:%i md5:%i dfrmVerts:%i dfrmTris:%i tangTris:%i guis:%i\n",
-						tr.pc.c_entityDefCallbacks,
-						tr.pc.c_generateMd5,
-						tr.pc.c_deformedVerts,
-						tr.pc.c_deformedIndexes / 3,
-						tr.pc.c_tangentIndexes / 3,
-						tr.pc.c_guiSurfs
+						pc.c_entityDefCallbacks,
+						pc.c_generateMd5,
+						pc.c_deformedVerts,
+						pc.c_deformedIndexes / 3,
+						pc.c_tangentIndexes / 3,
+						pc.c_guiSurfs
 					  );
 	}
 
 	if( r_showCull.GetBool() )
 	{
 		common->Printf( "%i box in %i box out\n",
-						tr.pc.c_box_cull_in, tr.pc.c_box_cull_out );
+						pc.c_box_cull_in, pc.c_box_cull_out );
 	}
 
 	if( r_showAddModel.GetBool() )
 	{
 		common->Printf( "callback:%i createInteractions:%i createShadowVolumes:%i\n",
-						tr.pc.c_entityDefCallbacks, tr.pc.c_createInteractions, tr.pc.c_createShadowVolumes );
-		common->Printf( "viewEntities:%i  shadowEntities:%i  viewLights:%i\n", tr.pc.c_visibleViewEntities,
-						tr.pc.c_shadowViewEntities, tr.pc.c_viewLights );
+						pc.c_entityDefCallbacks, pc.c_createInteractions, pc.c_createShadowVolumes );
+		common->Printf( "viewEntities:%i  shadowEntities:%i  viewLights:%i\n", pc.c_visibleViewEntities,
+						pc.c_shadowViewEntities, pc.c_viewLights );
 	}
 	if( r_showUpdates.GetBool() )
 	{
 		common->Printf( "entityUpdates:%i  entityRefs:%i  lightUpdates:%i  lightRefs:%i\n",
-						tr.pc.c_entityUpdates, tr.pc.c_entityReferences,
-						tr.pc.c_lightUpdates, tr.pc.c_lightReferences );
+						pc.c_entityUpdates, pc.c_entityReferences,
+						pc.c_lightUpdates, pc.c_lightReferences );
 	}
 	if( r_showMemory.GetBool() )
 	{
 		common->Printf( "frameData: %i (%i)\n", frameData->frameMemoryAllocated.GetValue(), frameData->highWaterAllocated );
 	}
 
-	memset( &tr.pc, 0, sizeof( tr.pc ) );
-	memset( &backEnd.pc, 0, sizeof( backEnd.pc ) );
+	memset( &pc, 0, sizeof( pc ) );
+	memset( &backend.pc, 0, sizeof( backend.pc ) );
 }
 
 /*
@@ -127,22 +130,27 @@ void idRenderSystemLocal::RenderCommandBuffers( const emptyCommand_t* const cmdH
 	// draw 2D graphics
 	if( !r_skipBackEnd.GetBool() )
 	{
-#if !defined(USE_GLES2) && !defined(USE_GLES3)
+// SRS - For OSX skip total rendering time query due to missing GL_TIMESTAMP support in Apple OpenGL 4.1, will calculate it inside SwapCommandBuffers_FinishRendering instead
+#if !defined(USE_VULKAN) && !defined(__APPLE__)
 		if( glConfig.timerQueryAvailable )
 		{
-			if( tr.timerQueryId == 0 )
+			if( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ][ MRB_GPU_TIME ] == 0 )
 			{
-				glGenQueries( 1, & tr.timerQueryId );
+				glCreateQueries( GL_TIMESTAMP, 2, &glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ][MRB_GPU_TIME ] );
 			}
-			glBeginQuery( GL_TIME_ELAPSED_EXT, tr.timerQueryId );
-			RB_ExecuteBackEndCommands( cmdHead );
-			glEndQuery( GL_TIME_ELAPSED_EXT );
+
+			glQueryCounter( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ][ MRB_GPU_TIME * 2 + 0 ], GL_TIMESTAMP );
+			backend.ExecuteBackEndCommands( cmdHead );
+			glQueryCounter( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ][ MRB_GPU_TIME * 2 + 1 ], GL_TIMESTAMP );
+
+			glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ][ MRB_GPU_TIME * 2 + 1 ]++;
+
 			glFlush();
 		}
 		else
 #endif
 		{
-			RB_ExecuteBackEndCommands( cmdHead );
+			backend.ExecuteBackEndCommands( cmdHead );
 		}
 	}
 
@@ -227,103 +235,7 @@ void	R_AddDrawPostProcess( viewDef_t* parms )
 //=================================================================================
 
 
-/*
-=============
-R_CheckCvars
 
-See if some cvars that we watch have changed
-=============
-*/
-static void R_CheckCvars()
-{
-	// gamma stuff
-	if( r_gamma.IsModified() || r_brightness.IsModified() )
-	{
-		r_gamma.ClearModified();
-		r_brightness.ClearModified();
-		R_SetColorMappings();
-	}
-
-	// filtering
-	if( r_maxAnisotropicFiltering.IsModified() || r_useTrilinearFiltering.IsModified() || r_lodBias.IsModified() )
-	{
-		idLib::Printf( "Updating texture filter parameters.\n" );
-		r_maxAnisotropicFiltering.ClearModified();
-		r_useTrilinearFiltering.ClearModified();
-		r_lodBias.ClearModified();
-		for( int i = 0 ; i < globalImages->images.Num() ; i++ )
-		{
-			if( globalImages->images[i] )
-			{
-				globalImages->images[i]->Bind();
-				globalImages->images[i]->SetTexParameters();
-			}
-		}
-	}
-
-#if !defined(USE_GLES2) && !defined(USE_GLES3)
-	extern idCVar r_useSeamlessCubeMap;
-	if( r_useSeamlessCubeMap.IsModified() )
-	{
-		r_useSeamlessCubeMap.ClearModified();
-		if( glConfig.seamlessCubeMapAvailable )
-		{
-			if( r_useSeamlessCubeMap.GetBool() )
-			{
-				glEnable( GL_TEXTURE_CUBE_MAP_SEAMLESS );
-			}
-			else
-			{
-				glDisable( GL_TEXTURE_CUBE_MAP_SEAMLESS );
-			}
-		}
-	}
-
-	extern idCVar r_useSRGB;
-	if( r_useSRGB.IsModified() )
-	{
-		r_useSRGB.ClearModified();
-		if( glConfig.sRGBFramebufferAvailable )
-		{
-			if( r_useSRGB.GetBool() )
-			{
-				glEnable( GL_FRAMEBUFFER_SRGB );
-			}
-			else
-			{
-				glDisable( GL_FRAMEBUFFER_SRGB );
-			}
-		}
-	}
-
-	if( r_multiSamples.IsModified() )
-	{
-		if( r_multiSamples.GetInteger() > 0 )
-		{
-			glEnable( GL_MULTISAMPLE );
-		}
-		else
-		{
-			glDisable( GL_MULTISAMPLE );
-		}
-	}
-
-	// RB: turn off shadow mapping for OpenGL drivers that are too slow
-	switch( glConfig.driverType )
-	{
-		case GLDRV_OPENGL_ES2:
-		case GLDRV_OPENGL_ES3:
-		case GLDRV_OPENGL_MESA:
-			r_useShadowMapping.SetInteger( 0 );
-			break;
-
-		default:
-			break;
-	}
-	// RB end
-
-#endif // #if !defined(USE_GLES2)
-}
 
 /*
 =============
@@ -333,7 +245,9 @@ idRenderSystemLocal::idRenderSystemLocal
 idRenderSystemLocal::idRenderSystemLocal() :
 	unitSquareTriangles( NULL ),
 	zeroOneCubeTriangles( NULL ),
-	testImageTriangles( NULL )
+	zeroOneSphereTriangles( NULL ),
+	testImageTriangles( NULL ),
+	bInitialized( false )
 {
 	Clear();
 }
@@ -352,10 +266,8 @@ idRenderSystemLocal::~idRenderSystemLocal()
 idRenderSystemLocal::SetColor
 =============
 */
-// RB: separated GetColor and GetColorNativeOrder
 void idRenderSystemLocal::SetColor( const idVec4& rgba )
 {
-	currentColor = rgba;
 	currentColorNativeBytesOrder = LittleInt( PackColor( rgba ) );
 }
 
@@ -364,21 +276,10 @@ void idRenderSystemLocal::SetColor( const idVec4& rgba )
 idRenderSystemLocal::GetColor
 =============
 */
-const idVec4& idRenderSystemLocal::GetColor()
-{
-	return currentColor;
-}
-
-/*
-=============
-idRenderSystemLocal::GetColorPacked
-=============
-*/
-uint32_t idRenderSystemLocal::GetColorPacked()
+uint32_t idRenderSystemLocal::GetColor()
 {
 	return LittleInt( currentColorNativeBytesOrder );
 }
-// RB end
 
 /*
 =============
@@ -419,7 +320,7 @@ idRenderSystemLocal::DrawStretchPic
 static triIndex_t quadPicIndexes[6] = { 3, 0, 2, 2, 0, 1 };
 void idRenderSystemLocal::DrawStretchPic( const idVec4& topLeft, const idVec4& topRight, const idVec4& bottomRight, const idVec4& bottomLeft, const idMaterial* material )
 {
-	if( !R_IsInitialized() )
+	if( !IsInitialized() )
 	{
 		return;
 	}
@@ -428,42 +329,6 @@ void idRenderSystemLocal::DrawStretchPic( const idVec4& topLeft, const idVec4& t
 		return;
 	}
 
-	// RB: added alternative interface for no glMapBuffer support
-#if defined(NO_GL_MAPBUFFER)
-
-	ALIGNTYPE16 idDrawVert localVerts[4];
-
-	localVerts[0].Clear();
-	localVerts[0].xyz[0] = topLeft.x;
-	localVerts[0].xyz[1] = topLeft.y;
-	localVerts[0].SetTexCoord( topLeft.z, topLeft.w );
-	localVerts[0].SetNativeOrderColor( currentColorNativeBytesOrder );
-	localVerts[0].ClearColor2();
-
-	localVerts[1].Clear();
-	localVerts[1].xyz[0] = topRight.x;
-	localVerts[1].xyz[1] = topRight.y;
-	localVerts[1].SetTexCoord( topRight.z, topRight.w );
-	localVerts[1].SetNativeOrderColor( currentColorNativeBytesOrder );
-	localVerts[1].ClearColor2();
-
-	localVerts[2].Clear();
-	localVerts[2].xyz[0] = bottomRight.x;
-	localVerts[2].xyz[1] = bottomRight.y;
-	localVerts[2].SetTexCoord( bottomRight.z, bottomRight.w );
-	localVerts[2].SetNativeOrderColor( currentColorNativeBytesOrder );
-	localVerts[2].ClearColor2();
-
-	localVerts[3].Clear();
-	localVerts[3].xyz[0] = bottomLeft.x;
-	localVerts[3].xyz[1] = bottomLeft.y;
-	localVerts[3].SetTexCoord( bottomLeft.z, bottomLeft.w );
-	localVerts[3].SetNativeOrderColor( currentColorNativeBytesOrder );
-	localVerts[3].ClearColor2();
-
-	guiModel->AllocTris( localVerts, 4, quadPicIndexes, 6, material, currentGLState, STEREO_DEPTH_TYPE_NONE );
-
-#else
 	idDrawVert* verts = guiModel->AllocTris( 4, quadPicIndexes, 6, material, currentGLState, STEREO_DEPTH_TYPE_NONE );
 	if( verts == NULL )
 	{
@@ -501,8 +366,6 @@ void idRenderSystemLocal::DrawStretchPic( const idVec4& topLeft, const idVec4& t
 	localVerts[3].ClearColor2();
 
 	WriteDrawVerts16( verts, localVerts, 4 );
-#endif
-	// RB end
 }
 
 /*
@@ -512,7 +375,7 @@ idRenderSystemLocal::DrawStretchTri
 */
 void idRenderSystemLocal::DrawStretchTri( const idVec2& p1, const idVec2& p2, const idVec2& p3, const idVec2& t1, const idVec2& t2, const idVec2& t3, const idMaterial* material )
 {
-	if( !R_IsInitialized() )
+	if( !IsInitialized() )
 	{
 		return;
 	}
@@ -523,35 +386,6 @@ void idRenderSystemLocal::DrawStretchTri( const idVec2& p1, const idVec2& p2, co
 
 	triIndex_t tempIndexes[3] = { 1, 0, 2 };
 
-	// RB: added alternative interface for no glMapBuffer support
-#if defined(NO_GL_MAPBUFFER)
-
-	ALIGNTYPE16 idDrawVert localVerts[3];
-
-	localVerts[0].Clear();
-	localVerts[0].xyz[0] = p1.x;
-	localVerts[0].xyz[1] = p1.y;
-	localVerts[0].SetTexCoord( t1 );
-	localVerts[0].SetNativeOrderColor( currentColorNativeBytesOrder );
-	localVerts[0].ClearColor2();
-
-	localVerts[1].Clear();
-	localVerts[1].xyz[0] = p2.x;
-	localVerts[1].xyz[1] = p2.y;
-	localVerts[1].SetTexCoord( t2 );
-	localVerts[1].SetNativeOrderColor( currentColorNativeBytesOrder );
-	localVerts[1].ClearColor2();
-
-	localVerts[2].Clear();
-	localVerts[2].xyz[0] = p3.x;
-	localVerts[2].xyz[1] = p3.y;
-	localVerts[2].SetTexCoord( t3 );
-	localVerts[2].SetNativeOrderColor( currentColorNativeBytesOrder );
-	localVerts[2].ClearColor2();
-
-	guiModel->AllocTris( localVerts, 3, tempIndexes, 3, material, currentGLState, STEREO_DEPTH_TYPE_NONE );
-
-#else
 	idDrawVert* verts = guiModel->AllocTris( 3, tempIndexes, 3, material, currentGLState, STEREO_DEPTH_TYPE_NONE );
 	if( verts == NULL )
 	{
@@ -582,7 +416,6 @@ void idRenderSystemLocal::DrawStretchTri( const idVec2& p1, const idVec2& p2, co
 	localVerts[2].ClearColor2();
 
 	WriteDrawVerts16( verts, localVerts, 3 );
-#endif
 }
 
 /*
@@ -590,19 +423,10 @@ void idRenderSystemLocal::DrawStretchTri( const idVec2& p1, const idVec2& p2, co
 idRenderSystemLocal::AllocTris
 =============
 */
-// RB: added alternative interface for no glMapBuffer support
-#if defined(NO_GL_MAPBUFFER)
-void idRenderSystemLocal::AllocTris( const idDrawVert* verts, int numVerts, const triIndex_t* indexes, int numIndexes, const idMaterial* material, const stereoDepthType_t stereoType )
-{
-	guiModel->AllocTris( verts, numVerts, indexes, numIndexes, material, currentGLState, stereoType );
-}
-#else
 idDrawVert* idRenderSystemLocal::AllocTris( int numVerts, const triIndex_t* indexes, int numIndexes, const idMaterial* material, const stereoDepthType_t stereoType )
 {
 	return guiModel->AllocTris( numVerts, indexes, numIndexes, material, currentGLState, stereoType );
 }
-#endif
-// RB end
 
 /*
 =====================
@@ -795,10 +619,12 @@ const emptyCommand_t* idRenderSystemLocal::SwapCommandBuffers(
 	uint64_t* backEndMicroSec,
 	uint64_t* shadowMicroSec,
 	uint64_t* gpuMicroSec,
-	bool swapBuffers )
+	backEndCounters_t* bc,
+	performanceCounters_t* pc
+)
 {
 
-	SwapCommandBuffers_FinishRendering( frontEndMicroSec, backEndMicroSec, shadowMicroSec, gpuMicroSec, swapBuffers );
+	SwapCommandBuffers_FinishRendering( frontEndMicroSec, backEndMicroSec, shadowMicroSec, gpuMicroSec, bc, pc );
 
 	return SwapCommandBuffers_FinishCommandBuffers();
 }
@@ -808,12 +634,15 @@ const emptyCommand_t* idRenderSystemLocal::SwapCommandBuffers(
 idRenderSystemLocal::SwapCommandBuffers_FinishRendering
 =====================
 */
+#define	FPS_FRAMES	6
 void idRenderSystemLocal::SwapCommandBuffers_FinishRendering(
 	uint64_t* frontEndMicroSec,
 	uint64_t* backEndMicroSec,
 	uint64_t* shadowMicroSec,
 	uint64_t* gpuMicroSec,
-	bool swapBuffers )
+	backEndCounters_t* bc,
+	performanceCounters_t* pc
+)
 {
 	SCOPED_PROFILE_EVENT( "SwapCommandBuffers" );
 
@@ -822,35 +651,152 @@ void idRenderSystemLocal::SwapCommandBuffers_FinishRendering(
 		*gpuMicroSec = 0;		// until shown otherwise
 	}
 
-	if( !R_IsInitialized() )
+	if( !IsInitialized() )
 	{
 		return;
 	}
 
+	//GL_CheckErrors();
 
 	// After coming back from an autoswap, we won't have anything to render
-	if( frameData->cmdHead->next != NULL && swapBuffers )
+	//if( frameData && frameData->cmdHead->next != NULL )
+
+	// keep capturing envprobes completely in the background
+	// and only update the screen when we update the progress bar in the console
+	if( !takingEnvprobe )
 	{
+#if !IMGUI_BFGUI
+		ImGuiHook::Render();
+#endif
+
 		// wait for our fence to hit, which means the swap has actually happened
 		// We must do this before clearing any resources the GPU may be using
-		GL_BlockingSwapBuffers();
+		backend.GL_BlockingSwapBuffers();
 	}
 
-#if !defined(USE_GLES2) && !defined(USE_GLES3)
+#if defined(USE_VULKAN)
+	if( gpuMicroSec != NULL )
+	{
+		*gpuMicroSec = backend.pc.gpuMicroSec;
+	}
+#else
 	// read back the start and end timer queries from the previous frame
 	if( glConfig.timerQueryAvailable )
 	{
-		// RB: 64 bit fixes, changed int64_t to GLuint64EXT
-		GLuint64EXT drawingTimeNanoseconds = 0;
-		// RB end
+		GLuint64EXT gpuStartNanoseconds = 0;
+		GLuint64EXT gpuEndNanoseconds = 0;
 
-		if( tr.timerQueryId != 0 )
+		if( glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ^ 1 ][ MRB_GPU_TIME * 2 + 1 ] > 0 )
 		{
-			glGetQueryObjectui64vEXT( tr.timerQueryId, GL_QUERY_RESULT, &drawingTimeNanoseconds );
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_GPU_TIME * 2 + 0], GL_QUERY_RESULT, &gpuStartNanoseconds );
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_GPU_TIME * 2 + 1], GL_QUERY_RESULT, &gpuEndNanoseconds );
+
+			backend.pc.gpuMicroSec = ( gpuEndNanoseconds - gpuStartNanoseconds ) / 1000;
+
+			if( gpuMicroSec != NULL )
+			{
+				*gpuMicroSec = backend.pc.gpuMicroSec;
+			}
 		}
+
+		if( glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ^ 1 ][ MRB_FILL_DEPTH_BUFFER  * 2 + 1 ] > 0 )
+		{
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_FILL_DEPTH_BUFFER * 2 + 0], GL_QUERY_RESULT, &gpuStartNanoseconds );
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_FILL_DEPTH_BUFFER * 2 + 1], GL_QUERY_RESULT, &gpuEndNanoseconds );
+
+			backend.pc.gpuDepthMicroSec = ( gpuEndNanoseconds - gpuStartNanoseconds ) / 1000;
+		}
+
+		if( glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ^ 1 ][ MRB_SSAO_PASS  * 2 + 1 ] > 0 )
+		{
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_SSAO_PASS * 2 + 0], GL_QUERY_RESULT, &gpuStartNanoseconds );
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_SSAO_PASS * 2 + 1], GL_QUERY_RESULT, &gpuEndNanoseconds );
+
+			backend.pc.gpuScreenSpaceAmbientOcclusionMicroSec = ( gpuEndNanoseconds - gpuStartNanoseconds ) / 1000;
+		}
+
+		if( glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ^ 1 ][ MRB_AMBIENT_PASS  * 2 + 1 ] > 0 )
+		{
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_AMBIENT_PASS * 2 + 0], GL_QUERY_RESULT, &gpuStartNanoseconds );
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_AMBIENT_PASS * 2 + 1], GL_QUERY_RESULT, &gpuEndNanoseconds );
+
+			backend.pc.gpuAmbientPassMicroSec = ( gpuEndNanoseconds - gpuStartNanoseconds ) / 1000;
+		}
+
+		if( glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ^ 1 ][ MRB_DRAW_INTERACTIONS  * 2 + 1 ] > 0 )
+		{
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_DRAW_INTERACTIONS * 2 + 0], GL_QUERY_RESULT, &gpuStartNanoseconds );
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_DRAW_INTERACTIONS * 2 + 1], GL_QUERY_RESULT, &gpuEndNanoseconds );
+
+			backend.pc.gpuInteractionsMicroSec = ( gpuEndNanoseconds - gpuStartNanoseconds ) / 1000;
+		}
+
+		if( glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ^ 1 ][ MRB_DRAW_SHADER_PASSES  * 2 + 1 ] > 0 )
+		{
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_DRAW_SHADER_PASSES * 2 + 0], GL_QUERY_RESULT, &gpuStartNanoseconds );
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_DRAW_SHADER_PASSES * 2 + 1], GL_QUERY_RESULT, &gpuEndNanoseconds );
+
+			backend.pc.gpuShaderPassMicroSec = ( gpuEndNanoseconds - gpuStartNanoseconds ) / 1000;
+		}
+
+		if( glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ^ 1 ][ MRB_POSTPROCESS  * 2 + 1 ] > 0 )
+		{
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_POSTPROCESS * 2 + 0], GL_QUERY_RESULT, &gpuStartNanoseconds );
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_POSTPROCESS * 2 + 1], GL_QUERY_RESULT, &gpuEndNanoseconds );
+
+			backend.pc.gpuPostProcessingMicroSec = ( gpuEndNanoseconds - gpuStartNanoseconds ) / 1000;
+		}
+
+// SRS - For OSX OpenGL calculate total rendering time vs direct measurement due to missing GL_TIMESTAMP support in Apple OpenGL 4.1
+#if defined(__APPLE__)
+		// SRS - On OSX gpuMicroSec starts with only a portion of the GPU rendering time, must add additional components for more accurate estimate
+		backend.pc.gpuMicroSec += backend.pc.gpuDepthMicroSec + backend.pc.gpuScreenSpaceAmbientOcclusionMicroSec + backend.pc.gpuScreenSpaceReflectionsMicroSec + backend.pc.gpuAmbientPassMicroSec + backend.pc.gpuInteractionsMicroSec + backend.pc.gpuShaderPassMicroSec + backend.pc.gpuPostProcessingMicroSec;
+
+		// SRS - For OSX elapsed time queries, no need to perform unnecessary calls to glGetQueryObjectui64vEXT since gpuStartNanoseconds will always equal 0
+		if( glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ^ 1 ][ MRB_FILL_GEOMETRY_BUFFER  * 2 + 1 ] > 0 )
+		{
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_FILL_GEOMETRY_BUFFER * 2 + 1], GL_QUERY_RESULT, &gpuEndNanoseconds );
+
+			backend.pc.gpuMicroSec += gpuEndNanoseconds / 1000;
+		}
+
+		if( glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ^ 1 ][ MRB_FOG_ALL_LIGHTS  * 2 + 1 ] > 0 )
+		{
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_FOG_ALL_LIGHTS * 2 + 1], GL_QUERY_RESULT, &gpuEndNanoseconds );
+
+			backend.pc.gpuMicroSec += gpuEndNanoseconds / 1000;
+		}
+
+		if( glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ^ 1 ][ MRB_DRAW_SHADER_PASSES_POST  * 2 + 1 ] > 0 )
+		{
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_DRAW_SHADER_PASSES_POST * 2 + 1], GL_QUERY_RESULT, &gpuEndNanoseconds );
+
+			backend.pc.gpuMicroSec += gpuEndNanoseconds / 1000;
+		}
+
+		if( glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ^ 1 ][ MRB_DRAW_DEBUG_TOOLS  * 2 + 1 ] > 0 )
+		{
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_DRAW_DEBUG_TOOLS * 2 + 1], GL_QUERY_RESULT, &gpuEndNanoseconds );
+
+			backend.pc.gpuMicroSec += gpuEndNanoseconds / 1000;
+		}
+
+		if( glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ^ 1 ][ MRB_DRAW_GUI  * 2 + 1 ] > 0 )
+		{
+			glGetQueryObjectui64vEXT( glcontext.renderLogMainBlockTimeQueryIds[ glcontext.frameParity ^ 1 ][ MRB_DRAW_GUI * 2 + 1], GL_QUERY_RESULT, &gpuEndNanoseconds );
+
+			backend.pc.gpuMicroSec += gpuEndNanoseconds / 1000;
+		}
+
 		if( gpuMicroSec != NULL )
 		{
-			*gpuMicroSec = drawingTimeNanoseconds / 1000;
+			*gpuMicroSec = backend.pc.gpuMicroSec;
+		}
+#endif
+
+		for( int i = 0; i < MRB_TOTAL_QUERIES; i++ )
+		{
+			glcontext.renderLogMainBlockTimeQueryIssued[ glcontext.frameParity ^ 1 ][ i ] = 0;
 		}
 	}
 #endif
@@ -860,24 +806,37 @@ void idRenderSystemLocal::SwapCommandBuffers_FinishRendering(
 	// save out timing information
 	if( frontEndMicroSec != NULL )
 	{
-		*frontEndMicroSec = pc.frontEndMicroSec;
+		*frontEndMicroSec = this->pc.frontEndMicroSec;
 	}
+
 	if( backEndMicroSec != NULL )
 	{
-		*backEndMicroSec = backEnd.pc.totalMicroSec;
+		*backEndMicroSec = backend.pc.cpuTotalMicroSec;
 	}
+
 	if( shadowMicroSec != NULL )
 	{
-		*shadowMicroSec = backEnd.pc.shadowMicroSec;
+		*shadowMicroSec = backend.pc.cpuShadowMicroSec;
+	}
+
+	// RB: TODO clean up the above and just pass entire backend and performance stats before they get cleared
+	if( bc != NULL )
+	{
+		*bc = backend.pc;
+	}
+
+	if( pc != NULL )
+	{
+		*pc = this->pc;
 	}
 
 	// print any other statistics and clear all of them
-	R_PerformanceCounters();
+	PrintPerformanceCounters();
 
 	// check for dynamic changes that require some initialization
-	R_CheckCvars();
+	backend.CheckCVars();
 
-	// RB begin
+	// RB: resize HDR buffers
 	Framebuffer::CheckFramebuffers();
 	// RB end
 
@@ -892,10 +851,16 @@ idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffers
 */
 const emptyCommand_t* idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffers()
 {
-	if( !R_IsInitialized() )
+	if( !IsInitialized() )
 	{
 		return NULL;
 	}
+
+	// RB: general GUI system path to treat ImGui surfaces in the renderer frontend like SWF
+	// this calls io.RenderDrawListsFn
+#if IMGUI_BFGUI
+	//ImGuiHook::Render();
+#endif
 
 	// close any gui drawing
 	guiModel->EmitFullScreen();
@@ -909,9 +874,10 @@ const emptyCommand_t* idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffe
 
 	// copy the code-used drawsurfs that were
 	// allocated at the start of the buffer memory to the backEnd referenced locations
-	backEnd.unitSquareSurface = tr.unitSquareSurface_;
-	backEnd.zeroOneCubeSurface = tr.zeroOneCubeSurface_;
-	backEnd.testImageSurface = tr.testImageSurface_;
+	backend.unitSquareSurface = tr.unitSquareSurface_;
+	backend.zeroOneCubeSurface = tr.zeroOneCubeSurface_;
+	backend.zeroOneSphereSurface = tr.zeroOneSphereSurface_;
+	backend.testImageSurface = tr.testImageSurface_;
 
 	// use the other buffers next frame, because another CPU
 	// may still be rendering into the current buffers
@@ -919,14 +885,7 @@ const emptyCommand_t* idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffe
 
 	// possibly change the stereo3D mode
 	// PC
-	if( glConfig.nativeScreenWidth == 1280 && glConfig.nativeScreenHeight == 1470 )
-	{
-		glConfig.stereo3Dmode = STEREO3D_HDMI_720;
-	}
-	else
-	{
-		glConfig.stereo3Dmode = GetStereoScopicRenderingMode();
-	}
+	UpdateStereo3DMode();
 
 	// prepare the new command buffer
 	guiModel->BeginFrame();
@@ -942,6 +901,7 @@ const emptyCommand_t* idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffe
 	//------------------------------
 	R_InitDrawSurfFromTri( tr.unitSquareSurface_, *tr.unitSquareTriangles );
 	R_InitDrawSurfFromTri( tr.zeroOneCubeSurface_, *tr.zeroOneCubeTriangles );
+	R_InitDrawSurfFromTri( tr.zeroOneSphereSurface_, *tr.zeroOneSphereTriangles );
 	R_InitDrawSurfFromTri( tr.testImageSurface_, *tr.testImageTriangles );
 
 	// Reset render crop to be the full screen
@@ -966,9 +926,18 @@ const emptyCommand_t* idRenderSystemLocal::SwapCommandBuffers_FinishCommandBuffe
 	// set the time for shader effects in 2D rendering
 	frameShaderTime = Sys_Milliseconds() * 0.001;
 
+#if 1 //!defined(USE_VULKAN)
+	// RB: TODO RC_SET_BUFFER is not handled in OpenGL
 	setBufferCommand_t* cmd2 = ( setBufferCommand_t* )R_GetCommandBuffer( sizeof( *cmd2 ) );
 	cmd2->commandId = RC_SET_BUFFER;
+
+#if defined(USE_VULKAN)
+	cmd2->buffer = 0;
+#else
 	cmd2->buffer = ( int )GL_BACK;
+#endif
+
+#endif
 
 	// the old command buffer can now be rendered, while the new one can
 	// be built in parallel
@@ -984,6 +953,17 @@ void idRenderSystemLocal::WriteDemoPics()
 {
 	session->WriteDemo()->WriteInt( DS_RENDER );
 	session->WriteDemo()->WriteInt( DC_GUI_MODEL );
+}
+
+/*
+=====================
+idRenderSystemLocal::WriteEndFrame
+=====================
+*/
+void idRenderSystemLocal::WriteEndFrame()
+{
+	session->WriteDemo()->WriteInt( DS_RENDER );
+	session->WriteDemo()->WriteInt( DC_END_FRAME );
 }
 
 /*
@@ -1018,7 +998,6 @@ In split screen mode the rendering size is also smaller.
 */
 void idRenderSystemLocal::PerformResolutionScaling( int& newWidth, int& newHeight )
 {
-
 	float xScale = 1.0f;
 	float yScale = 1.0f;
 	resolutionScale.GetCurrentResolutionScale( xScale, yScale );
@@ -1032,9 +1011,9 @@ void idRenderSystemLocal::PerformResolutionScaling( int& newWidth, int& newHeigh
 idRenderSystemLocal::CropRenderSize
 ================
 */
-void idRenderSystemLocal::CropRenderSize( int width, int height, bool unused_makePowerOfTwo )
+void idRenderSystemLocal::CropRenderSize( int width, int height )
 {
-	if( !R_IsInitialized() )
+	if( !IsInitialized() )
 	{
 		return;
 	}
@@ -1081,7 +1060,7 @@ idRenderSystemLocal::UnCrop
 */
 void idRenderSystemLocal::UnCrop()
 {
-	if( !R_IsInitialized() )
+	if( !IsInitialized() )
 	{
 		return;
 	}
@@ -1116,7 +1095,7 @@ idRenderSystemLocal::CaptureRenderToImage
 */
 void idRenderSystemLocal::CaptureRenderToImage( const char* imageName, bool clearColorAfterCopy )
 {
-	if( !R_IsInitialized() )
+	if( !IsInitialized() )
 	{
 		return;
 	}
@@ -1134,8 +1113,7 @@ void idRenderSystemLocal::CaptureRenderToImage( const char* imageName, bool clea
 			common->Printf( "write DC_CAPTURE_RENDER: %s\n", imageName );
 		}
 	}
-
-	idImage*	 image = globalImages->GetImage( imageName );
+	idImage* image = globalImages->GetImage( imageName );
 	if( image == NULL )
 	{
 		image = globalImages->AllocImage( imageName );
@@ -1162,7 +1140,7 @@ idRenderSystemLocal::CaptureRenderToFile
 */
 void idRenderSystemLocal::CaptureRenderToFile( const char* fileName, bool fixAlpha )
 {
-	if( !R_IsInitialized() )
+	if( !IsInitialized() )
 	{
 		return;
 	}
@@ -1171,11 +1149,11 @@ void idRenderSystemLocal::CaptureRenderToFile( const char* fileName, bool fixAlp
 
 	guiModel->EmitFullScreen();
 	guiModel->Clear();
+
 	RenderCommandBuffers( frameData->cmdHead );
 
-#if !defined(USE_GLES2)
+#if !defined(USE_VULKAN)
 	glReadBuffer( GL_BACK );
-#endif
 
 	// include extra space for OpenGL padding to word boundaries
 	int	c = ( rc.GetWidth() + 3 ) * rc.GetHeight();
@@ -1197,6 +1175,7 @@ void idRenderSystemLocal::CaptureRenderToFile( const char* fileName, bool fixAlp
 
 	R_StaticFree( data );
 	R_StaticFree( data2 );
+#endif
 }
 
 

@@ -1,0 +1,26 @@
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+MOV	result.color, 0;
+
+END
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+MOV	result.color, 0;
+
+END

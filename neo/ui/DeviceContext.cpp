@@ -36,7 +36,7 @@ If you have questions concerning this license or the applicable additional terms
 extern idCVar in_useJoystick;
 
 // bypass rendersystem to directly work on guiModel
-//extern idGuiModel* tr_guiModel;
+extern idGuiModel* tr_guiModel;
 
 idVec4 idDeviceContext::colorPurple;
 idVec4 idDeviceContext::colorOrange;
@@ -48,11 +48,8 @@ idVec4 idDeviceContext::colorBlack;
 idVec4 idDeviceContext::colorWhite;
 idVec4 idDeviceContext::colorNone;
 
-#if !defined(USE_IDFONT)
-
-//idCVar gui_smallFontLimit( "gui_smallFontLimit", "0.30", CVAR_GUI | CVAR_ARCHIVE, "" );
-//idCVar gui_mediumFontLimit( "gui_mediumFontLimit", "0.60", CVAR_GUI | CVAR_ARCHIVE, "" );
-
+idCVar gui_smallFontLimit( "gui_smallFontLimit", "0", CVAR_GUI | CVAR_ARCHIVE, "" );
+idCVar gui_mediumFontLimit( "gui_mediumFontLimit", "0", CVAR_GUI | CVAR_ARCHIVE, "" );
 
 idList<fontInfoEx_t> idDeviceContext::fonts;
 
@@ -112,8 +109,6 @@ void idDeviceContext::SetFont( int num )
 		activeFont = &fonts[0];
 	}
 }
-#endif
-
 
 void idDeviceContext::Init()
 {
@@ -123,14 +118,8 @@ void idDeviceContext::Init()
 	yOffset = 0.0f;
 	whiteImage = declManager->FindMaterial( "guis/assets/white.tga" );
 	whiteImage->SetSort( SS_GUI );
-
-	// RB begin
-#if defined(USE_IDFONT)
-	activeFont = renderSystem->RegisterFont( "" );
-#else
 	SetupFonts();
 	activeFont = &fonts[0];
-#endif
 	colorPurple = idVec4( 1, 0, 1, 1 );
 	colorOrange = idVec4( 1, 1, 0, 1 );
 	colorYellow = idVec4( 0, 1, 1, 1 );
@@ -140,14 +129,7 @@ void idDeviceContext::Init()
 	colorWhite = idVec4( 1, 1, 1, 1 );
 	colorBlack = idVec4( 0, 0, 0, 1 );
 	colorNone = idVec4( 0, 0, 0, 0 );
-
-	// RB begin
-#if defined(STANDALONE)
-	cursorImages[CURSOR_ARROW] = declManager->FindMaterial( "guis/assets/cursors/cursor_arrow.tga" );
-#else
 	cursorImages[CURSOR_ARROW] = declManager->FindMaterial( "ui/assets/guicursor_arrow.tga" );
-#endif
-	// RB end
 	cursorImages[CURSOR_HAND] = declManager->FindMaterial( "ui/assets/guicursor_hand.tga" );
 	cursorImages[CURSOR_HAND_JOY1] = declManager->FindMaterial( "ui/assets/guicursor_hand_cross.tga" );
 	cursorImages[CURSOR_HAND_JOY2] = declManager->FindMaterial( "ui/assets/guicursor_hand_circle.tga" );
@@ -184,12 +166,8 @@ void idDeviceContext::Init()
 
 void idDeviceContext::Shutdown()
 {
-	// RB begin
-#if !defined(USE_IDFONT)
 	fontName.Clear();
 	fonts.Clear();
-#endif
-	// RB end
 	clipRects.Clear();
 	Clear();
 }
@@ -197,13 +175,8 @@ void idDeviceContext::Shutdown()
 void idDeviceContext::Clear()
 {
 	initialized = false;
-
-	// RB begin
-#if !defined(USE_IDFONT)
 	useFont = NULL;
 	activeFont = NULL;
-#endif
-	// RB end
 }
 
 idDeviceContext::idDeviceContext()
@@ -374,34 +347,12 @@ void idDeviceContext::DrawWinding( idWinding& w, const idMaterial* mat )
 	}
 	assert( numIndexes == ( w.GetNumPoints() - 2 ) * 3 );
 
-	// RB: added alternative interface for no glMapBuffer support
-#if defined(NO_GL_MAPBUFFER)
-
-	uint32_t currentColor = renderSystem->GetColor();
-
-	static ALIGNTYPE16 idDrawVert verts[MAX_POINTS_ON_WINDING];
-	for( int j = 0 ; j < w.GetNumPoints() ; j++ )
-	{
-		verts[j].xyz.x = xOffset + w[j].x * xScale;
-		verts[j].xyz.y = yOffset + w[j].y * yScale;
-		verts[j].xyz.z = w[j].z;
-		verts[j].SetTexCoord( w[j].s, w[j].t );
-		verts[j].SetColor( currentColor );
-		verts[j].ClearColor2();
-		verts[j].SetNormal( 0.0f, 0.0f, 1.0f );
-		verts[j].SetTangent( 1.0f, 0.0f, 0.0f );
-		verts[j].SetBiTangent( 0.0f, 1.0f, 0.0f );
-	}
-
-	renderSystem->AllocTris( verts, w.GetNumPoints(), tempIndexes, numIndexes, mat );
-
-#else
 	idDrawVert* verts = renderSystem->AllocTris( w.GetNumPoints(), tempIndexes, numIndexes, mat );
 	if( verts == NULL )
 	{
 		return;
 	}
-	uint32_t currentColor = renderSystem->GetColorPacked();
+	uint32_t currentColor = renderSystem->GetColor();
 
 	for( int j = 0 ; j < w.GetNumPoints() ; j++ )
 	{
@@ -415,8 +366,6 @@ void idDeviceContext::DrawWinding( idWinding& w, const idMaterial* mat )
 		verts[j].SetTangent( 1.0f, 0.0f, 0.0f );
 		verts[j].SetBiTangent( 0.0f, 1.0f, 0.0f );
 	}
-#endif
-	// RB end
 }
 
 void idDeviceContext::DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, const idMaterial* shader )
@@ -646,10 +595,9 @@ void idDeviceContext::DrawMaterialRect( float x, float y, float w, float h, floa
 
 void idDeviceContext::SetCursor( int n )
 {
-#if 0
-	// TODO
 	if( n > CURSOR_ARROW && n < CURSOR_COUNT )
 	{
+
 		keyBindings_t binds = idKeyInput::KeyBindingsFromBinding( "_use", true );
 
 		keyNum_t keyNum = K_NONE;
@@ -686,7 +634,6 @@ void idDeviceContext::SetCursor( int n )
 
 	}
 	else
-#endif
 	{
 		cursor = CURSOR_ARROW;
 	}
@@ -722,28 +669,6 @@ void idDeviceContext::DrawCursor( float* x, float* y, float size )
  =======================================================================================================================
  */
 
-#if defined(USE_IDFONT)
-void idDeviceContext::PaintChar( float x, float y, const scaledGlyphInfo_t& glyphInfo )
-{
-	y -= glyphInfo.top;
-	x += glyphInfo.left;
-
-	float w = glyphInfo.width;
-	float h = glyphInfo.height;
-	float s = glyphInfo.s1;
-	float t = glyphInfo.t1;
-	float s2 = glyphInfo.s2;
-	float t2 = glyphInfo.t2;
-	const idMaterial* hShader = glyphInfo.material;
-
-	if( ClippedCoords( &x, &y, &w, &h, &s, &t, &s2, &t2 ) )
-	{
-		return;
-	}
-
-	DrawStretchPic( x, y, w, h, s, t, s2, t2, hShader );
-}
-#else
 void idDeviceContext::PaintChar( float x, float y, float width, float height, float scale, float	s, float	t, float	s2, float t2, const idMaterial* hShader )
 {
 	float	w, h;
@@ -763,8 +688,6 @@ void idDeviceContext::PaintChar( float x, float y, float width, float height, fl
 
 void idDeviceContext::SetFontByScale( float scale )
 {
-	// RB: the small fonts suck
-	/*
 	if( scale <= gui_smallFontLimit.GetFloat() )
 	{
 		useFont = &activeFont->fontInfoSmall;
@@ -778,95 +701,15 @@ void idDeviceContext::SetFontByScale( float scale )
 		activeFont->maxWidth = activeFont->maxWidthMedium;
 	}
 	else
-	*/
-	// RB end
 	{
 		useFont = &activeFont->fontInfoLarge;
 		activeFont->maxHeight = activeFont->maxHeightLarge;
 		activeFont->maxWidth = activeFont->maxWidthLarge;
 	}
 }
-#endif
 
 int idDeviceContext::DrawText( float x, float y, float scale, idVec4 color, const char* text, float adjust, int limit, int style, int cursor )
 {
-#if defined(USE_IDFONT)
-	int			len;
-	idVec4		newColor;
-
-	idStr drawText = text;
-	int charIndex = 0;
-
-	if( text && color.w != 0.0f )
-	{
-		renderSystem->SetColor( color );
-		memcpy( &newColor[0], &color[0], sizeof( idVec4 ) );
-		len = drawText.Length();
-		if( limit > 0 && len > limit )
-		{
-			len = limit;
-		}
-
-		float prevGlyphSkip = 0.0f;
-
-		while( charIndex < len )
-		{
-			uint32_t textChar = drawText.UTF8Char( charIndex );
-
-			if( idStr::IsColor( drawText.c_str() + charIndex ) )
-			{
-				if( drawText[ charIndex++ ] == C_COLOR_DEFAULT )
-				{
-					newColor = color;
-				}
-				else
-				{
-					newColor = idStr::ColorForIndex( charIndex );
-					newColor[3] = color[3];
-				}
-				if( cursor == charIndex - 1 || cursor == charIndex )
-				{
-					float backup = 0.0f;
-					if( prevGlyphSkip > 0.0f )
-					{
-						backup = ( prevGlyphSkip + adjust ) / 5.0f;
-					}
-					if( cursor == charIndex - 1 )
-					{
-						backup *= 2.0f;
-					}
-					else
-					{
-						renderSystem->SetColor( newColor );
-					}
-					DrawEditCursor( x - backup, y, scale );
-				}
-				renderSystem->SetColor( newColor );
-				continue;
-			}
-			else
-			{
-				scaledGlyphInfo_t glyphInfo;
-				activeFont->GetScaledGlyph( scale, textChar, glyphInfo );
-				prevGlyphSkip = glyphInfo.xSkip;
-
-				PaintChar( x, y, glyphInfo );
-
-				if( cursor == charIndex - 1 )
-				{
-					DrawEditCursor( x, y, scale );
-				}
-				x += glyphInfo.xSkip + adjust;
-			}
-		}
-		if( cursor == len )
-		{
-			DrawEditCursor( x, y, scale );
-		}
-	}
-	return drawText.Length();
-#else
-
 	int			len, count;
 	idVec4		newColor;
 	const glyphInfo_t* glyph;
@@ -950,7 +793,6 @@ int idDeviceContext::DrawText( float x, float y, float scale, idVec4 color, cons
 	}
 
 	return count;
-#endif
 }
 
 void idDeviceContext::SetSize( float width, float height )
@@ -967,9 +809,6 @@ void idDeviceContext::SetOffset( float x, float y )
 
 int idDeviceContext::CharWidth( const char c, float scale )
 {
-#if defined(USE_IDFONT)
-	return idMath::Ftoi( activeFont->GetGlyphWidth( scale, c ) );
-#else
 	glyphInfo_t* glyph;
 	float		useScale;
 	SetFontByScale( scale );
@@ -977,7 +816,6 @@ int idDeviceContext::CharWidth( const char c, float scale )
 	useScale = scale * font->glyphScale;
 	glyph = &font->glyphs[( const unsigned char )c];
 	return idMath::Ftoi( glyph->xSkip * useScale );
-#endif
 }
 
 int idDeviceContext::TextWidth( const char* text, float scale, int limit )
@@ -987,39 +825,6 @@ int idDeviceContext::TextWidth( const char* text, float scale, int limit )
 		return 0;
 	}
 
-#if defined(USE_IDFONT)
-	int i;
-	float width = 0;
-	if( limit > 0 )
-	{
-		for( i = 0; text[i] != '\0' && i < limit; i++ )
-		{
-			if( idStr::IsColor( text + i ) )
-			{
-				i++;
-			}
-			else
-			{
-				width += activeFont->GetGlyphWidth( scale, ( ( const unsigned char* )text )[i] );
-			}
-		}
-	}
-	else
-	{
-		for( i = 0; text[i] != '\0'; i++ )
-		{
-			if( idStr::IsColor( text + i ) )
-			{
-				i++;
-			}
-			else
-			{
-				width += activeFont->GetGlyphWidth( scale, ( ( const unsigned char* )text )[i] );
-			}
-		}
-	}
-	return idMath::Ftoi( width );
-#else
 	int i, width;
 
 	SetFontByScale( scale );
@@ -1055,14 +860,10 @@ int idDeviceContext::TextWidth( const char* text, float scale, int limit )
 		}
 	}
 	return idMath::Ftoi( scale * useFont->glyphScale * width );
-#endif
 }
 
 int idDeviceContext::TextHeight( const char* text, float scale, int limit )
 {
-#if defined(USE_IDFONT)
-	return idMath::Ftoi( activeFont->GetLineHeight( scale ) );
-#else
 	int			len, count;
 	float		max;
 	glyphInfo_t* glyph;
@@ -1104,29 +905,20 @@ int idDeviceContext::TextHeight( const char* text, float scale, int limit )
 	}
 
 	return idMath::Ftoi( max * useScale );
-#endif
 }
 
 int idDeviceContext::MaxCharWidth( float scale )
 {
-#if defined(USE_IDFONT)
-	return idMath::Ftoi( activeFont->GetMaxCharWidth( scale ) );
-#else
 	SetFontByScale( scale );
 	float useScale = scale * useFont->glyphScale;
 	return idMath::Ftoi( activeFont->maxWidth * useScale );
-#endif
 }
 
 int idDeviceContext::MaxCharHeight( float scale )
 {
-#if defined(USE_IDFONT)
-	return idMath::Ftoi( activeFont->GetLineHeight( scale ) );
-#else
 	SetFontByScale( scale );
 	float useScale = scale * useFont->glyphScale;
 	return idMath::Ftoi( activeFont->maxHeight * useScale );
-#endif
 }
 
 const idMaterial* idDeviceContext::GetScrollBarImage( int index )
@@ -1150,209 +942,15 @@ void idDeviceContext::DrawEditCursor( float x, float y, float scale )
 	{
 		return;
 	}
-
-#if defined(USE_IDFONT)
-	char cursorChar = ( overStrikeMode ) ? '_' : '|';
-	scaledGlyphInfo_t glyphInfo;
-	activeFont->GetScaledGlyph( scale, cursorChar, glyphInfo );
-	PaintChar( x, y, glyphInfo );
-#else
 	SetFontByScale( scale );
 	float useScale = scale * useFont->glyphScale;
 	const glyphInfo_t* glyph2 = &useFont->glyphs[( overStrikeMode ) ? '_' : '|'];
 	float	yadj = useScale * glyph2->top;
 	PaintChar( x, y - yadj, glyph2->imageWidth, glyph2->imageHeight, useScale, glyph2->s, glyph2->t, glyph2->s2, glyph2->t2, glyph2->glyph );
-#endif
 }
 
 int idDeviceContext::DrawText( const char* text, float textScale, int textAlign, idVec4 color, idRectangle rectDraw, bool wrap, int cursor, bool calcOnly, idList<int>* breaks, int limit )
 {
-#if defined(USE_IDFONT)
-	int			count = 0;
-	int			charIndex = 0;
-	int			lastBreak = 0;
-	float		y = 0.0f;
-	float		textWidth = 0.0f;
-	float		textWidthAtLastBreak = 0.0f;
-
-	float		charSkip = MaxCharWidth( textScale ) + 1;
-	float		lineSkip = MaxCharHeight( textScale );
-
-	bool		lineBreak = false;
-	bool		wordBreak = false;
-
-	idStr drawText = text;
-	idStr textBuffer;
-
-	if( !calcOnly && !( text && *text ) )
-	{
-		if( cursor == 0 )
-		{
-			renderSystem->SetColor( color );
-			DrawEditCursor( rectDraw.x, lineSkip + rectDraw.y, textScale );
-		}
-		return idMath::Ftoi( rectDraw.w / charSkip );
-	}
-
-	y = lineSkip + rectDraw.y;
-
-	if( breaks )
-	{
-		breaks->Append( 0 );
-	}
-
-	while( charIndex < drawText.Length() )
-	{
-		uint32_t textChar = drawText.UTF8Char( charIndex );
-
-		// See if we need to start a new line.
-		if( textChar == '\n' || textChar == '\r' || charIndex == drawText.Length() )
-		{
-			lineBreak = true;
-			if( charIndex < drawText.Length() )
-			{
-				// New line character and we still have more text to read.
-				char nextChar = drawText[ charIndex + 1 ];
-				if( ( textChar == '\n' && nextChar == '\r' ) || ( textChar == '\r' && nextChar == '\n' ) )
-				{
-					// Just absorb extra newlines.
-					textChar = drawText.UTF8Char( charIndex );
-				}
-			}
-		}
-
-		// Check for escape colors if not then simply get the glyph width.
-		if( textChar == C_COLOR_ESCAPE && charIndex < drawText.Length() )
-		{
-			textBuffer.AppendUTF8Char( textChar );
-			textChar = drawText.UTF8Char( charIndex );
-		}
-
-		// If the character isn't a new line then add it to the text buffer.
-		if( textChar != '\n' && textChar != '\r' )
-		{
-			textWidth += activeFont->GetGlyphWidth( textScale, textChar );
-			textBuffer.AppendUTF8Char( textChar );
-		}
-
-		if( !lineBreak && ( textWidth > rectDraw.w ) )
-		{
-			// The next character will cause us to overflow, if we haven't yet found a suitable
-			// break spot, set it to be this character
-			if( textBuffer.Length() > 0 && lastBreak == 0 )
-			{
-				lastBreak = textBuffer.Length();
-				textWidthAtLastBreak = textWidth;
-			}
-			wordBreak = true;
-		}
-		else if( lineBreak || ( wrap && ( textChar == ' ' || textChar == '\t' ) ) )
-		{
-			// The next character is in view, so if we are a break character, store our position
-			lastBreak = textBuffer.Length();
-			textWidthAtLastBreak = textWidth;
-		}
-
-		// We need to go to a new line
-		if( lineBreak || wordBreak )
-		{
-			float x = rectDraw.x;
-
-			if( textWidthAtLastBreak > 0 )
-			{
-				textWidth = textWidthAtLastBreak;
-			}
-
-			// Align text if needed
-			if( textAlign == ALIGN_RIGHT )
-			{
-				x = rectDraw.x + rectDraw.w - textWidth;
-			}
-			else if( textAlign == ALIGN_CENTER )
-			{
-				x = rectDraw.x + ( rectDraw.w - textWidth ) / 2;
-			}
-
-			if( wrap || lastBreak > 0 )
-			{
-				// This is a special case to handle breaking in the middle of a word.
-				// if we didn't do this, the cursor would appear on the end of this line
-				// and the beginning of the next.
-				if( wordBreak && cursor >= lastBreak && lastBreak == textBuffer.Length() )
-				{
-					cursor++;
-				}
-			}
-
-			// Draw what's in the current text buffer.
-			if( !calcOnly )
-			{
-				if( lastBreak > 0 )
-				{
-					count += DrawText( x, y, textScale, color, textBuffer.Left( lastBreak ).c_str(), 0, 0, 0, cursor );
-					textBuffer = textBuffer.Right( textBuffer.Length() - lastBreak );
-				}
-				else
-				{
-					count += DrawText( x, y, textScale, color, textBuffer.c_str(), 0, 0, 0, cursor );
-					textBuffer.Clear();
-				}
-			}
-
-			if( cursor < lastBreak )
-			{
-				cursor = -1;
-			}
-			else if( cursor >= 0 )
-			{
-				cursor -= ( lastBreak + 1 );
-			}
-
-			// If wrap is disabled return at this point.
-			if( !wrap )
-			{
-				return lastBreak;
-			}
-
-			// If we've hit the allowed character limit then break.
-			if( limit && count > limit )
-			{
-				break;
-			}
-
-			y += lineSkip + 5;
-
-			if( !calcOnly && y > rectDraw.Bottom() )
-			{
-				break;
-			}
-
-			// If breaks were requested then make a note of this one.
-			if( breaks )
-			{
-				breaks->Append( drawText.Length() - charIndex );
-			}
-
-			// Reset necessary parms for next line.
-			lastBreak = 0;
-			textWidth = 0;
-			textWidthAtLastBreak = 0;
-			lineBreak = false;
-			wordBreak = false;
-
-			// Reassess the remaining width
-			for( int i = 0; i < textBuffer.Length(); )
-			{
-				if( textChar != C_COLOR_ESCAPE )
-				{
-					textWidth += activeFont->GetGlyphWidth( textScale, textBuffer.UTF8Char( i ) );
-				}
-			}
-
-			continue;
-		}
-	}
-#else
 	const char*	p, *textPtr, *newLinePtr;
 	char		buff[1024];
 	int			len, newLine, newLineWidth, count;
@@ -1517,7 +1115,7 @@ int idDeviceContext::DrawText( const char* text, float textScale, int textAlign,
 			textWidth += textScale * useFont->glyphScale * useFont->glyphs[( const unsigned char ) * ( buff + len - 1 ) ].xSkip;
 		}
 	}
-#endif
+
 	return idMath::Ftoi( rectDraw.w / charSkip );
 }
 
@@ -1698,159 +1296,3 @@ bool idDeviceContextOptimized::ClippedCoords( float* x, float* y, float* w, floa
 	// still needs to be drawn
 	return false;
 }
-
-/*
-=============
-idDeviceContextOptimized::DrawText
-=============
-*/
-#if defined(USE_IDFONT)
-static triIndex_t quadPicIndexes[6] = { 3, 0, 2, 2, 0, 1 };
-int idDeviceContextOptimized::DrawText( float x, float y, float scale, idVec4 color, const char* text, float adjust, int limit, int style, int cursor )
-{
-	if( !matIsIdentity || cursor != -1 )
-	{
-		// fallback to old code
-		return idDeviceContext::DrawText( x, y, scale, color, text, adjust, limit, style, cursor );
-	}
-
-	idStr drawText = text;
-
-	if( drawText.Length() == 0 )
-	{
-		return 0;
-	}
-	if( color.w == 0.0f )
-	{
-		return 0;
-	}
-
-	const uint32_t currentColor = PackColor( color );
-	uint32_t currentColorNativeByteOrder = LittleInt( currentColor );
-
-	int len = drawText.Length();
-	if( limit > 0 && len > limit )
-	{
-		len = limit;
-	}
-
-	int charIndex = 0;
-	while( charIndex < drawText.Length() )
-	{
-		uint32_t textChar = drawText.UTF8Char( charIndex );
-		if( textChar == C_COLOR_ESCAPE )
-		{
-			// I'm not sure if inline text color codes are used anywhere in the game,
-			// they may only be needed for multi-color user names
-			idVec4		newColor;
-			uint32_t colorIndex = drawText.UTF8Char( charIndex );
-			if( colorIndex == C_COLOR_DEFAULT )
-			{
-				newColor = color;
-			}
-			else
-			{
-				newColor = idStr::ColorForIndex( colorIndex );
-				newColor[3] = color[3];
-			}
-			renderSystem->SetColor( newColor );
-			currentColorNativeByteOrder = LittleInt( PackColor( newColor ) );
-			continue;
-		}
-
-		scaledGlyphInfo_t glyphInfo;
-		activeFont->GetScaledGlyph( scale, textChar, glyphInfo );
-
-		// PaintChar( x, y, glyphInfo );
-		float drawY = y - glyphInfo.top;
-		float drawX = x + glyphInfo.left;
-		float w = glyphInfo.width;
-		float h = glyphInfo.height;
-		float s = glyphInfo.s1;
-		float t = glyphInfo.t1;
-		float s2 = glyphInfo.s2;
-		float t2 = glyphInfo.t2;
-
-		if( !ClippedCoords( &drawX, &drawY, &w, &h, &s, &t, &s2, &t2 ) )
-		{
-			float x1 = xOffset + drawX * xScale;
-			float x2 = xOffset + ( drawX + w ) * xScale;
-			float y1 = yOffset + drawY * yScale;
-			float y2 = yOffset + ( drawY + h ) * yScale;
-
-
-			// RB: added alternative interface for no glMapBuffer support
-#if defined(NO_GL_MAPBUFFER)
-
-			static ALIGNTYPE16 idDrawVert verts[4];
-
-			verts[0].xyz[0] = x1;
-			verts[0].xyz[1] = y1;
-			verts[0].xyz[2] = 0.0f;
-			verts[0].SetTexCoord( s, t );
-			verts[0].SetNativeOrderColor( currentColorNativeByteOrder );
-			verts[0].ClearColor2();
-
-			verts[1].xyz[0] = x2;
-			verts[1].xyz[1] = y1;
-			verts[1].xyz[2] = 0.0f;
-			verts[1].SetTexCoord( s2, t );
-			verts[1].SetNativeOrderColor( currentColorNativeByteOrder );
-			verts[1].ClearColor2();
-
-			verts[2].xyz[0] = x2;
-			verts[2].xyz[1] = y2;
-			verts[2].xyz[2] = 0.0f;
-			verts[2].SetTexCoord( s2, t2 );
-			verts[2].SetNativeOrderColor( currentColorNativeByteOrder );
-			verts[2].ClearColor2();
-
-			verts[3].xyz[0] = x1;
-			verts[3].xyz[1] = y2;
-			verts[3].xyz[2] = 0.0f;
-			verts[3].SetTexCoord( s, t2 );
-			verts[3].SetNativeOrderColor( currentColorNativeByteOrder );
-			verts[3].ClearColor2();
-
-			renderSystem->AllocTris( verts, 4, quadPicIndexes, 6, glyphInfo.material, STEREO_DEPTH_TYPE_NONE );
-#else
-			idDrawVert* verts = renderSystem->AllocTris( 4, quadPicIndexes, 6, glyphInfo.material, STEREO_DEPTH_TYPE_NONE );
-			if( verts != NULL )
-			{
-				verts[0].xyz[0] = x1;
-				verts[0].xyz[1] = y1;
-				verts[0].xyz[2] = 0.0f;
-				verts[0].SetTexCoord( s, t );
-				verts[0].SetNativeOrderColor( currentColorNativeByteOrder );
-				verts[0].ClearColor2();
-
-				verts[1].xyz[0] = x2;
-				verts[1].xyz[1] = y1;
-				verts[1].xyz[2] = 0.0f;
-				verts[1].SetTexCoord( s2, t );
-				verts[1].SetNativeOrderColor( currentColorNativeByteOrder );
-				verts[1].ClearColor2();
-
-				verts[2].xyz[0] = x2;
-				verts[2].xyz[1] = y2;
-				verts[2].xyz[2] = 0.0f;
-				verts[2].SetTexCoord( s2, t2 );
-				verts[2].SetNativeOrderColor( currentColorNativeByteOrder );
-				verts[2].ClearColor2();
-
-				verts[3].xyz[0] = x1;
-				verts[3].xyz[1] = y2;
-				verts[3].xyz[2] = 0.0f;
-				verts[3].SetTexCoord( s, t2 );
-				verts[3].SetNativeOrderColor( currentColorNativeByteOrder );
-				verts[3].ClearColor2();
-			}
-#endif
-			// RB end
-		}
-
-		x += glyphInfo.xSkip + adjust;
-	}
-	return drawText.Length();
-}
-#endif // #if defined(USE_IDFONT)

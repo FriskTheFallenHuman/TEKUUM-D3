@@ -93,6 +93,21 @@ public:
 		return com_shuttingDown;
 	}
 
+	uint64_t		GetRendererBackEndMicroseconds() const
+	{
+		return time_backend;
+	}
+
+	uint64_t		GetRendererShadowsMicroseconds() const
+	{
+		return time_shadows;
+	}
+
+	uint64_t		GetRendererGPUMicroseconds() const
+	{
+		return time_gpu;
+	}
+
 private:
 	void						InitCommands();
 	void						InitRenderSystem();

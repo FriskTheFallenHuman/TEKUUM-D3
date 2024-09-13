@@ -42,13 +42,9 @@ void idSessionLocal::StartWipe( const char* _wipeMaterial, bool hold )
 {
 	console->Close();
 
-	// render the current screen into a texture for the wipe model
-	renderSystem->CropRenderSize( 640, 480, true );
-
 	Draw();
 
-	renderSystem->CaptureRenderToImage( "_scratch" );
-	renderSystem->UnCrop();
+	renderSystem->CaptureRenderToImage( "_currentRender" );
 
 	wipeMaterial = declManager->FindMaterial( _wipeMaterial, false );
 
@@ -637,6 +633,84 @@ void idSessionLocal::PacifierUpdate()
 	idAsyncNetwork::server.PacifierUpdate();
 }
 
+// foresthale 2014-05-30: loading progress pacifier for binarize operations only
+void idSessionLocal::PacifierBinarizeFilename( const char* filename, const char* reason )
+{
+	idLib::Printf( "Binarize File: '%s' - reason '%s'\n", filename, reason );
+
+	// we won't actually show updates on very quick files (<16ms), so keep this false until the first progress
+	pacifierBinarizeActive = false;
+	pacifierBinarizeFilename = filename;
+	pacifierBinarizeInfo = "";
+	pacifierBinarizeProgress = 0.0f;
+	pacifierBinarizeStartTime = Sys_Milliseconds();
+	pacifierBinarizeMiplevel = 0;
+	pacifierBinarizeMiplevelTotal = 0;
+}
+
+void idSessionLocal::PacifierBinarizeInfo( const char* info )
+{
+	pacifierBinarizeInfo = info;
+}
+
+void idSessionLocal::PacifierBinarizeMiplevel( int level, int maxLevel )
+{
+	pacifierBinarizeMiplevel = level;
+	pacifierBinarizeMiplevelTotal = maxLevel;
+}
+
+// foresthale 2014-05-30: loading progress pacifier for binarize operations only
+void idSessionLocal::PacifierBinarizeProgress( float progress )
+{
+	static int lastUpdateTime = 0;
+	int time = Sys_Milliseconds();
+	if( progress == 0.0f )
+	{
+		// restart the progress, so that if multiple images have to be
+		// binarized for one filename, we don't give bogus estimates...
+		pacifierBinarizeStartTime = Sys_Milliseconds();
+	}
+	pacifierBinarizeProgress = progress;
+	if( ( time - lastUpdateTime ) >= 16 )
+	{
+		lastUpdateTime = time;
+		pacifierBinarizeActive = true;
+
+		PacifierUpdate();
+
+		// TODO merge
+		//UpdateLevelPacifier( true, progress );
+	}
+}
+
+// foresthale 2014-05-30: loading progress pacifier for binarize operations only
+void idSessionLocal::PacifierBinarizeEnd()
+{
+	pacifierBinarizeActive = false;
+	pacifierBinarizeStartTime = 0;
+	pacifierBinarizeProgress = 0.0f;
+	pacifierBinarizeTimeLeft = 0.0f;
+	pacifierBinarizeFilename = "";
+	pacifierBinarizeProgressTotal = 0;
+	pacifierBinarizeProgressCurrent = 0;
+	pacifierBinarizeMiplevel = 0;
+	pacifierBinarizeMiplevelTotal = 0;
+}
+
+// foresthale 2014-05-30: loading progress pacifier for binarize operations only
+void idSessionLocal::PacifierBinarizeProgressTotal( int total )
+{
+	pacifierBinarizeProgressTotal = total;
+	pacifierBinarizeProgressCurrent = 0;
+}
+
+// foresthale 2014-05-30: loading progress pacifier for binarize operations only
+void idSessionLocal::PacifierBinarizeProgressIncrement( int step )
+{
+	pacifierBinarizeProgressCurrent += step;
+	PacifierBinarizeProgress( ( float )pacifierBinarizeProgressCurrent / pacifierBinarizeProgressTotal );
+}
+
 /*
 ===============
 idSessionLocal::ScrubSaveGameFileName
@@ -783,10 +857,8 @@ bool idSessionLocal::SaveGame( const char* saveName, bool autosave, const char* 
 	// Write screenshot
 	if( !autosave )
 	{
-		renderSystem->CropRenderSize( 320, 240, false );
+		renderSystem->CaptureRenderToImage( "_currentRender" );
 		game->Draw( 0 );
-		renderSystem->CaptureRenderToFile( previewFile, true );
-		renderSystem->UnCrop();
 	}
 
 	// Write description, which is just a text file with

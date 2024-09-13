@@ -627,10 +627,8 @@ void idPlayerView::DoubleVision( idUserInterface* hud, const renderView_t* view,
 	shift = fabs( shift );
 
 	// if double vision, render to a texture
-	renderSystem->CropRenderSize( 512, 256, true );
 	SingleView( hud, view );
 	renderSystem->CaptureRenderToImage( "_scratch" );
-	renderSystem->UnCrop();
 
 	// carry red tint if in berserk mode
 	idVec4 color( 1, 1, 1, 1 );
@@ -653,10 +651,8 @@ idPlayerView::BerserkVision
 */
 void idPlayerView::BerserkVision( idUserInterface* hud, const renderView_t* view )
 {
-	renderSystem->CropRenderSize( 512, 256, true );
 	SingleView( hud, view );
 	renderSystem->CaptureRenderToImage( "_scratch" );
-	renderSystem->UnCrop();
 	renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
 	renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 1, 1, 0, dvMaterial );
 }

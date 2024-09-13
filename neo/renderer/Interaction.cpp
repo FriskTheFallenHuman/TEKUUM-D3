@@ -1,25 +1,25 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Doom 3 BFG Edition GPL Source Code
+Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
+Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
+Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
+along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
+In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
 
 If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
@@ -29,7 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "tr_local.h"
+#include "RenderCommon.h"
 
 /*
 ===========================================================================
@@ -73,24 +73,9 @@ void R_CalcInteractionFacing( const idRenderEntityLocal* ent, const srfTriangles
 		const idDrawVert& v2 = tri->verts[tri->indexes[i + 2]];
 
 		const idPlane plane( v0.xyz, v1.xyz, v2.xyz );
-
-		// RB: TODO support Half-Lambert lighting
-#if 1
 		const float d = plane.Distance( localLightOrigin );
+
 		cullInfo.facing[face] = ( d >= 0.0f );
-#else
-		idVec3 L = localLightOrigin - v0.xyz;
-		L += ( localLightOrigin - v1.xyz );
-		L += ( localLightOrigin - v2.xyz );
-		L.Normalize();
-
-		const idVec3& normal = plane.Normal();
-		float halfLdotN = ( normal * L ) * 0.5 + 0.5;
-		halfLdotN *= halfLdotN;
-
-		cullInfo.facing[face] = ( halfLdotN >= 0.0f );
-#endif
-		// RB end
 	}
 	cullInfo.facing[numFaces] = 1;	// for dangling edges to reference
 }
@@ -107,7 +92,7 @@ vertex is clearly inside, the entire triangle will be accepted.
 */
 void R_CalcInteractionCullBits( const idRenderEntityLocal* ent, const srfTriangles_t* tri, const idRenderLightLocal* light, srfCullInfo_t& cullInfo )
 {
-	//SCOPED_PROFILE_EVENT( "R_CalcInteractionCullBits" );
+	SCOPED_PROFILE_EVENT( "R_CalcInteractionCullBits" );
 
 	if( cullInfo.cullBits != NULL )
 	{
@@ -213,8 +198,9 @@ static srfTriangles_t* R_CreateInteractionLightTris( const idRenderEntityLocal* 
 	indexes = NULL;
 
 	// it is debatable if non-shadowing lights should light back faces. we aren't at the moment
+	// RB: now we do with r_useHalfLambert, so don't cull back faces if we have smooth shadowing enabled
 	if( r_lightAllBackFaces.GetBool() || light->lightShader->LightEffectsBackSides()
-			|| shader->ReceivesLightingOnBackSides() || ent->parms.noSelfShadow || ent->parms.noShadow )
+			|| shader->ReceivesLightingOnBackSides() || ent->parms.noSelfShadow || ent->parms.noShadow || r_usePBR.GetBool() || ( r_useHalfLambertLighting.GetInteger() && r_useShadowMapping.GetBool() ) )
 	{
 		includeBackFaces = true;
 	}

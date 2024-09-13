@@ -57,7 +57,7 @@ using namespace Collada;
 
 // ------------------------------------------------------------------------------------------------
 // Constructor to be privately used by Importer
-ColladaParser::ColladaParser( const char* pFile )
+ColladaParser::ColladaParser( const char* pFile, ID_TIME_T* sourceTimeStamp )
 	: mFileName( pFile )
 {
 	mRootNode = NULL;
@@ -73,6 +73,8 @@ ColladaParser::ColladaParser( const char* pFile )
 	{
 		ThrowException( "Collada: Unable to open file." );
 	}
+
+	*sourceTimeStamp = mReader->getTimestamp();
 
 	// start reading
 	ReadContents();
@@ -2403,7 +2405,7 @@ void ColladaParser::ReadPrimitives( Mesh* pMesh, idList<InputChannel>& pPerIndex
 		idToken token;
 		idLexer lexer( content, idStr::Length( content ), "indices" );
 
-		for( unsigned int a = 0; a < indices.Num(); a++ )
+		for( int a = 0; a < indices.Num(); a++ )
 		{
 			int value = lexer.ParseInt();
 

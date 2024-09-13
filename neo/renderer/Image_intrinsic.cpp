@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013-2014 Robert Beckebans
+Copyright (C) 2013-2021 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -30,8 +30,17 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
+//#include "libs/imgui/imgui.h"
 
-#include "tr_local.h"
+#include "RenderCommon.h"
+#include "SMAA/AreaTex.h"
+#include "SMAA/SearchTex.h"
+#include "Image_brdfLut.h"
+//#include "Image_blueNoiseVC_1M.h" // 256^2 R8 data
+#include "Image_blueNoiseVC_2.h" // 512^2 RGB8 data
+
+#include "Image_env_UAC_lobby_amb.h"
+#include "Image_env_UAC_lobby_spec.h"
 
 #define	DEFAULT_SIZE	16
 
@@ -132,6 +141,60 @@ static void R_BlackImage( idImage* image )
 						  TF_DEFAULT, TR_REPEAT, TD_DEFAULT );
 }
 
+static void R_CyanImage( idImage* image )
+{
+	byte	data[DEFAULT_SIZE][DEFAULT_SIZE][4];
+
+	for( int x = 0; x < DEFAULT_SIZE; x++ )
+	{
+		for( int y = 0; y < DEFAULT_SIZE; y++ )
+		{
+			data[y][x][0] = byte( colorCyan.x * 255 );
+			data[y][x][1] = byte( colorCyan.y * 255 );
+			data[y][x][2] = byte( colorCyan.z * 255 );
+			data[y][x][3] = byte( colorCyan.w * 255 );
+		}
+	}
+
+	image->GenerateImage( ( byte* )data, DEFAULT_SIZE, DEFAULT_SIZE, TF_DEFAULT, TR_REPEAT, TD_DIFFUSE );
+}
+
+static void R_ChromeSpecImage( idImage* image )
+{
+	byte	data[DEFAULT_SIZE][DEFAULT_SIZE][4];
+
+	for( int x = 0; x < DEFAULT_SIZE; x++ )
+	{
+		for( int y = 0; y < DEFAULT_SIZE; y++ )
+		{
+			data[y][x][0] = 0;
+			data[y][x][1] = 255;
+			data[y][x][2] = 255;
+			data[y][x][3] = 255;
+		}
+	}
+
+	image->GenerateImage( ( byte* )data, DEFAULT_SIZE, DEFAULT_SIZE, TF_DEFAULT, TR_REPEAT, TD_SPECULAR_PBR_RMAO );
+}
+
+static void R_PlasticSpecImage( idImage* image )
+{
+	byte	data[DEFAULT_SIZE][DEFAULT_SIZE][4];
+
+	for( int x = 0; x < DEFAULT_SIZE; x++ )
+	{
+		for( int y = 0; y < DEFAULT_SIZE; y++ )
+		{
+			data[y][x][0] = 0;
+			data[y][x][1] = 0;
+			data[y][x][2] = 255;
+			data[y][x][3] = 255;
+		}
+	}
+
+	image->GenerateImage( ( byte* )data, DEFAULT_SIZE, DEFAULT_SIZE, TF_DEFAULT, TR_REPEAT, TD_SPECULAR_PBR_RMAO );
+}
+
 static void R_RGBA8Image( idImage* image )
 {
 	byte	data[DEFAULT_SIZE][DEFAULT_SIZE][4];
@@ -145,39 +208,91 @@ static void R_RGBA8Image( idImage* image )
 	image->GenerateImage( ( byte* )data, DEFAULT_SIZE, DEFAULT_SIZE, TF_DEFAULT, TR_REPEAT, TD_LOOKUP_TABLE_RGBA );
 }
 
+static void R_RGBA8LinearImage( idImage* image )
+{
+	byte	data[DEFAULT_SIZE][DEFAULT_SIZE][4];
+
+	memset( data, 0, sizeof( data ) );
+	data[0][0][0] = 16;
+	data[0][0][1] = 32;
+	data[0][0][2] = 48;
+	data[0][0][3] = 96;
+
+	image->GenerateImage( ( byte* )data, DEFAULT_SIZE, DEFAULT_SIZE, TF_LINEAR, TR_REPEAT, TD_LOOKUP_TABLE_RGBA );
+}
+
 static void R_DepthImage( idImage* image )
 {
 	// RB: NULL data and MSAA support
-	int msaaSamples = r_multiSamples.GetInteger();
-	image->GenerateImage( NULL, glConfig.nativeScreenWidth, glConfig.nativeScreenHeight, TF_NEAREST, TR_CLAMP, TD_DEPTH, msaaSamples );
+#if defined(USE_HDR_MSAA)
+	textureSamples_t msaaSamples = glConfig.multisamples;
+#else
+	int msaaSamples = 0;
+#endif
+	image->GenerateImage( NULL, renderSystem->GetWidth(), renderSystem->GetHeight(), TF_NEAREST, TR_CLAMP, TD_DEPTH );//, msaaSamples );
 	// RB end
 }
 
 // RB begin
 static void R_HDR_RGBA16FImage_ResNative( idImage* image )
 {
-	int msaaSamples = r_multiSamples.GetInteger();
-	image->GenerateImage( NULL, glConfig.nativeScreenWidth, glConfig.nativeScreenHeight, TF_NEAREST, TR_CLAMP, TD_RGBA16F, msaaSamples );
+	// FIXME
+#if defined(USE_HDR_MSAA)
+	int msaaSamples = glConfig.multisamples;
+#else
+	int msaaSamples = 0;
+#endif
+	image->GenerateImage( NULL, renderSystem->GetWidth(), renderSystem->GetHeight(), TF_NEAREST, TR_CLAMP, TD_RGBA16F );//, msaaSamples );
 }
 
 static void R_HDR_RGBA16FImage_ResNative_NoMSAA( idImage* image )
 {
-	image->GenerateImage( NULL, glConfig.nativeScreenWidth, glConfig.nativeScreenHeight, TF_NEAREST, TR_CLAMP, TD_RGBA16F );
+	image->GenerateImage( NULL, renderSystem->GetWidth(), renderSystem->GetHeight(), TF_NEAREST, TR_CLAMP, TD_RGBA16F );
 }
 
 static void R_HDR_RGBA16FImage_ResQuarter( idImage* image )
 {
-	image->GenerateImage( NULL, glConfig.nativeScreenWidth / 4, glConfig.nativeScreenHeight / 4, TF_NEAREST, TR_CLAMP, TD_RGBA16F );
+	image->GenerateImage( NULL, renderSystem->GetWidth() / 4, renderSystem->GetHeight() / 4, TF_NEAREST, TR_CLAMP, TD_RGBA16F );
 }
 
 static void R_HDR_RGBA16FImage_ResQuarter_Linear( idImage* image )
 {
-	image->GenerateImage( NULL, glConfig.nativeScreenWidth / 4, glConfig.nativeScreenHeight / 4, TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_RGBA );
+	image->GenerateImage( NULL, renderSystem->GetWidth() / 4, renderSystem->GetHeight() / 4, TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_RGBA );
 }
 
 static void R_HDR_RGBA16FImage_Res64( idImage* image )
 {
 	image->GenerateImage( NULL, 64, 64, TF_NEAREST, TR_CLAMP, TD_RGBA16F );
+}
+
+static void R_EnvprobeImage_HDR( idImage* image )
+{
+	image->GenerateImage( NULL, ENVPROBE_CAPTURE_SIZE, ENVPROBE_CAPTURE_SIZE, TF_NEAREST, TR_CLAMP, TD_RGBA16F );
+}
+
+static void R_EnvprobeImage_Depth( idImage* image )
+{
+	image->GenerateImage( NULL, ENVPROBE_CAPTURE_SIZE, ENVPROBE_CAPTURE_SIZE, TF_NEAREST, TR_CLAMP, TD_DEPTH );
+}
+
+static void R_SMAAImage_ResNative( idImage* image )
+{
+	image->GenerateImage( NULL, renderSystem->GetWidth(), renderSystem->GetHeight(), TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_RGBA );
+}
+
+static void R_GeometryBufferImage_ResNative( idImage* image )
+{
+	image->GenerateImage( NULL, renderSystem->GetWidth(), renderSystem->GetHeight(), TF_LINEAR, TR_CLAMP, TD_RGBA16F );
+}
+
+static void R_SSAOImage_ResHalf( idImage* image )
+{
+	image->GenerateImage( NULL, renderSystem->GetWidth() / 2, renderSystem->GetHeight() / 2, TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_RGBA );
+}
+
+static void R_HierarchicalZBufferImage_ResNative( idImage* image )
+{
+	image->GenerateImage( NULL, renderSystem->GetWidth(), renderSystem->GetHeight(), TF_NEAREST_MIPMAP, TR_CLAMP, TD_R32F );
 }
 // RB end
 
@@ -474,7 +589,6 @@ void R_QuadraticImage( idImage* image )
 }
 
 // RB begin
-#if !defined(USE_GLES3)
 static void R_CreateShadowMapImage_Res0( idImage* image )
 {
 	int size = shadowMapResolutions[0];
@@ -572,6 +686,152 @@ static void R_CreateJitterImage1( idImage* image )
 	image->GenerateImage( ( byte* )data, JITTER_SIZE, JITTER_SIZE, TF_NEAREST, TR_REPEAT, TD_LOOKUP_TABLE_RGBA );
 }
 
+static void R_CreateRandom256Image( idImage* image )
+{
+	byte	data[256][256][4];
+
+	for( int i = 0 ; i < 256 ; i++ )
+	{
+		for( int j = 0 ; j < 256 ; j++ )
+		{
+			data[i][j][0] = rand();
+			data[i][j][1] = rand();
+			data[i][j][2] = rand();
+			data[i][j][3] = rand();
+		}
+	}
+
+	image->GenerateImage( ( byte* )data, 256, 256, TF_NEAREST, TR_REPEAT, TD_LOOKUP_TABLE_RGBA );
+}
+
+// RB
+static void R_CreateBlueNoise256Image( idImage* image )
+{
+	static byte	data[BLUENOISE_TEX_HEIGHT][BLUENOISE_TEX_WIDTH][4];
+
+	for( int x = 0; x < BLUENOISE_TEX_WIDTH; x++ )
+	{
+		for( int y = 0; y < BLUENOISE_TEX_HEIGHT; y++ )
+		{
+#if 1
+			data[x][y][0] = blueNoiseTexBytes[ y * BLUENOISE_TEX_PITCH + x * 3 + 0 ];
+			data[x][y][1] = blueNoiseTexBytes[ y * BLUENOISE_TEX_PITCH + x * 3 + 1 ];
+			data[x][y][2] = blueNoiseTexBytes[ y * BLUENOISE_TEX_PITCH + x * 3 + 2 ];
+#else
+			data[x][y][0] = blueNoiseTexBytes[ y * BLUENOISE_TEX_PITCH + x ];
+			data[x][y][1] = blueNoiseTexBytes[ y * BLUENOISE_TEX_PITCH + x ];
+			data[x][y][2] = blueNoiseTexBytes[ y * BLUENOISE_TEX_PITCH + x ];
+#endif
+			data[x][y][3] = 1;
+		}
+	}
+
+	image->GenerateImage( ( byte* )data, BLUENOISE_TEX_WIDTH, BLUENOISE_TEX_HEIGHT, TF_NEAREST, TR_REPEAT, TD_LOOKUP_TABLE_RGBA );
+}
+
+
+static void R_CreateHeatmap5ColorsImage( idImage* image )
+{
+	int		x, y;
+	byte	data[16][FALLOFF_TEXTURE_SIZE][4];
+
+	const int numColors = 5;
+	static idVec4 colors[numColors] = { colorBlue, colorCyan, colorGreen, colorYellow, colorRed };
+
+	memset( data, 0, sizeof( data ) );
+	for( x = 0 ; x < FALLOFF_TEXTURE_SIZE; x++ )
+	{
+		int index1, index2;
+
+		float value = x / ( float )FALLOFF_TEXTURE_SIZE;
+
+		float lerp = 0.0f;
+
+		if( value <= 0.0 )
+		{
+			index1 = index2 = 0;
+		}
+		else if( value >= 1.0f )
+		{
+			index1 = index2 = numColors - 1;
+		}
+		else
+		{
+			value = value * ( numColors - 1 );
+			index1 = idMath::Floor( value );
+			index2 = index1 + 1;
+			lerp = value - float( index1 );
+		}
+
+		idVec4 color( 0, 0, 0, 1 );
+
+		color.x = ( colors[index2].x - colors[index1].x ) * lerp + colors[index1].x;
+		color.y = ( colors[index2].y - colors[index1].y ) * lerp + colors[index1].y;
+		color.z = ( colors[index2].z - colors[index1].z ) * lerp + colors[index1].z;
+
+		for( y = 0 ; y < 16 ; y++ )
+		{
+			data[y][x][0] = color.x * 255;
+			data[y][x][1] = color.y * 255;
+			data[y][x][2] = color.z * 255;
+			data[y][x][3] = 255;
+		}
+	}
+
+	image->GenerateImage( ( byte* )data, FALLOFF_TEXTURE_SIZE, 16, TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_RGBA );
+}
+
+static void R_CreateHeatmap7ColorsImage( idImage* image )
+{
+	int		x, y;
+	byte	data[16][FALLOFF_TEXTURE_SIZE][4];
+
+	const int numColors = 7;
+	static idVec4 colors[numColors] = { colorBlack, colorBlue, colorCyan, colorGreen, colorYellow, colorRed, colorWhite };
+
+	memset( data, 0, sizeof( data ) );
+	for( x = 0 ; x < FALLOFF_TEXTURE_SIZE; x++ )
+	{
+		int index1, index2;
+
+		float value = x / ( float )FALLOFF_TEXTURE_SIZE;
+
+		float lerp = 0.0f;
+
+		if( value <= 0.0 )
+		{
+			index1 = index2 = 0;
+		}
+		else if( value >= 1.0f )
+		{
+			index1 = index2 = numColors - 1;
+		}
+		else
+		{
+			value = value * ( numColors - 1 );
+			index1 = idMath::Floor( value );
+			index2 = index1 + 1;
+			lerp = value - float( index1 );
+		}
+
+		idVec4 color( 0, 0, 0, 1 );
+
+		color.x = ( colors[index2].x - colors[index1].x ) * lerp + colors[index1].x;
+		color.y = ( colors[index2].y - colors[index1].y ) * lerp + colors[index1].y;
+		color.z = ( colors[index2].z - colors[index1].z ) * lerp + colors[index1].z;
+
+		for( y = 0 ; y < 16 ; y++ )
+		{
+			data[y][x][0] = color.x * 255;
+			data[y][x][1] = color.y * 255;
+			data[y][x][2] = color.z * 255;
+			data[y][x][3] = 255;
+		}
+	}
+
+	image->GenerateImage( ( byte* )data, FALLOFF_TEXTURE_SIZE, 16, TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_RGBA );
+}
+
 static void R_CreateGrainImage1( idImage* image )
 {
 	const static int GRAIN_SIZE = 128;
@@ -604,25 +864,99 @@ static void R_CreateGrainImage1( idImage* image )
 	image->GenerateImage( ( byte* )data, GRAIN_SIZE, GRAIN_SIZE, TF_NEAREST, TR_REPEAT, TD_LOOKUP_TABLE_RGBA );
 }
 
-static void R_CreateRandom256Image( idImage* image )
+static void R_CreateSMAAAreaImage( idImage* image )
 {
-	byte	data[256][256][4];
+	static byte	data[AREATEX_HEIGHT][AREATEX_WIDTH][4];
 
-	for( int i = 0 ; i < 256 ; i++ )
+	for( int x = 0; x < AREATEX_WIDTH; x++ )
 	{
-		for( int j = 0 ; j < 256 ; j++ )
+		for( int y = 0; y < AREATEX_HEIGHT; y++ )
 		{
-			data[i][j][0] = rand();
-			data[i][j][1] = rand();
-			data[i][j][2] = rand();
-			data[i][j][3] = rand();
+#if 0
+			data[AREATEX_HEIGHT - y][x][0] = areaTexBytes[ y * AREATEX_PITCH + x * 2 + 0 ];
+			data[AREATEX_HEIGHT - y][x][1] = areaTexBytes[ y * AREATEX_PITCH + x * 2 + 1 ];
+			data[AREATEX_HEIGHT - y][x][2] = 0;
+			data[AREATEX_HEIGHT - y][x][3] = 1;
+#else
+			data[y][x][0] = areaTexBytes[ y * AREATEX_PITCH + x * 2 + 0 ];
+			data[y][x][1] = areaTexBytes[ y * AREATEX_PITCH + x * 2 + 1 ];
+			data[y][x][2] = 0;
+			data[y][x][3] = 1;
+#endif
 		}
 	}
 
-	image->GenerateImage( ( byte* )data, 256, 256, TF_NEAREST, TR_REPEAT, TD_LOOKUP_TABLE_RGBA );
+	image->GenerateImage( ( byte* )data, AREATEX_WIDTH, AREATEX_HEIGHT, TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_RGBA );
 }
-#endif // #if !defined(USE_GLES3)
+
+static void R_CreateSMAASearchImage( idImage* image )
+{
+	static byte	data[SEARCHTEX_HEIGHT][SEARCHTEX_WIDTH][4];
+
+	for( int x = 0; x < SEARCHTEX_WIDTH; x++ )
+	{
+		for( int y = 0; y < SEARCHTEX_HEIGHT; y++ )
+		{
+#if 0
+			data[SEARCHTEX_HEIGHT - y][x][0] = searchTexBytes[ y * SEARCHTEX_PITCH + x ];
+			data[SEARCHTEX_HEIGHT - y][x][1] = 0;
+			data[SEARCHTEX_HEIGHT - y][x][2] = 0;
+			data[SEARCHTEX_HEIGHT - y][x][3] = 1;
+#else
+			data[y][x][0] = searchTexBytes[ y * SEARCHTEX_PITCH + x ];
+			data[y][x][1] = 0;
+			data[y][x][2] = 0;
+			data[y][x][3] = 1;
+#endif
+		}
+	}
+
+	image->GenerateImage( ( byte* )data, SEARCHTEX_WIDTH, SEARCHTEX_HEIGHT, TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_MONO );
+}
+
+static void R_CreateImGuiFontImage( idImage* image )
+{
+	//ImGuiIO& io = ImGui::GetIO();
+
+	//byte* pixels = NULL;
+	//int width, height;
+	//io.Fonts->GetTexDataAsRGBA32( &pixels, &width, &height ); // Load as RGBA 32-bits for OpenGL3 demo because it is more likely to be compatible with user's existing shader.
+
+	/*
+	glGenTextures( 1, &g_FontTexture );
+	glBindTexture( GL_TEXTURE_2D, g_FontTexture );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+	glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels );
+	*/
+
+	//image->GenerateImage( ( byte* )pixels, width, height, TF_LINEAR, TR_CLAMP, TD_LOOKUP_TABLE_RGBA );
+
+	// Store our identifier
+	//io.Fonts->TexID = ( void* )( intptr_t )image->GetImGuiTextureID();
+
+	// Cleanup (don't clear the input data if you want to append new fonts later)
+	//io.Fonts->ClearInputData();
+	//io.Fonts->ClearTexData();
+}
+
+static void R_CreateBrdfLutImage( idImage* image )
+{
+	image->GenerateImage( ( byte* )brfLutTexBytes, BRDFLUT_TEX_WIDTH, BRDFLUT_TEX_HEIGHT, TF_LINEAR, TR_CLAMP, TD_RG16F );
+}
+
+static void R_CreateEnvprobeImage_UAC_lobby_irradiance( idImage* image )
+{
+	image->GenerateImage( ( byte* )IMAGE_ENV_UAC_LOBBY_AMB_H_Bytes, IMAGE_ENV_UAC_LOBBY_AMB_H_TEX_WIDTH, IMAGE_ENV_UAC_LOBBY_AMB_H_TEX_HEIGHT, TF_DEFAULT, TR_CLAMP, TD_R11G11B10F, SAMPLE_1, CF_2D_PACKED_MIPCHAIN );
+}
+
+static void R_CreateEnvprobeImage_UAC_lobby_radiance( idImage* image )
+{
+	image->GenerateImage( ( byte* )IMAGE_ENV_UAC_LOBBY_SPEC_H_Bytes, IMAGE_ENV_UAC_LOBBY_SPEC_H_TEX_WIDTH, IMAGE_ENV_UAC_LOBBY_SPEC_H_TEX_HEIGHT, TF_DEFAULT, TR_CLAMP, TD_R11G11B10F, SAMPLE_1, CF_2D_PACKED_MIPCHAIN );
+}
+
 // RB end
+
 
 /*
 ================
@@ -635,6 +969,7 @@ void idImageManager::CreateIntrinsicImages()
 	defaultImage = ImageFromFunction( "_default", R_DefaultImage );
 	whiteImage = ImageFromFunction( "_white", R_WhiteImage );
 	blackImage = ImageFromFunction( "_black", R_BlackImage );
+	cyanImage = ImageFromFunction( "_cyan", R_CyanImage );
 	flatNormalMap = ImageFromFunction( "_flat", R_FlatNormalImage );
 	alphaNotchImage = ImageFromFunction( "_alphaNotch", R_AlphaNotchImage );
 	fogImage = ImageFromFunction( "_fog", R_FogImage );
@@ -646,9 +981,6 @@ void idImageManager::CreateIntrinsicImages()
 	// cinematicImage is used for cinematic drawing
 	cinematicImage = ImageFromFunction( "_cinematic", R_RGBA8Image );
 
-	grainImage1 = globalImages->ImageFromFunction( "_grain1", R_CreateGrainImage1 );
-
-#if !defined(USE_GLES3)
 	shadowImage[0] = ImageFromFunction( va( "_shadowMapArray0_%i", shadowMapResolutions[0] ), R_CreateShadowMapImage_Res0 );
 	shadowImage[1] = ImageFromFunction( va( "_shadowMapArray1_%i", shadowMapResolutions[1] ), R_CreateShadowMapImage_Res1 );
 	shadowImage[2] = ImageFromFunction( va( "_shadowMapArray2_%i", shadowMapResolutions[2] ), R_CreateShadowMapImage_Res2 );
@@ -660,15 +992,46 @@ void idImageManager::CreateIntrinsicImages()
 	jitterImage16 = globalImages->ImageFromFunction( "_jitter16", R_CreateJitterImage16 );
 
 	randomImage256 = globalImages->ImageFromFunction( "_random256", R_CreateRandom256Image );
+	blueNoiseImage256 = globalImages->ImageFromFunction( "_blueNoise256", R_CreateBlueNoise256Image );
 
 	currentRenderHDRImage = globalImages->ImageFromFunction( "_currentRenderHDR", R_HDR_RGBA16FImage_ResNative );
+#if defined(USE_HDR_MSAA)
 	currentRenderHDRImageNoMSAA = globalImages->ImageFromFunction( "_currentRenderHDRNoMSAA", R_HDR_RGBA16FImage_ResNative_NoMSAA );
+#endif
 	currentRenderHDRImageQuarter = globalImages->ImageFromFunction( "_currentRenderHDRQuarter", R_HDR_RGBA16FImage_ResQuarter );
 	currentRenderHDRImage64 = globalImages->ImageFromFunction( "_currentRenderHDR64", R_HDR_RGBA16FImage_Res64 );
 
-	bloomRender[0] = globalImages->ImageFromFunction( "_bloomRender0", R_HDR_RGBA16FImage_ResQuarter_Linear );
-	bloomRender[1] = globalImages->ImageFromFunction( "_bloomRender1", R_HDR_RGBA16FImage_ResQuarter_Linear );
-#endif
+	envprobeHDRImage = globalImages->ImageFromFunction( "_envprobeHDR", R_EnvprobeImage_HDR );
+	envprobeDepthImage = ImageFromFunction( "_envprobeDepth", R_EnvprobeImage_Depth );
+
+	bloomRenderImage[0] = globalImages->ImageFromFunction( "_bloomRender0", R_HDR_RGBA16FImage_ResQuarter_Linear );
+	bloomRenderImage[1] = globalImages->ImageFromFunction( "_bloomRender1", R_HDR_RGBA16FImage_ResQuarter_Linear );
+
+	heatmap5Image = ImageFromFunction( "_heatmap5", R_CreateHeatmap5ColorsImage );
+	heatmap7Image = ImageFromFunction( "_heatmap7", R_CreateHeatmap7ColorsImage );
+
+	grainImage1 = globalImages->ImageFromFunction( "_grain1", R_CreateGrainImage1 );
+
+	smaaInputImage = ImageFromFunction( "_smaaInput", R_RGBA8LinearImage );
+
+	smaaAreaImage = globalImages->ImageFromFunction( "_smaaArea", R_CreateSMAAAreaImage );
+	smaaSearchImage = globalImages->ImageFromFunction( "_smaaSearch", R_CreateSMAASearchImage );
+
+	smaaEdgesImage = globalImages->ImageFromFunction( "_smaaEdges", R_SMAAImage_ResNative );
+	smaaBlendImage = globalImages->ImageFromFunction( "_smaaBlend", R_SMAAImage_ResNative );
+
+	currentNormalsImage = ImageFromFunction( "_currentNormals", R_GeometryBufferImage_ResNative );
+
+	ambientOcclusionImage[0] = ImageFromFunction( "_ao0", R_SMAAImage_ResNative );
+	ambientOcclusionImage[1] = ImageFromFunction( "_ao1", R_SMAAImage_ResNative );
+
+	hierarchicalZbufferImage = ImageFromFunction( "_cszBuffer", R_HierarchicalZBufferImage_ResNative );
+
+	imguiFontImage = ImageFromFunction( "_imguiFont", R_CreateImGuiFontImage );
+
+	chromeSpecImage = ImageFromFunction( "_chromeSpec", R_ChromeSpecImage );
+	plasticSpecImage = ImageFromFunction( "_plasticSpec", R_PlasticSpecImage );
+	brdfLutImage = ImageFromFunction( "_brdfLut", R_CreateBrdfLutImage );
 	// RB end
 
 	// scratchImage is used for screen wipes/doublevision etc..
@@ -684,6 +1047,16 @@ void idImageManager::CreateIntrinsicImages()
 
 	loadingIconImage = ImageFromFile( "textures/loadingicon2", TF_DEFAULT, TR_CLAMP, TD_DEFAULT, CF_2D );
 	hellLoadingIconImage = ImageFromFile( "textures/loadingicon3", TF_DEFAULT, TR_CLAMP, TD_DEFAULT, CF_2D );
+
+	// RB begin
+#if 0
+	defaultUACIrradianceCube = ImageFromFile( "env/UAC5_amb", TF_DEFAULT, TR_CLAMP, TD_R11G11B10F, CF_2D_PACKED_MIPCHAIN );
+	defaultUACRadianceCube = ImageFromFile( "env/UAC5_spec", TF_DEFAULT, TR_CLAMP, TD_R11G11B10F, CF_2D_PACKED_MIPCHAIN );
+#else
+	defaultUACIrradianceCube = ImageFromFunction( "_defaultUACIrradiance", R_CreateEnvprobeImage_UAC_lobby_irradiance );
+	defaultUACRadianceCube = ImageFromFunction( "_defaultUACRadiance", R_CreateEnvprobeImage_UAC_lobby_radiance );
+#endif
+	// RB end
 
 	release_assert( loadingIconImage->referencedOutsideLevelLoad );
 	release_assert( hellLoadingIconImage->referencedOutsideLevelLoad );

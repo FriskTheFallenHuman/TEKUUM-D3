@@ -1,0 +1,56 @@
+!!ARBvp1.0
+OPTION ARB_position_invariant ;
+
+# pass screen aligned texture coordinates
+MOV	result.texcoord[0], vertex.texcoord[0];
+
+END;
+
+
+!!ARBfp1.0 
+#OPTION ARB_precision_hint_fastest;		# we want full precision in this one
+
+# texture 0 is the near depth texture, set as a luminance texture
+# texture 1 is the far depth texture, set as a luminance texture
+# writes result.depth.z as the midpoint of the two
+
+TEMP	R0, R1;
+
+PARAM	pointFive = { 0.5 };
+
+TEX		R0, fragment.texcoord[0], texture[0], 2D;
+MUL		R0.x, R0, pointFive;
+TEX		R1, fragment.texcoord[0], texture[1], 2D;
+MAD		result.depth.z, R1.x, pointFive.x, R0.x;
+
+#MAD		result.color, R1, pointFive, R0;	# testing
+
+END;
+!!ARBvp1.0
+OPTION ARB_position_invariant ;
+
+# pass screen aligned texture coordinates
+MOV	result.texcoord[0], vertex.texcoord[0];
+
+END;
+
+
+!!ARBfp1.0 
+#OPTION ARB_precision_hint_fastest;		# we want full precision in this one
+
+# texture 0 is the near depth texture, set as a luminance texture
+# texture 1 is the far depth texture, set as a luminance texture
+# writes result.depth.z as the midpoint of the two
+
+TEMP	R0, R1;
+
+PARAM	pointFive = { 0.5 };
+
+TEX		R0, fragment.texcoord[0], texture[0], 2D;
+MUL		R0.x, R0, pointFive;
+TEX		R1, fragment.texcoord[0], texture[1], 2D;
+MAD		result.depth.z, R1.x, pointFive.x, R0.x;
+
+#MAD		result.color, R1, pointFive, R0;	# testing
+
+END;

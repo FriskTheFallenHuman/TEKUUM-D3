@@ -3,7 +3,8 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013 Robert Beckebans
+Copyright (C) 2014-2016 Robert Beckebans
+Copyright (C) 2014-2016 Kot in Action Creative Artel
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -31,7 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 
-#include "tr_local.h"
+#include "RenderCommon.h"
 
 /*
 
@@ -71,18 +72,9 @@ typedef struct mtrParsingData_s
 	bool			forceOverlays;
 } mtrParsingData_t;
 
+extern idCVar r_useHighQualitySky;
+
 idCVar r_forceSoundOpAmplitude( "r_forceSoundOpAmplitude", "0", CVAR_FLOAT, "Don't call into the sound system for amplitudes" );
-
-// RB begin
-#if defined(__ANDROID__)
-	idCVar binaryLoadMaterials( "binaryLoadMaterials", "0", 0, "enable binary load/write of material decls" );
-#else
-	idCVar binaryLoadMaterials( "binaryLoadMaterials", "0", 0, "enable binary load/write of material decls" );
-#endif
-
-static const byte BMTR_VERSION = 101;
-static const unsigned int BMTR_MAGIC = ( 'B' << 24 ) | ( 'M' << 16 ) | ( 'R' << 8 ) | BMTR_VERSION;
-// RB end
 
 /*
 =============
@@ -120,6 +112,7 @@ void idMaterial::CommonInit()
 	hasSubview = false;
 	allowOverlays = true;
 	unsmoothedTangents = false;
+	mikktspace = false; // RB
 	gui = NULL;
 	memset( deformRegisters, 0, sizeof( deformRegisters ) );
 	editorAlpha = 1.0;
@@ -265,6 +258,24 @@ idImage* idMaterial::GetEditorImage() const
 	return editorImage;
 }
 
+// RB - just look for first stage and fallback to editor image like D3Radiant does
+idImage* idMaterial::GetLightEditorImage() const
+{
+	if( numStages && stages )
+	{
+		for( int i = 0; i < numStages; i++ )
+		{
+			idImage* image = stages[i].texture.image;
+			if( image )
+			{
+				return image;
+			}
+		}
+	}
+
+	return GetEditorImage();
+}
+// RB end
 
 // info parms
 typedef struct
@@ -368,7 +379,7 @@ idMaterial::MatchToken
 Sets defaultShader and returns false if the next token doesn't match
 ===============
 */
-bool idMaterial::MatchToken( idTokenParser& src, const char* match )
+bool idMaterial::MatchToken( idLexer& src, const char* match )
 {
 	if( !src.ExpectTokenString( match ) )
 	{
@@ -383,7 +394,7 @@ bool idMaterial::MatchToken( idTokenParser& src, const char* match )
 idMaterial::ParseSort
 =================
 */
-void idMaterial::ParseSort( idTokenParser& src )
+void idMaterial::ParseSort( idLexer& src )
 {
 	idToken token;
 
@@ -445,7 +456,7 @@ void idMaterial::ParseSort( idTokenParser& src )
 idMaterial::ParseStereoEye
 =================
 */
-void idMaterial::ParseStereoEye( idTokenParser& src )
+void idMaterial::ParseStereoEye( idLexer& src )
 {
 	idToken token;
 
@@ -475,7 +486,7 @@ void idMaterial::ParseStereoEye( idTokenParser& src )
 idMaterial::ParseDecalInfo
 =================
 */
-void idMaterial::ParseDecalInfo( idTokenParser& src )
+void idMaterial::ParseDecalInfo( idLexer& src )
 {
 	idToken token;
 
@@ -618,7 +629,7 @@ int idMaterial::EmitOp( int a, int b, expOpType_t opType )
 idMaterial::ParseEmitOp
 =================
 */
-int idMaterial::ParseEmitOp( idTokenParser& src, int a, expOpType_t opType, int priority )
+int idMaterial::ParseEmitOp( idLexer& src, int a, expOpType_t opType, int priority )
 {
 	int		b;
 
@@ -633,7 +644,7 @@ idMaterial::ParseTerm
 Returns a register index
 =================
 */
-int idMaterial::ParseTerm( idTokenParser& src )
+int idMaterial::ParseTerm( idLexer& src )
 {
 	idToken token;
 	int		a, b;
@@ -808,7 +819,7 @@ Returns a register index
 =================
 */
 #define	TOP_PRIORITY 4
-int idMaterial::ParseExpressionPriority( idTokenParser& src, int priority )
+int idMaterial::ParseExpressionPriority( idLexer& src, int priority )
 {
 	idToken token;
 	int		a;
@@ -900,7 +911,7 @@ idMaterial::ParseExpression
 Returns a register index
 =================
 */
-int idMaterial::ParseExpression( idTokenParser& src )
+int idMaterial::ParseExpression( idLexer& src )
 {
 	return ParseExpressionPriority( src, TOP_PRIORITY );
 }
@@ -1023,7 +1034,7 @@ int idMaterial::NameToDstBlendMode( const idStr& name )
 idMaterial::ParseBlend
 ================
 */
-void idMaterial::ParseBlend( idTokenParser& src, shaderStage_t* stage )
+void idMaterial::ParseBlend( idLexer& src, shaderStage_t* stage )
 {
 	idToken token;
 	int		srcBlend, dstBlend;
@@ -1055,17 +1066,17 @@ void idMaterial::ParseBlend( idTokenParser& src, shaderStage_t* stage )
 		stage->drawStateBits = GLS_SRCBLEND_ZERO | GLS_DSTBLEND_ONE;
 		return;
 	}
-	if( !token.Icmp( "bumpmap" ) )
+	if( !token.Icmp( "bumpmap" ) || !token.Icmp( "normalmap" ) )
 	{
 		stage->lighting = SL_BUMP;
 		return;
 	}
-	if( !token.Icmp( "diffusemap" ) )
+	if( !token.Icmp( "diffusemap" ) || !token.Icmp( "basecolormap" ) )
 	{
 		stage->lighting = SL_DIFFUSE;
 		return;
 	}
-	if( !token.Icmp( "specularmap" ) )
+	if( !token.Icmp( "specularmap" ) ||  !token.Icmp( "rmaomap" ) )
 	{
 		stage->lighting = SL_SPECULAR;
 		return;
@@ -1092,7 +1103,7 @@ If there are two values, 3 = 0.0, 4 = 1.0
 if there are three values, 4 = 1.0
 ================
 */
-void idMaterial::ParseVertexParm( idTokenParser& src, newShaderStage_t* newStage )
+void idMaterial::ParseVertexParm( idLexer& src, newShaderStage_t* newStage )
 {
 	idToken				token;
 
@@ -1147,7 +1158,7 @@ void idMaterial::ParseVertexParm( idTokenParser& src, newShaderStage_t* newStage
 idMaterial::ParseVertexParm2
 ================
 */
-void idMaterial::ParseVertexParm2( idTokenParser& src, newShaderStage_t* newStage )
+void idMaterial::ParseVertexParm2( idLexer& src, newShaderStage_t* newStage )
 {
 	idToken	token;
 	src.ReadTokenOnLine( &token );
@@ -1179,7 +1190,7 @@ void idMaterial::ParseVertexParm2( idTokenParser& src, newShaderStage_t* newStag
 idMaterial::ParseFragmentMap
 ================
 */
-void idMaterial::ParseFragmentMap( idTokenParser& src, newShaderStage_t* newStage )
+void idMaterial::ParseFragmentMap( idLexer& src, newShaderStage_t* newStage )
 {
 	const char*			str;
 	textureFilter_t		tf;
@@ -1217,6 +1228,11 @@ void idMaterial::ParseFragmentMap( idTokenParser& src, newShaderStage_t* newStag
 	{
 		src.ReadTokenOnLine( &token );
 
+		if( !token.Icmp( "normalMap" ) )
+		{
+			td = TD_BUMP;
+			continue;
+		}
 		if( !token.Icmp( "cubeMap" ) )
 		{
 			cubeMap = CF_NATIVE;
@@ -1349,7 +1365,7 @@ An open brace has been parsed
 
 =================
 */
-void idMaterial::ParseStage( idTokenParser& src, const textureRepeat_t trpDefault )
+void idMaterial::ParseStage( idLexer& src, const textureRepeat_t trpDefault )
 {
 	idToken				token;
 	const char*			str;
@@ -1560,8 +1576,16 @@ void idMaterial::ParseStage( idTokenParser& src, const textureRepeat_t trpDefaul
 		{
 			continue;
 		}
-		if( !token.Icmp( "uncompressed" ) )
+		if( !token.Icmp( "uncompressedCubeMap" ) )
 		{
+			if( r_useHighQualitySky.GetBool() )
+			{
+				td = TD_HIGHQUALITY_CUBE;	// motorsep 05-17-2015; token to mark cubemap/skybox to be uncompressed texture
+			}
+			else
+			{
+				td = TD_LOWQUALITY_CUBE;
+			}
 			continue;
 		}
 		if( !token.Icmp( "nopicmip" ) )
@@ -1832,8 +1856,8 @@ void idMaterial::ParseStage( idTokenParser& src, const textureRepeat_t trpDefaul
 		{
 			if( src.ReadTokenOnLine( &token ) )
 			{
-				newStage.vertexProgram = renderProgManager.FindVertexShader( token.c_str() );
-				newStage.fragmentProgram = renderProgManager.FindFragmentShader( token.c_str() );
+				newStage.vertexProgram = renderProgManager.FindShader( token.c_str(), SHADER_STAGE_VERTEX, "", 0, false );
+				newStage.fragmentProgram = renderProgManager.FindShader( token.c_str(), SHADER_STAGE_FRAGMENT, "", 0, false );
 			}
 			continue;
 		}
@@ -1841,7 +1865,7 @@ void idMaterial::ParseStage( idTokenParser& src, const textureRepeat_t trpDefaul
 		{
 			if( src.ReadTokenOnLine( &token ) )
 			{
-				newStage.fragmentProgram = renderProgManager.FindFragmentShader( token.c_str() );
+				newStage.fragmentProgram = renderProgManager.FindShader( token.c_str(), SHADER_STAGE_FRAGMENT, "", 0, false );
 			}
 			continue;
 		}
@@ -1849,7 +1873,7 @@ void idMaterial::ParseStage( idTokenParser& src, const textureRepeat_t trpDefaul
 		{
 			if( src.ReadTokenOnLine( &token ) )
 			{
-				newStage.vertexProgram = renderProgManager.FindVertexShader( token.c_str() );
+				newStage.vertexProgram = renderProgManager.FindShader( token.c_str(), SHADER_STAGE_VERTEX, "", 0, false );
 			}
 			continue;
 		}
@@ -1883,7 +1907,7 @@ void idMaterial::ParseStage( idTokenParser& src, const textureRepeat_t trpDefaul
 	if( newStage.fragmentProgram || newStage.vertexProgram )
 	{
 		newStage.glslProgram = renderProgManager.FindGLSLProgram( GetName(), newStage.vertexProgram, newStage.fragmentProgram );
-		ss->newStage = new newShaderStage_t;
+		ss->newStage = ( newShaderStage_t* )Mem_Alloc( sizeof( newStage ) );
 		*( ss->newStage ) = newStage;
 	}
 
@@ -1902,7 +1926,18 @@ void idMaterial::ParseStage( idTokenParser& src, const textureRepeat_t trpDefaul
 				td = TD_DIFFUSE;
 				break;
 			case SL_SPECULAR:
-				td = TD_SPECULAR;
+				if( idStr::FindText( imageName, "_rmaod", false ) != -1 )
+				{
+					td = TD_SPECULAR_PBR_RMAOD;
+				}
+				else if( idStr::FindText( imageName, "_rmao", false ) != -1 )
+				{
+					td = TD_SPECULAR_PBR_RMAO;
+				}
+				else
+				{
+					td = TD_SPECULAR;
+				}
 				break;
 			default:
 				break;
@@ -1915,10 +1950,13 @@ void idMaterial::ParseStage( idTokenParser& src, const textureRepeat_t trpDefaul
 		// create new coverage stage
 		shaderStage_t* newCoverageStage = &pd->parseStages[numStages];
 		numStages++;
+
 		// copy it
 		*newCoverageStage = *ss;
+
 		// toggle alphatest off for the current stage so it doesn't get called during the depth fill pass
 		ss->hasAlphaTest = false;
+
 		// toggle alpha test on for the coverage stage
 		newCoverageStage->hasAlphaTest = true;
 		newCoverageStage->lighting = SL_COVERAGE;
@@ -1961,7 +1999,7 @@ void idMaterial::ParseStage( idTokenParser& src, const textureRepeat_t trpDefaul
 idMaterial::ParseDeform
 ===============
 */
-void idMaterial::ParseDeform( idTokenParser& src )
+void idMaterial::ParseDeform( idLexer& src )
 {
 	idToken token;
 
@@ -2115,13 +2153,7 @@ void idMaterial::AddImplicitStages( const textureRepeat_t trpDefault /* = TR_REP
 		idStr::snPrintf( buffer, sizeof( buffer ), "blend bumpmap\nmap _flat\n}\n" );
 		newSrc.LoadMemory( buffer, strlen( buffer ), "bumpmap" );
 		newSrc.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
-
-		// RB begin
-		idTokenParser newSrc2;
-		newSrc2.LoadFromLexer( newSrc, "temp" );
-		newSrc2.StartParsing( "temp" );
-		ParseStage( newSrc2, trpDefault );
-		// RB end
+		ParseStage( newSrc, trpDefault );
 		newSrc.FreeSource();
 	}
 
@@ -2130,13 +2162,7 @@ void idMaterial::AddImplicitStages( const textureRepeat_t trpDefault /* = TR_REP
 		idStr::snPrintf( buffer, sizeof( buffer ), "blend diffusemap\nmap _white\n}\n" );
 		newSrc.LoadMemory( buffer, strlen( buffer ), "diffusemap" );
 		newSrc.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
-
-		// RB begin
-		idTokenParser newSrc2;
-		newSrc2.LoadFromLexer( newSrc, "temp" );
-		newSrc2.StartParsing( "temp" );
-		ParseStage( newSrc2, trpDefault );
-		// RB end
+		ParseStage( newSrc, trpDefault );
 		newSrc.FreeSource();
 	}
 
@@ -2204,7 +2230,7 @@ Parse it into the global material variable. Later functions will optimize it.
 If there is any error during parsing, defaultShader will be set.
 =================
 */
-void idMaterial::ParseMaterial( idTokenParser& src )
+void idMaterial::ParseMaterial( idLexer& src )
 {
 	idToken		token;
 	int			s;
@@ -2280,7 +2306,7 @@ void idMaterial::ParseMaterial( idTokenParser& src )
 		// noshadow
 		else if( !token.Icmp( "noShadows" ) )
 		{
-			//SetMaterialFlag( MF_NOSHADOWS );
+			SetMaterialFlag( MF_NOSHADOWS );
 			continue;
 		}
 		else if( !token.Icmp( "suppressInSubview" ) )
@@ -2361,7 +2387,10 @@ void idMaterial::ParseMaterial( idTokenParser& src )
 			// volume would be coplanar with the surface, giving depth fighting
 			// we could make this no-self-shadows, but it may be more important
 			// to receive shadows from no-self-shadow monsters
-			//SetMaterialFlag( MF_NOSHADOWS );
+			if( !r_useShadowMapping.GetBool() ) // motorsep 11-08-2014; when shadow mapping is on, we allow two-sided surfaces to cast shadows
+			{
+				SetMaterialFlag( MF_NOSHADOWS );
+			}
 		}
 		// backSided
 		else if( !token.Icmp( "backSided" ) )
@@ -2369,7 +2398,7 @@ void idMaterial::ParseMaterial( idTokenParser& src )
 			cullType = CT_BACK_SIDED;
 			// the shadow code doesn't handle this, so just disable shadows.
 			// We could fix this in the future if there was a need.
-			//SetMaterialFlag( MF_NOSHADOWS );
+			SetMaterialFlag( MF_NOSHADOWS );
 		}
 		// foglight
 		else if( !token.Icmp( "fogLight" ) )
@@ -2406,6 +2435,18 @@ void idMaterial::ParseMaterial( idTokenParser& src )
 		else if( !token.Icmp( "unsmoothedTangents" ) )
 		{
 			unsmoothedTangents = true;
+			continue;
+		}
+		else if( !token.Icmp( "origin" ) )
+		{
+			SetMaterialFlag( MF_ORIGIN );
+			contentFlags = CONTENTS_ORIGIN;
+			continue;
+		}
+		// RB: mikktspace
+		else if( !token.Icmp( "mikktspace" ) )
+		{
+			mikktspace = true;
 			continue;
 		}
 		// lightFallofImage <imageprogram>
@@ -2481,20 +2522,13 @@ void idMaterial::ParseMaterial( idTokenParser& src )
 			continue;
 		}
 		// diffusemap for stage shortcut
-		else if( !token.Icmp( "diffusemap" ) )
+		else if( !token.Icmp( "diffusemap" ) || !token.Icmp( "basecolormap" ) )
 		{
 			str = R_ParsePastImageProgram( src );
 			idStr::snPrintf( buffer, sizeof( buffer ), "blend diffusemap\nmap %s\n}\n", str );
 			newSrc.LoadMemory( buffer, strlen( buffer ), "diffusemap" );
 			newSrc.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
-
-			// RB begin
-			idTokenParser newSrc2;
-			newSrc2.LoadFromLexer( newSrc, "temp" );
-			newSrc2.StartParsing( "temp" );
-			ParseStage( newSrc2, trpDefault );
-			// RB end
-
+			ParseStage( newSrc, trpDefault );
 			newSrc.FreeSource();
 			continue;
 		}
@@ -2505,32 +2539,29 @@ void idMaterial::ParseMaterial( idTokenParser& src )
 			idStr::snPrintf( buffer, sizeof( buffer ), "blend specularmap\nmap %s\n}\n", str );
 			newSrc.LoadMemory( buffer, strlen( buffer ), "specularmap" );
 			newSrc.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
-
-			// RB begin
-			idTokenParser newSrc2;
-			newSrc2.LoadFromLexer( newSrc, "temp" );
-			newSrc2.StartParsing( "temp" );
-			ParseStage( newSrc2, trpDefault );
-			// RB end
-
+			ParseStage( newSrc, trpDefault );
+			newSrc.FreeSource();
+			continue;
+		}
+		// RB: rmaomap for stage shortcut
+		else if( !token.Icmp( "rmaomap" ) || !token.Icmp( "reflectionmap" )  || !token.Icmp( "pbrmap" ) )
+		{
+			str = R_ParsePastImageProgram( src );
+			idStr::snPrintf( buffer, sizeof( buffer ), "blend rmaomap\nmap %s\n}\n", str );
+			newSrc.LoadMemory( buffer, strlen( buffer ), "rmaomap" );
+			newSrc.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
+			ParseStage( newSrc, trpDefault );
 			newSrc.FreeSource();
 			continue;
 		}
 		// normalmap for stage shortcut
-		else if( !token.Icmp( "bumpmap" ) )
+		else if( !token.Icmp( "bumpmap" ) || !token.Icmp( "normalmap" ) )
 		{
 			str = R_ParsePastImageProgram( src );
 			idStr::snPrintf( buffer, sizeof( buffer ), "blend bumpmap\nmap %s\n}\n", str );
 			newSrc.LoadMemory( buffer, strlen( buffer ), "bumpmap" );
 			newSrc.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
-
-			// RB begin
-			idTokenParser newSrc2;
-			newSrc2.LoadFromLexer( newSrc, "temp" );
-			newSrc2.StartParsing( "temp" );
-			ParseStage( newSrc2, trpDefault );
-			// RB end
-
+			ParseStage( newSrc, trpDefault );
 			newSrc.FreeSource();
 			continue;
 		}
@@ -2550,6 +2581,33 @@ void idMaterial::ParseMaterial( idTokenParser& src )
 
 			// noShadows
 			SetMaterialFlag( MF_NOSHADOWS );
+			continue;
+		}
+
+		// motorsep 11-23-2014; material LOD keys that define what LOD iteration the surface falls into
+		else if( !token.Icmp( "lod1" ) )
+		{
+			SetMaterialFlag( MF_LOD1 );
+			continue;
+		}
+		else if( !token.Icmp( "lod2" ) )
+		{
+			SetMaterialFlag( MF_LOD2 );
+			continue;
+		}
+		else if( !token.Icmp( "lod3" ) )
+		{
+			SetMaterialFlag( MF_LOD3 );
+			continue;
+		}
+		else if( !token.Icmp( "lod4" ) )
+		{
+			SetMaterialFlag( MF_LOD4 );
+			continue;
+		}
+		else if( !token.Icmp( "persistentLOD" ) )
+		{
+			SetMaterialFlag( MF_LOD_PERSISTENT );
 			continue;
 		}
 		else if( token == "{" )
@@ -2633,42 +2691,6 @@ Parses the current material definition and finds all necessary images.
 */
 bool idMaterial::Parse( const char* text, const int textLength, bool allowBinaryVersion )
 {
-	// RB begin
-	idTokenParser bsrc;
-
-	unsigned int magic = 0;
-	unsigned int sourceChecksum = 0;
-	unsigned int loadedChecksum = 0;
-	idStrStatic< MAX_OSPATH > generatedFileName;
-	bool loadedFromBinary = false;
-	if( allowBinaryVersion && binaryLoadMaterials.GetBool() )
-	{
-		// Try to load the generated version of it
-		// If successful,
-		// - Create an MD5 of the hash of the source
-		// - Load the MD5 of the generated, if they differ, create a new generated
-		generatedFileName = "generated/materials/";
-		generatedFileName.AppendPath( GetName() );
-		generatedFileName.SetFileExtension( ".bmtr" );
-
-		idFileLocal file( fileSystem->OpenFileReadMemory( generatedFileName ) );
-		sourceChecksum = MD5_BlockChecksum( text, textLength );
-
-		if( file != NULL )
-		{
-			file->ReadBig( magic );
-			file->ReadBig( loadedChecksum );
-
-			if( ( magic == BMTR_MAGIC ) && ( sourceChecksum == loadedChecksum ) )
-			{
-				bsrc.LoadFromFile( file );
-
-				loadedFromBinary = true;
-			}
-		}
-	}
-	// RB end
-
 	idLexer	src;
 	idToken	token;
 	mtrParsingData_t parsingData;
@@ -2677,28 +2699,15 @@ bool idMaterial::Parse( const char* text, const int textLength, bool allowBinary
 	src.SetFlags( DECL_LEXER_FLAGS );
 	src.SkipUntilString( "{" );
 
-	if( magic != BMTR_MAGIC || sourceChecksum != loadedChecksum || !bsrc.IsLoaded() || !bsrc.StartParsing( GetName() ) )
-	{
-		loadedFromBinary = false;
-
-		bsrc.LoadFromLexer( src, GetName() );
-	}
-
 	// reset to the unparsed state
 	CommonInit();
 
-	// RB: replaced memset
-#if defined(USE_EXTENDED_BINARY_MATERIALS)
-	parsingData.Clear();
-#else
 	memset( &parsingData, 0, sizeof( parsingData ) );
-#endif
-	// RB end
 
 	pd = &parsingData;	// this is only valid during parse
 
 	// parse it
-	ParseMaterial( bsrc );
+	ParseMaterial( src );
 
 	// if we are doing an fs_copyfiles, also reference the editorImage
 	if( cvarSystem->GetCVarInteger( "fs_copyFiles" ) )
@@ -2770,7 +2779,7 @@ bool idMaterial::Parse( const char* text, const int textLength, bool allowBinary
 	// translucent automatically implies noshadows
 	if( coverage == MC_TRANSLUCENT )
 	{
-		//SetMaterialFlag( MF_NOSHADOWS );
+		SetMaterialFlag( MF_NOSHADOWS );
 	}
 	else
 	{
@@ -2781,7 +2790,7 @@ bool idMaterial::Parse( const char* text, const int textLength, bool allowBinary
 	// if we are translucent, draw with an alpha in the editor
 	if( coverage == MC_TRANSLUCENT )
 	{
-		editorAlpha = 0.25;
+		editorAlpha = 0.5;
 	}
 	else
 	{
@@ -2816,9 +2825,7 @@ bool idMaterial::Parse( const char* text, const int textLength, bool allowBinary
 			if( sort != SS_PORTAL_SKY )
 			{
 				sort = SS_POST_PROCESS;
-				// RB: we want post process shaders that operate on opaque surfaces
-				//coverage = MC_TRANSLUCENT;
-				// RB end
+				coverage = MC_TRANSLUCENT;
 			}
 			break;
 		}
@@ -2831,9 +2838,7 @@ bool idMaterial::Parse( const char* text, const int textLength, bool allowBinary
 					if( sort != SS_PORTAL_SKY )
 					{
 						sort = SS_POST_PROCESS;
-						// RB: we want post process shaders that operate on opaque surfaces
-						//coverage = MC_TRANSLUCENT;
-						// RB end
+						coverage = MC_TRANSLUCENT;
 					}
 					i = numStages;
 					break;
@@ -2906,10 +2911,7 @@ bool idMaterial::Parse( const char* text, const int textLength, bool allowBinary
 
 	if( numStages )
 	{
-		// RB begin
 		stages = ( shaderStage_t* )R_StaticAlloc( numStages * sizeof( stages[0] ) );
-		//stages = new shaderStage_t[numStages];
-		// RB end
 		memcpy( stages, pd->parseStages, numStages * sizeof( stages[0] ) );
 	}
 
@@ -2940,22 +2942,6 @@ bool idMaterial::Parse( const char* text, const int textLength, bool allowBinary
 		MakeDefault();
 		return false;
 	}
-
-	// RB begin
-	if( allowBinaryVersion && binaryLoadMaterials.GetBool() && !loadedFromBinary )
-	{
-		idLib::Printf( "Writing %s\n", generatedFileName.c_str() );
-
-		idFileLocal outputFile( fileSystem->OpenFileWrite( generatedFileName, "fs_basepath" ) );
-
-		outputFile->WriteBig( BMTR_MAGIC );
-		outputFile->WriteBig( sourceChecksum );
-		bsrc.WriteToFile( outputFile );
-
-		//WriteBinary( outputFile, sourceChecksum );
-	}
-	// RB end
-
 	return true;
 }
 
@@ -3221,11 +3207,6 @@ idMaterial::UpdateCinematic
 */
 void idMaterial::UpdateCinematic( int time ) const
 {
-	if( !stages || !stages[0].texture.cinematic || !backEnd.viewDef )
-	{
-		return;
-	}
-	stages[0].texture.cinematic->ImageForTime( tr.primaryRenderView.time[0] );
 }
 
 /*
@@ -3269,7 +3250,6 @@ idMaterial::GetCinematicStartTime
 */
 int idMaterial::GetCinematicStartTime() const
 {
-#if 0
 	for( int i = 0; i < numStages; i++ )
 	{
 		if( stages[i].texture.cinematic )
@@ -3278,10 +3258,19 @@ int idMaterial::GetCinematicStartTime() const
 		}
 	}
 	return -1;
-#else
-	return -1;
-#endif
 }
+
+// RB: added because we can't rely on the FFmpeg feedback how long a video really is
+bool idMaterial::CinematicIsPlaying() const
+{
+	if( !stages || !stages[0].texture.cinematic )
+	{
+		return 0;
+	}
+
+	return stages[0].texture.cinematic->IsPlaying();
+}
+// RB end
 
 /*
 ==================
@@ -3355,16 +3344,38 @@ bool idMaterial::SetDefaultText()
 	if( 1 )    //fileSystem->ReadFile( GetName(), NULL ) != -1 ) {
 	{
 		char generated[2048];
-		idStr::snPrintf( generated, sizeof( generated ),
-						 "material %s // IMPLICITLY GENERATED\n"
-						 "{\n"
-						 "{\n"
-						 "blend blend\n"
-						 "colored\n"
-						 "map \"%s\"\n"
-						 "clamp\n"
-						 "}\n"
-						 "}\n", GetName(), GetName() );
+
+		// RB: HACK super hack for light editor 2D rendering
+		idStr matName = GetName();
+		if( matName.IcmpPrefix( "lighteditor/" ) == 0 )
+		{
+			idStr imageName = GetName();
+			imageName.StripLeading( "lighteditor/" );
+
+			idStr::snPrintf( generated, sizeof( generated ),
+							 "material %s // IMPLICITLY GENERATED\n"
+							 "{\n"
+							 "{\n"
+							 "blend blend\n"
+							 "colored\n"
+							 "map \"%s\"\n"
+							 "clamp\n"
+							 "}\n"
+							 "}\n", matName.c_str(), imageName.c_str() );
+		}
+		else
+		{
+			idStr::snPrintf( generated, sizeof( generated ),
+							 "material %s // IMPLICITLY GENERATED\n"
+							 "{\n"
+							 "{\n"
+							 "blend blend\n"
+							 "colored\n"
+							 "map \"%s\"\n"
+							 "clamp\n"
+							 "}\n"
+							 "}\n", GetName(), GetName() );
+		}
 		SetText( generated );
 		return true;
 	}

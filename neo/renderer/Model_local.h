@@ -1,25 +1,26 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Doom 3 BFG Edition GPL Source Code
+Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2012-2021 Robert Beckebans
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
+Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
+Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
+along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
+In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
 
 If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
@@ -39,9 +40,8 @@ If you have questions concerning this license or the applicable additional terms
 
 class idJointMat;
 struct deformInfo_t;
-// RB begin
-class ColladaParser;
-// RB end
+class ColladaParser;	// RB: Collada support
+struct objModel_t;		// RB: Wavefront OBJ support
 
 class idRenderModelStatic : public idRenderModel
 {
@@ -61,7 +61,7 @@ public:
 	}
 
 	// RB begin
-	virtual void				ExportOBJ( idFile* file, ID_TIME_T* _timeStamp = NULL ) const;
+	virtual void				ExportOBJ( idFile* objFile, idFile* mtlFile, ID_TIME_T* _timeStamp = NULL );
 	// RB end
 
 	virtual void				PartialInitFromFile( const char* fileName );
@@ -74,10 +74,7 @@ public:
 	virtual void				TouchData();
 	virtual void				InitEmpty( const char* name );
 	virtual void				AddSurface( modelSurface_t surface );
-	virtual void				FinishSurfaces();
-	// RB begin
-	virtual void				CreateVertexCache();
-	// RB end
+	virtual void				FinishSurfaces( bool useMikktspace );
 	virtual void				FreeVertexCache();
 	virtual const char* 		Name() const;
 	virtual void				Print() const;
@@ -120,16 +117,14 @@ public:
 
 	void						MakeDefaultModel();
 
-	bool						LoadASE( const char* fileName );
-	// RB begin
-	bool						LoadDAE( const char* fileName );
-	// RB end
-	bool						LoadLWO( const char* fileName );
-	bool						LoadMA( const char* filename );
+	bool						LoadASE( const char* fileName, ID_TIME_T* sourceTimeStamp );
+	bool						LoadLWO( const char* fileName, ID_TIME_T* sourceTimeStamp );
+	bool						LoadMA( const char* filename, ID_TIME_T* sourceTimeStamp );
+	bool						LoadDAE( const char* fileName, ID_TIME_T* sourceTimeStamp ); // RB
+	bool						LoadOBJ( const char* fileName, ID_TIME_T* sourceTimeStamp ); // RB
 
-	// RB begin
-	bool						ConvertDAEToModelSurfaces( const ColladaParser* dae );
-	// RB end
+	bool						ConvertDAEToModelSurfaces( const ColladaParser* dae ); // RB
+	bool						ConvertOBJToModelSurfaces( const objModel_t* obj ); // RB
 	bool						ConvertASEToModelSurfaces( const struct aseModel_s* ase );
 	bool						ConvertLWOToModelSurfaces( const struct st_lwObject* lwo );
 	bool						ConvertMAToModelSurfaces( const struct maModel_s* ma );
@@ -141,7 +136,7 @@ public:
 	bool						FindSurfaceWithId( int id, int& surfaceNum ) const;
 
 public:
-	idList<modelSurface_t>		surfaces;
+	idList<modelSurface_t>	surfaces;
 	idBounds					bounds;
 	int							overlaysAdded;
 
@@ -242,11 +237,15 @@ public:
 		return true;
 	}
 
+	// RB begin
+	virtual void				ExportOBJ( idFile* objFile, idFile* mtlFile, ID_TIME_T* _timeStamp = NULL );
+	// RB end
+
 private:
-	idList<idMD5Joint>			joints;
-	idList<idJointQuat>			defaultPose;
-	idList<idJointMat>			invertedDefaultPose;
-	idList<idMD5Mesh>			meshes;
+	idList<idMD5Joint>	joints;
+	idList<idJointQuat>	defaultPose;
+	idList<idJointMat>	invertedDefaultPose;
+	idList<idMD5Mesh>	meshes;
 
 	void						DrawJoints( const renderEntity_t* ent, const viewDef_t* view ) const;
 	void						ParseJoint( idLexer& parser, idMD5Joint* joint, idJointQuat* defaultPose );
@@ -334,11 +333,11 @@ private:
 	int							drop_radius;
 	float						drop_delay;
 
-	idList<float>				pages;
+	idList<float>	pages;
 	float* 						page1;
 	float* 						page2;
 
-	idList<idDrawVert>			verts;
+	idList<idDrawVert>	verts;
 
 	int							nextDropTime;
 
@@ -444,7 +443,7 @@ struct Trail_t
 
 class idRenderModelTrail : public idRenderModelStatic
 {
-	idList<Trail_t>				trails;
+	idList<Trail_t>	trails;
 	int							numActive;
 	idBounds					trailBounds;
 

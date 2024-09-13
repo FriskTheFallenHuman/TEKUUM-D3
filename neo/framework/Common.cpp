@@ -1352,13 +1352,10 @@ void idCommonLocal::PrintLoadingMessage( const char* msg )
 		return;
 	}
 
-	// RB begin
-#if defined(__ANDROID__) && !defined(USE_NATIVE_ACTIVITY)
-	ji.ShowProgressDialog( msg );
-#else
-	//renderSystem->BeginFrame( renderSystem->GetWidth(), renderSystem->GetHeight() );
+	//const emptyCommand_t* renderCommands = NULL;
 
-	const emptyCommand_t* cmd = renderSystem->SwapCommandBuffers_FinishCommandBuffers();
+	// RB: this is the same as Doom 3 renderSystem->BeginFrame()
+	//renderCommands = renderSystem->SwapCommandBuffers_FinishCommandBuffers();
 
 	const idMaterial* whiteMaterial = declManager->FindMaterial( "_white" );
 	const idMaterial* splashScreen = declManager->FindMaterial( "splashScreen" );
@@ -1382,28 +1379,16 @@ void idCommonLocal::PrintLoadingMessage( const char* msg )
 		renderSystem->DrawStretchPic( 0, 0, barWidth, SCREEN_HEIGHT, 0, 0, 1, 1, whiteMaterial );
 		renderSystem->DrawStretchPic( SCREEN_WIDTH - barWidth, 0, barWidth, SCREEN_HEIGHT, 0, 0, 1, 1, whiteMaterial );
 	}
-
-	renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 1, 1, splashScreen );
+	renderSystem->SetColor4( 1, 1, 1, 1 );
+	renderSystem->DrawStretchPic( barWidth, barHeight, SCREEN_WIDTH - barWidth * 2.0f, SCREEN_HEIGHT - barHeight * 2.0f, 0, 0, 1, 1, splashScreen );
 	int len = strlen( msg );
-	renderSystem->DrawSmallStringExt( ( 640 - len * SMALLCHAR_WIDTH ) / 2, 410, msg, idVec4( 0.0f, 0.81f, 0.94f, 1.0f ), true );
+	renderSystem->DrawSmallStringExt( ( SCREEN_WIDTH - len * SMALLCHAR_WIDTH ) / 2, SCREEN_HEIGHT - 60, msg, idVec4( 0.0f, 0.81f, 0.94f, 1.0f ), true );
 
-	//renderSystem->EndFrame( NULL, NULL );
-
+	const emptyCommand_t* cmd = renderSystem->SwapCommandBuffers( &time_frontend, &time_backend, &time_shadows, &time_gpu, NULL, NULL );
 	renderSystem->RenderCommandBuffers( cmd );
 
-	if( com_speeds.GetBool() || com_showFPS.GetInteger() == 1 )
-	{
-		renderSystem->SwapCommandBuffers_FinishRendering( &time_frontend, &time_backend, &time_shadows, &time_gpu, true );
-	}
-	else
-	{
-		renderSystem->SwapCommandBuffers_FinishRendering( NULL, NULL, NULL, NULL, true );
-	}
-
-	//const emptyCommand_t* cmd = renderSystem->SwapCommandBuffers( NULL, NULL, NULL, NULL, true );
-	//renderSystem->RenderCommandBuffers( cmd );
-#endif
-	// RB end
+	// RB: this is the same as Doom 3 renderSystem->EndFrame()
+	//renderSystem->SwapCommandBuffers_FinishRendering( &time_frontend, &time_backend, &time_shadows, &time_gpu );
 }
 
 /*

@@ -83,6 +83,10 @@ public:
 	// returns the length of the animation in milliseconds
 	virtual int			AnimationLength();
 
+	// RB: let us know wether this video went EOF or is still active
+	virtual bool        IsPlaying() const;
+	// RB end
+
 	// the pointers in cinData_t will remain valid until the next UpdateForTime() call
 	virtual cinData_t	ImageForTime( int milliseconds );
 
@@ -91,6 +95,9 @@ public:
 
 	// closes the file and frees all allocated memory
 	virtual void		ResetTime( int time );
+
+	// gets the time the cinematic started
+	virtual int			GetStartTime( void );
 
 	// RB begin
 	virtual bool		IsLooping();

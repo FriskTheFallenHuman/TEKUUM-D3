@@ -1,25 +1,26 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Doom 3 BFG Edition GPL Source Code
+Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2015 Robert Beckebans
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
+Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
+Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
+along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
+In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
 
 If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
@@ -39,12 +40,6 @@ If you have questions concerning this license or the applicable additional terms
 
 #define PROC_FILE_EXT				"proc"
 #define	PROC_FILE_ID				"mapProcFile003"
-
-// RB: extended proc file format for precomputed lighting
-#define	PROC_FILE_ID2				"mapProcFile004"
-const int PROC_EXT_VERSION			= 4;
-// RB end
-
 
 // shader parms
 const int SHADERPARM_RED			= 0;
@@ -222,6 +217,31 @@ typedef struct renderLight_s
 } renderLight_t;
 
 
+// RB begin
+typedef struct
+{
+	idVec3					origin;
+	float					shaderParms[MAX_ENTITY_SHADER_PARMS];
+
+	// if non-zero, the environment probe will not show up in the specific view,
+	// which may be used if we want to have slightly different muzzle
+	// flash lights for the player and other views
+	int						suppressEnvprobeInViewID;
+
+	// if non-zero, the environment probe will only show up in the specific view
+	// which can allow player gun gui lights and such to not effect everyone
+	int						allowEnvprobeInViewID;
+
+} renderEnvironmentProbe_t;
+// RB end
+
+
+// RB: added back refdef flags from Quake 3
+const int RDF_NOSHADOWS		= BIT( 0 ); // force renderer to use faster lighting only path
+const int RDF_NOAMBIENT		= BIT( 1 ); // don't render indirect lighting
+const int RDF_IRRADIANCE	= BIT( 2 ); // render into 256^2 HDR render target for irradiance/radiance GGX calculation
+const int RDF_UNDERWATER	= BIT( 3 ); // TODO enable automatic underwater caustics and fog
+
 typedef struct renderView_s
 {
 	// player views will set this to a non-zero integer for model suppress / allow
@@ -245,6 +265,8 @@ typedef struct renderView_s
 	// the viewEyeBuffer may be of a different polarity than stereoScreenSeparation if the eyes have been swapped
 	int						viewEyeBuffer;				// -1 = left eye, 1 = right eye, 0 = monoscopic view or GUI
 	float					stereoScreenSeparation;		// projection matrix horizontal offset, positive or negative based on camera eye
+
+	int						rdflags;			// RB: RDF_NOSHADOWS, etc
 } renderView_t;
 
 
@@ -291,6 +313,12 @@ typedef enum
 	PS_BLOCK_ALL = ( 1 << NUM_PORTAL_ATTRIBUTES ) - 1
 } portalConnection_t;
 
+// Admer: Suppress Windows API DrawText, so IntelliSense can properly highlight idRenderWorld::DrawText
+#ifdef _WIN32
+	#ifdef DrawText
+		#undef DrawText
+	#endif
+#endif
 
 class idRenderWorld
 {
@@ -320,6 +348,13 @@ public:
 	virtual	void			UpdateLightDef( qhandle_t lightHandle, const renderLight_t* rlight ) = 0;
 	virtual	void			FreeLightDef( qhandle_t lightHandle ) = 0;
 	virtual const renderLight_t* GetRenderLight( qhandle_t lightHandle ) const = 0;
+
+	// RB: environment probes for IBL
+	virtual	qhandle_t		AddEnvprobeDef( const renderEnvironmentProbe_t* ep ) = 0;
+	virtual	void			UpdateEnvprobeDef( qhandle_t envprobeHandle, const renderEnvironmentProbe_t* ep ) = 0;
+	virtual	void			FreeEnvprobeDef( qhandle_t envprobeHandle ) = 0;
+	virtual const renderEnvironmentProbe_t* GetRenderEnvprobe( qhandle_t envprobeHandle ) const = 0;
+	// RB end
 
 	// Force the generation of all light / surface interactions at the start of a level
 	// If this isn't called, they will all be dynamically generated
@@ -394,6 +429,9 @@ public:
 
 	// returns one portal from an area
 	virtual exitPortal_t	GetPortal( int areaNum, int portalNum ) = 0;
+
+	// RB: returns the AABB of a BSP area
+	virtual	idBounds		AreaBounds( int areaNum ) const = 0;
 
 	//-------------- Tracing  -----------------
 

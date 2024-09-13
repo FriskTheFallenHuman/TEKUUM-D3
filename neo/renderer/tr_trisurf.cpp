@@ -1,25 +1,26 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Doom 3 BFG Edition GPL Source Code
+Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2020 Stephen Pridham (Mikkelsen tangent space support)
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
+Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
+Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
+along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
+In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
 
 If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
@@ -29,7 +30,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "tr_local.h"
+#include "RenderCommon.h"
+
+#include "../libs/mikktspace/mikktspace.h"
 
 /*
 ==============================================================================
@@ -113,6 +116,38 @@ is highly uneven.
 
 // instead of using the texture T vector, cross the normal and S vector for an orthogonal axis
 #define DERIVE_UNSMOOTHED_BITANGENT
+
+// SP Begin
+
+// Mikktspace is a standard that should be used for new assets. If you'd like to use the original
+// method of calculating tangent spaces for the original game's normal maps, disable mikktspace before
+// loading in the model.
+// see http://www.mikktspace.com/
+//idCVar r_useMikktspace( "r_useMikktspace", "1", CVAR_RENDERER | CVAR_BOOL, "Use the mikktspace standard to derive tangents" );
+
+static void* mkAlloc( int bytes );
+static void mkFree( void* mem );
+static int mkGetNumFaces( const SMikkTSpaceContext* pContext );
+static int mkGetNumVerticesOfFace( const SMikkTSpaceContext* pContext, const int iFace );
+static void mkGetPosition( const SMikkTSpaceContext* pContext, float fvPosOut[], const int iFace, const int iVert );
+static void mkGetNormal( const SMikkTSpaceContext* pContext, float fvNormOut[], const int iFace, const int iVert );
+static void mkGetTexCoord( const SMikkTSpaceContext* pContext, float fvTexcOut[], const int iFace, const int iVert );
+static void mkSetTSpaceBasic( const SMikkTSpaceContext* pContext, const float fvTangent[], const float fSign, const int iFace, const int iVert );
+
+// Helper class for loading in the interface functions for mikktspace.
+class idMikkTSpaceInterface
+{
+public:
+	idMikkTSpaceInterface();
+
+	SMikkTSpaceInterface mkInterface;
+};
+
+static idMikkTSpaceInterface mikkTSpaceInterface;
+
+static void SetUpMikkTSpaceContext( SMikkTSpaceContext* context );
+
+// SP end
 
 /*
 =================
@@ -415,7 +450,7 @@ R_ResizeStaticTriSurfVerts
 void R_ResizeStaticTriSurfVerts( srfTriangles_t* tri, int numVerts )
 {
 	idDrawVert* newVerts = ( idDrawVert* )Mem_Alloc16( numVerts * sizeof( idDrawVert ) );
-	const int copy = Min( numVerts, tri->numVerts );
+	const int copy = std::min( numVerts, tri->numVerts );
 	memcpy( newVerts, tri->verts, copy * sizeof( idDrawVert ) );
 	Mem_Free( tri->verts );
 	tri->verts = newVerts;
@@ -429,7 +464,7 @@ R_ResizeStaticTriSurfIndexes
 void R_ResizeStaticTriSurfIndexes( srfTriangles_t* tri, int numIndexes )
 {
 	triIndex_t* newIndexes = ( triIndex_t* )Mem_Alloc16( numIndexes * sizeof( triIndex_t ) );
-	const int copy = Min( numIndexes, tri->numIndexes );
+	const int copy = std::min( numIndexes, tri->numIndexes );
 	memcpy( newIndexes, tri->indexes, copy * sizeof( triIndex_t ) );
 	Mem_Free( tri->indexes );
 	tri->indexes = newIndexes;
@@ -1009,6 +1044,23 @@ static void	R_DuplicateMirroredVertexes( srfTriangles_t* tri )
 
 /*
 ============
+R_DeriveMikktspaceTangents
+
+Derives the tangent space for the given triangles using the Mikktspace standard.
+Normals must be calculated beforehand.
+============
+*/
+static bool R_DeriveMikktspaceTangents( srfTriangles_t* tri )
+{
+	SMikkTSpaceContext context;
+	SetUpMikkTSpaceContext( &context );
+	context.m_pUserData = tri;
+
+	return ( genTangSpaceDefault( &context ) != 0 );
+}
+
+/*
+============
 R_DeriveNormalsAndTangents
 
 Derives the normal and orthogonal tangent vectors for the triangle vertices.
@@ -1306,8 +1358,23 @@ to save space or speed transforms?
 this version only handles bilateral symetry
 =================
 */
-void R_DeriveTangentsWithoutNormals( srfTriangles_t* tri )
+void R_DeriveTangentsWithoutNormals( srfTriangles_t* tri, bool useMikktspace )
 {
+	// SP begin
+	if( useMikktspace )
+	{
+		if( !R_DeriveMikktspaceTangents( tri ) )
+		{
+			idLib::Warning( "Mikkelsen tangent space calculation failed" );
+		}
+		else
+		{
+			tri->tangentsCalculated = true;
+			return;
+		}
+	}
+	// SP End
+
 	idTempArray< idVec3 > triangleTangents( tri->numIndexes / 3 );
 	idTempArray< idVec3 > triangleBitangents( tri->numIndexes / 3 );
 
@@ -1722,7 +1789,7 @@ void R_TestDegenerateTextureSpace( srfTriangles_t* tri )
 		const idDrawVert& b = tri->verts[tri->indexes[i + 1]];
 		const idDrawVert& c = tri->verts[tri->indexes[i + 2]];
 
-		// RB begin
+		// RB: compare texcoords instead of pointers
 		if( a.GetTexCoord() == b.GetTexCoord() || b.GetTexCoord() == c.GetTexCoord() || c.GetTexCoord() == a.GetTexCoord() )
 		{
 			c_degenerate++;
@@ -1915,7 +1982,7 @@ R_CleanupTriangles
 FIXME: allow createFlat and createSmooth normals, as well as explicit
 =================
 */
-void R_CleanupTriangles( srfTriangles_t* tri, bool createNormals, bool identifySilEdges, bool useUnsmoothedTangents )
+void R_CleanupTriangles( srfTriangles_t* tri, bool createNormals, bool identifySilEdges, bool useUnsmoothedTangents, bool useMikktspace )
 {
 	R_RangeCheckIndexes( tri );
 
@@ -1948,7 +2015,7 @@ void R_CleanupTriangles( srfTriangles_t* tri, bool createNormals, bool identifyS
 	}
 	else if( !createNormals )
 	{
-		R_DeriveTangentsWithoutNormals( tri );
+		R_DeriveTangentsWithoutNormals( tri, useMikktspace );
 	}
 	else
 	{
@@ -2141,11 +2208,11 @@ void R_InitDrawSurfFromTri( drawSurf_t& ds, srfTriangles_t& tri )
 	}
 	else if( !vertexCache.CacheIsCurrent( tri.ambientCache ) )
 	{
-		tri.ambientCache = vertexCache.AllocVertex( tri.verts, ALIGN( tri.numVerts * sizeof( tri.verts[0] ), VERTEX_CACHE_ALIGN ) );
+		tri.ambientCache = vertexCache.AllocVertex( tri.verts, tri.numVerts );
 	}
 	if( !vertexCache.CacheIsCurrent( tri.indexCache ) )
 	{
-		tri.indexCache = vertexCache.AllocIndex( tri.indexes, ALIGN( tri.numIndexes * sizeof( tri.indexes[0] ), INDEX_CACHE_ALIGN ) );
+		tri.indexCache = vertexCache.AllocIndex( tri.indexes, tri.numIndexes );
 	}
 
 	ds.numIndexes = tri.numIndexes;
@@ -2206,4 +2273,176 @@ void R_CreateStaticBuffersForTri( srfTriangles_t& tri )
 		tri.staticShadowVertexes = NULL;
 #endif
 	}
+}
+
+// SP begin
+static void* mkAlloc( int bytes )
+{
+	return R_StaticAlloc( bytes );
+}
+
+static void mkFree( void* mem )
+{
+	R_StaticFree( mem );
+}
+
+static int mkGetNumFaces( const SMikkTSpaceContext* pContext )
+{
+	srfTriangles_t* tris = reinterpret_cast<srfTriangles_t*>( pContext->m_pUserData );
+	return tris->numIndexes / 3;
+}
+
+static int mkGetNumVerticesOfFace( const SMikkTSpaceContext* pContext, const int iFace )
+{
+	return 3;
+}
+
+static void mkGetPosition( const SMikkTSpaceContext* pContext, float fvPosOut[], const int iFace, const int iVert )
+{
+	srfTriangles_t* tris = reinterpret_cast<srfTriangles_t*>( pContext->m_pUserData );
+
+	const int vertIndex = iFace * 3;
+	const int index = tris->indexes[vertIndex + iVert];
+	const idDrawVert& vert = tris->verts[index];
+
+	fvPosOut[0] = vert.xyz[0];
+	fvPosOut[1] = vert.xyz[1];
+	fvPosOut[2] = vert.xyz[2];
+}
+
+static void mkGetNormal( const SMikkTSpaceContext* pContext, float fvNormOut[], const int iFace, const int iVert )
+{
+	srfTriangles_t* tris = reinterpret_cast<srfTriangles_t*>( pContext->m_pUserData );
+
+	const int vertIndex = iFace * 3;
+	const int index = tris->indexes[vertIndex + iVert];
+	const idDrawVert& vert = tris->verts[index];
+
+	const idVec3 norm = vert.GetNormal();
+	fvNormOut[0] = norm.x;
+	fvNormOut[1] = norm.y;
+	fvNormOut[2] = norm.z;
+}
+
+static void mkGetTexCoord( const SMikkTSpaceContext* pContext, float fvTexcOut[], const int iFace, const int iVert )
+{
+	srfTriangles_t* tris = reinterpret_cast<srfTriangles_t*>( pContext->m_pUserData );
+
+	const int vertIndex = iFace * 3;
+	const int index = tris->indexes[vertIndex + iVert];
+	const idDrawVert& vert = tris->verts[index];
+
+	const idVec2 texCoord = vert.GetTexCoord();
+	fvTexcOut[0] = texCoord.x;
+	fvTexcOut[1] = texCoord.y;
+}
+
+static void mkSetTSpaceBasic( const SMikkTSpaceContext* pContext, const float fvTangent[], const float fSign, const int iFace, const int iVert )
+{
+	srfTriangles_t* tris = reinterpret_cast<srfTriangles_t*>( pContext->m_pUserData );
+
+	const int vertIndex = iFace * 3;
+	const int index = tris->indexes[vertIndex + iVert];
+
+	const idVec3 tangent( fvTangent[0], fvTangent[1], fvTangent[2] );
+	tris->verts[index].SetTangent( tangent );
+	tris->verts[index].SetBiTangentSign( fSign );
+}
+
+idMikkTSpaceInterface::idMikkTSpaceInterface()
+	: mkInterface()
+{
+	mkInterface.m_alloc = mkAlloc;
+	mkInterface.m_free = mkFree;
+	mkInterface.m_getNumFaces = mkGetNumFaces;
+	mkInterface.m_getNumVerticesOfFace = mkGetNumVerticesOfFace;
+	mkInterface.m_getPosition = mkGetPosition;
+	mkInterface.m_getNormal = mkGetNormal;
+	mkInterface.m_getTexCoord = mkGetTexCoord;
+	mkInterface.m_setTSpaceBasic = mkSetTSpaceBasic;
+}
+
+static void SetUpMikkTSpaceContext( SMikkTSpaceContext* context )
+{
+	context->m_pInterface = &mikkTSpaceInterface.mkInterface;
+}
+
+// SP end
+
+
+// RB: Determines the closest point between a point and a triangle
+idVec3 R_ClosestPointPointTriangle( const idVec3& point, const idVec3& vertex1, const idVec3& vertex2, const idVec3& vertex3 )
+{
+	idVec3 result;
+
+	// Source: Real-Time Collision Detection by Christer Ericson
+	// Reference: Page 136
+
+	// check if P in vertex region outside A
+	idVec3 ab = vertex2 - vertex1;
+	idVec3 ac = vertex3 - vertex1;
+	idVec3 ap = point - vertex1;
+
+	float d1 = ( ab * ap );
+	float d2 = ( ac * ap );
+	if( d1 <= 0.0f && d2 <= 0.0f )
+	{
+		result = vertex1; //Barycentric coordinates (1,0,0)
+		return result;
+	}
+
+	// Check if P in vertex region outside B
+	idVec3 bp = point - vertex2;
+	float d3 = ( ab * bp );
+	float d4 = ( ac * bp );
+	if( d3 >= 0.0f && d4 <= d3 )
+	{
+		result = vertex2; // barycentric coordinates (0,1,0)
+		return result;
+	}
+
+	// Check if P in edge region of AB, if so return projection of P onto AB
+	float vc = d1 * d4 - d3 * d2;
+	if( vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f )
+	{
+		float v = d1 / ( d1 - d3 );
+		result = vertex1 + v * ab; //Barycentric coordinates (1-v,v,0)
+		return result;
+	}
+
+	// Check if P in vertex region outside C
+	idVec3 cp = point - vertex3;
+	float d5 = ( ab * cp );
+	float d6 = ( ac * cp );
+	if( d6 >= 0.0f && d5 <= d6 )
+	{
+		result = vertex3; //Barycentric coordinates (0,0,1)
+		return result;
+	}
+
+	// Check if P in edge region of AC, if so return projection of P onto AC
+	float vb = d5 * d2 - d1 * d6;
+	if( vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f )
+	{
+		float w = d2 / ( d2 - d6 );
+		result = vertex1 + w * ac; //Barycentric coordinates (1-w,0,w)
+		return result;
+	}
+
+	// Check if P in edge region of BC, if so return projection of P onto BC
+	float va = d3 * d6 - d5 * d4;
+	if( va <= 0.0f && ( d4 - d3 ) >= 0.0f && ( d5 - d6 ) >= 0.0f )
+	{
+		float w = ( d4 - d3 ) / ( ( d4 - d3 ) + ( d5 - d6 ) );
+		result = vertex2 + w * ( vertex3 - vertex2 ); //Barycentric coordinates (0,1-w,w)
+		return result;
+	}
+
+	// P inside face region. Compute Q through its barycentric coordinates (u,v,w)
+	float denom = 1.0f / ( va + vb + vc );
+	float v2 = vb * denom;
+	float w2 = vc * denom;
+	result = vertex1 + ab * v2 + ac * w2; //= u*vertex1 + v*vertex2 + w*vertex3, u = va * denom = 1.0f - v - w
+
+	return result;
 }

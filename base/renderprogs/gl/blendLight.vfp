@@ -1,0 +1,58 @@
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+DP4	result.texcoord[0].x, vertex.position, program.env[39];
+DP4	result.texcoord[0].y, vertex.position, program.env[40];
+DP4	result.texcoord[0].w, vertex.position, program.env[41];
+
+DP4	result.texcoord[1].x, vertex.position, program.env[43];
+MOV	result.texcoord[1].y, 0.5;
+
+MOV	result.color, program.env[18];
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP R0, R1, R2;
+
+TXP R0, fragment.texcoord[0], texture[0], 2D;
+TEX R1, fragment.texcoord[1], texture[1], 2D;
+
+MUL	R2, R0, R1;
+MUL result.color, R2, fragment.color;
+
+END
+
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+DP4	result.texcoord[0].x, vertex.position, program.env[39];
+DP4	result.texcoord[0].y, vertex.position, program.env[40];
+DP4	result.texcoord[0].w, vertex.position, program.env[41];
+
+DP4	result.texcoord[1].x, vertex.position, program.env[43];
+MOV	result.texcoord[1].y, 0.5;
+
+MOV	result.color, program.env[18];
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP R0, R1, R2;
+
+TXP R0, fragment.texcoord[0], texture[0], 2D;
+TEX R1, fragment.texcoord[1], texture[1], 2D;
+
+MUL	R2, R0, R1;
+MUL result.color, R2, fragment.color;
+
+END
+

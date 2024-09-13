@@ -34,10 +34,6 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "Rectangle.h"
 
-#if defined(USE_IDFONT)
-	#include "../renderer/Font.h"
-#endif
-
 const int VIRTUAL_WIDTH = 640;
 const int VIRTUAL_HEIGHT = 480;
 const int BLINK_DIVISOR = 200;
@@ -91,19 +87,10 @@ public:
 	virtual void		PopClipRect();
 	virtual void		EnableClipping( bool b );
 
-	// RB begin
-#if defined(USE_IDFONT)
-	void				SetFont( idFont* font )
-	{
-		activeFont = font;
-	}
-#else
 	void				SetFont( int num );
 
 	int					FindFont( const char* name );
 	void				SetupFonts();
-#endif
-	// RB end
 
 	void				SetOverStrike( bool b )
 	{
@@ -160,11 +147,6 @@ public:
 protected:
 	virtual int			DrawText( float x, float y, float scale, idVec4 color, const char* text, float adjust, int limit, int style, int cursor = -1 );
 
-	// RB begin
-#if defined(USE_IDFONT)
-	void				PaintChar( float x, float y, const scaledGlyphInfo_t& glyphInfo );
-	idFont* 			activeFont;
-#else
 	void				PaintChar( float x, float y, float width, float height, float scale, float	s, float	t, float	s2, float t2, const idMaterial* hShader );
 	void				SetFontByScale( float scale );
 
@@ -174,8 +156,6 @@ protected:
 
 	static idList<fontInfoEx_t> fonts;
 	idStr				fontLang;
-#endif
-	// RB end
 
 	void				Clear();
 
@@ -209,10 +189,6 @@ class idDeviceContextOptimized : public idDeviceContext
 	virtual void		PushClipRect( idRectangle r );
 	virtual void		PopClipRect();
 	virtual void		EnableClipping( bool b );
-
-#if defined(USE_IDFONT)
-	virtual int			DrawText( float x, float y, float scale, idVec4 color, const char* text, float adjust, int limit, int style, int cursor = -1 );
-#endif
 
 	float				clipX1;
 	float				clipX2;

@@ -1,25 +1,26 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Doom 3 BFG Edition GPL Source Code
+Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2016-2017 Dustin Land
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
+Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
+Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
+along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
+In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
 
 If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
@@ -70,6 +71,12 @@ static const uint64_t GLS_DEPTHFUNC_GREATER				= 2 << 13;
 static const uint64_t GLS_DEPTHFUNC_EQUAL					= 3 << 13;
 static const uint64_t GLS_DEPTHFUNC_BITS					= 3 << 13;
 
+static const uint64_t GLS_CULL_FRONTSIDED					= 0 << 15;
+static const uint64_t GLS_CULL_BACKSIDED					= 1 << 15;
+static const uint64_t GLS_CULL_TWOSIDED					= 2 << 15;
+static const uint64_t GLS_CULL_BITS						= 2 << 15;
+static const uint64_t GLS_CULL_MASK						= GLS_CULL_FRONTSIDED | GLS_CULL_BACKSIDED | GLS_CULL_TWOSIDED;
+
 static const uint64_t GLS_BLENDOP_ADD						= 0 << 18;
 static const uint64_t GLS_BLENDOP_SUB						= 1 << 18;
 static const uint64_t GLS_BLENDOP_MIN						= 2 << 18;
@@ -86,6 +93,7 @@ static const uint64_t GLS_STENCIL_FUNC_MASK_BITS			= 0xFFll << GLS_STENCIL_FUNC_
 #define GLS_STENCIL_MAKE_REF( x ) ( ( (uint64_t)(x) << GLS_STENCIL_FUNC_REF_SHIFT ) & GLS_STENCIL_FUNC_REF_BITS )
 #define GLS_STENCIL_MAKE_MASK( x ) ( ( (uint64_t)(x) << GLS_STENCIL_FUNC_MASK_SHIFT ) & GLS_STENCIL_FUNC_MASK_BITS )
 
+// Next 12 bits act as front+back unless GLS_SEPARATE_STENCIL is set, in which case it acts as front.
 static const uint64_t GLS_STENCIL_FUNC_ALWAYS				= 0ull << 36;
 static const uint64_t GLS_STENCIL_FUNC_LESS				= 1ull << 36;
 static const uint64_t GLS_STENCIL_FUNC_LEQUAL				= 2ull << 36;
@@ -126,21 +134,59 @@ static const uint64_t GLS_STENCIL_OP_PASS_INCR_WRAP		= 6ull << 45;
 static const uint64_t GLS_STENCIL_OP_PASS_DECR_WRAP		= 7ull << 45;
 static const uint64_t GLS_STENCIL_OP_PASS_BITS			= 7ull << 45;
 
-static const uint64_t GLS_ALPHATEST_FUNC_REF_SHIFT		= 48;
-static const uint64_t GLS_ALPHATEST_FUNC_REF_BITS			= 0xFFll << GLS_ALPHATEST_FUNC_REF_SHIFT;
-#define GLS_ALPHATEST_MAKE_REF( x ) ( ( (uint64_t)(x) << GLS_ALPHATEST_FUNC_REF_SHIFT ) & GLS_ALPHATEST_FUNC_REF_BITS )
+// Next 12 bits act as back and are only active when GLS_SEPARATE_STENCIL is set.
+static const uint64_t GLS_BACK_STENCIL_FUNC_ALWAYS		= 0ull << 48;
+static const uint64_t GLS_BACK_STENCIL_FUNC_LESS			= 1ull << 48;
+static const uint64_t GLS_BACK_STENCIL_FUNC_LEQUAL		= 2ull << 48;
+static const uint64_t GLS_BACK_STENCIL_FUNC_GREATER		= 3ull << 48;
+static const uint64_t GLS_BACK_STENCIL_FUNC_GEQUAL		= 4ull << 48;
+static const uint64_t GLS_BACK_STENCIL_FUNC_EQUAL			= 5ull << 48;
+static const uint64_t GLS_BACK_STENCIL_FUNC_NOTEQUAL		= 6ull << 48;
+static const uint64_t GLS_BACK_STENCIL_FUNC_NEVER			= 7ull << 48;
+static const uint64_t GLS_BACK_STENCIL_FUNC_BITS			= 7ull << 48;
 
-static const uint64_t GLS_ALPHATEST_FUNC_ALWAYS			= 0ull << 56;
-static const uint64_t GLS_ALPHATEST_FUNC_LESS				= 1ull << 56;
-static const uint64_t GLS_ALPHATEST_FUNC_GREATER			= 2ull << 56;
-static const uint64_t GLS_ALPHATEST_FUNC_EQUAL			= 3ull << 56;
-static const uint64_t GLS_ALPHATEST_FUNC_BITS				= 3ull << 56;
+static const uint64_t GLS_BACK_STENCIL_OP_FAIL_KEEP		= 0ull << 51;
+static const uint64_t GLS_BACK_STENCIL_OP_FAIL_ZERO		= 1ull << 51;
+static const uint64_t GLS_BACK_STENCIL_OP_FAIL_REPLACE	= 2ull << 51;
+static const uint64_t GLS_BACK_STENCIL_OP_FAIL_INCR		= 3ull << 51;
+static const uint64_t GLS_BACK_STENCIL_OP_FAIL_DECR		= 4ull << 51;
+static const uint64_t GLS_BACK_STENCIL_OP_FAIL_INVERT		= 5ull << 51;
+static const uint64_t GLS_BACK_STENCIL_OP_FAIL_INCR_WRAP	= 6ull << 51;
+static const uint64_t GLS_BACK_STENCIL_OP_FAIL_DECR_WRAP	= 7ull << 51;
+static const uint64_t GLS_BACK_STENCIL_OP_FAIL_BITS		= 7ull << 51;
 
-static const uint64_t GLS_STENCIL_OP_BITS					= GLS_STENCIL_OP_FAIL_BITS | GLS_STENCIL_OP_ZFAIL_BITS | GLS_STENCIL_OP_PASS_BITS;
+static const uint64_t GLS_BACK_STENCIL_OP_ZFAIL_KEEP		= 0ull << 54;
+static const uint64_t GLS_BACK_STENCIL_OP_ZFAIL_ZERO		= 1ull << 54;
+static const uint64_t GLS_BACK_STENCIL_OP_ZFAIL_REPLACE	= 2ull << 54;
+static const uint64_t GLS_BACK_STENCIL_OP_ZFAIL_INCR		= 3ull << 54;
+static const uint64_t GLS_BACK_STENCIL_OP_ZFAIL_DECR		= 4ull << 54;
+static const uint64_t GLS_BACK_STENCIL_OP_ZFAIL_INVERT	= 5ull << 54;
+static const uint64_t GLS_BACK_STENCIL_OP_ZFAIL_INCR_WRAP	= 6ull << 54;
+static const uint64_t GLS_BACK_STENCIL_OP_ZFAIL_DECR_WRAP	= 7ull << 54;
+static const uint64_t GLS_BACK_STENCIL_OP_ZFAIL_BITS		= 7ull << 54;
 
+static const uint64_t GLS_BACK_STENCIL_OP_PASS_KEEP		= 0ull << 57;
+static const uint64_t GLS_BACK_STENCIL_OP_PASS_ZERO		= 1ull << 57;
+static const uint64_t GLS_BACK_STENCIL_OP_PASS_REPLACE	= 2ull << 57;
+static const uint64_t GLS_BACK_STENCIL_OP_PASS_INCR		= 3ull << 57;
+static const uint64_t GLS_BACK_STENCIL_OP_PASS_DECR		= 4ull << 57;
+static const uint64_t GLS_BACK_STENCIL_OP_PASS_INVERT		= 5ull << 57;
+static const uint64_t GLS_BACK_STENCIL_OP_PASS_INCR_WRAP	= 6ull << 57;
+static const uint64_t GLS_BACK_STENCIL_OP_PASS_DECR_WRAP	= 7ull << 57;
+static const uint64_t GLS_BACK_STENCIL_OP_PASS_BITS		= 7ull << 57;
+
+static const uint64_t GLS_SEPARATE_STENCIL				= GLS_BACK_STENCIL_OP_FAIL_BITS | GLS_BACK_STENCIL_OP_ZFAIL_BITS | GLS_BACK_STENCIL_OP_PASS_BITS;
+static const uint64_t GLS_STENCIL_OP_BITS					= GLS_STENCIL_OP_FAIL_BITS | GLS_STENCIL_OP_ZFAIL_BITS | GLS_STENCIL_OP_PASS_BITS | GLS_SEPARATE_STENCIL;
+static const uint64_t GLS_STENCIL_FRONT_OPS				= GLS_STENCIL_OP_FAIL_BITS | GLS_STENCIL_OP_ZFAIL_BITS | GLS_STENCIL_OP_PASS_BITS;
+static const uint64_t GLS_STENCIL_BACK_OPS				= GLS_SEPARATE_STENCIL;
+
+static const uint64_t GLS_DEPTH_TEST_MASK					= 1ull << 60;
+static const uint64_t GLS_CLOCKWISE						= 1ull << 61;
+static const uint64_t GLS_MIRROR_VIEW						= 1ull << 62;
 static const uint64_t GLS_OVERRIDE						= 1ull << 63;		// override the render prog state
 
-static const uint64_t GLS_DEFAULT = 0;
+static const uint64_t GLS_KEEP							= GLS_DEPTH_TEST_MASK;
+static const uint64_t GLS_DEFAULT							= 0;
 
 #define STENCIL_SHADOW_TEST_VALUE		128
 #define STENCIL_SHADOW_MASK_VALUE		255

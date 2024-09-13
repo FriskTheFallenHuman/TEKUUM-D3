@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013 Robert Beckebans
+Copyright (C) 2013-2020 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -29,56 +29,50 @@ If you have questions concerning this license or the applicable additional terms
 
 struct guiModelSurface_t
 {
-	const idMaterial* 		material;
-	uint64_t					glState;
-
-	// RB: added alternative interface for no glMapBuffer support
-#if defined(NO_GL_MAPBUFFER)
-	int						firstVert;
-	int						numVerts;
-#endif
-	// RB end
-	int						firstIndex;
-	int						numIndexes;
+	const idMaterial* 	material;
+	uint64_t				glState;
+	int					firstIndex;
+	int					numIndexes;
 	stereoDepthType_t		stereoType;
 };
 
 class idRenderMatrix;
+
+/*
+namespace ImGui
+{
+struct ImDrawData;
+}
+*/
 
 class idGuiModel
 {
 public:
 	idGuiModel();
 
-	void	Clear();
+	void		Clear();
 
-	void	WriteToDemo( idDemoFile* demo );
-	void	ReadFromDemo( idDemoFile* demo );
+	void		WriteToDemo( idDemoFile* demo );
+	void		ReadFromDemo( idDemoFile* demo );
 
 	// allocates memory for verts and indexes in frame-temporary buffer memory
-	void	BeginFrame();
+	void		BeginFrame();
 
-	void	EmitToCurrentView( float modelMatrix[16], bool depthHack );
-	void	EmitFullScreen();
+	void		EmitToCurrentView( float modelMatrix[16], bool depthHack );
+	void		EmitFullScreen();
+
+	// RB
+	//void		EmitImGui( ImDrawData* drawData );
 
 	// the returned pointer will be in write-combined memory, so only make contiguous
 	// 32 bit writes and never read from it.
-
-	// RB: added alternative interface for no glMapBuffer support
-#if defined(NO_GL_MAPBUFFER)
-	void	AllocTris( const idDrawVert* verts, int numVerts, const triIndex_t* indexes, int numIndexes, const idMaterial* material,
-					   const uint64_t glState, const stereoDepthType_t stereoType );
-#else
 	idDrawVert* AllocTris( int numVerts, const triIndex_t* indexes, int numIndexes, const idMaterial* material,
 						   const uint64_t glState, const stereoDepthType_t stereoType );
-#endif
-	// RB end
 
 	//---------------------------
 private:
-	void	AdvanceSurf();
-	void	EmitSurfaces( float modelMatrix[16], float modelViewMatrix[16],
-						  bool depthHack, bool allowFullScreenStereoDepth, bool linkAsEntity );
+	void		AdvanceSurf();
+	void		EmitSurfaces( float modelMatrix[16], float modelViewMatrix[16], bool depthHack, bool allowFullScreenStereoDepth, bool linkAsEntity );
 
 	guiModelSurface_t* 			surf;
 
@@ -92,22 +86,14 @@ private:
 	static const int MAX_INDEXES = ( 20000 * 6 );
 	static const int MAX_VERTS	 = ( 20000 * 4 );
 
-	// RB: added alternative interface for no glMapBuffer support
-#if defined(NO_GL_MAPBUFFER)
-	idList<idDrawVert>			verts;
-	idList<triIndex_t>			indexes;
-#else
 	vertCacheHandle_t			vertexBlock;
 	vertCacheHandle_t			indexBlock;
-
 	idDrawVert* 				vertexPointer;
 	triIndex_t* 				indexPointer;
-#endif
-	// RB end
 
-	int		numVerts;
-	int		numIndexes;
+	int							numVerts;
+	int							numIndexes;
 
-	idList<guiModelSurface_t >	surfaces;
+	idList<guiModelSurface_t>	surfaces;
 };
 

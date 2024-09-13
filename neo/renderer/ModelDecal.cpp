@@ -1,25 +1,27 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Doom 3 BFG Edition GPL Source Code
+Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2014-2016 Robert Beckebans
+Copyright (C) 2014-2016 Kot in Action Creative Artel
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
+Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
+Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
+along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
+In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
 
 If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
@@ -29,7 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "tr_local.h"
+#include "RenderCommon.h"
 #include "Model_local.h"
 
 #include "../idlib/geometry/DrawVert_intrinsics.h"
@@ -53,7 +55,10 @@ idRenderModelDecal::idRenderModelDecal() :
 	nextDecal( 0 ),
 	firstDeferredDecal( 0 ),
 	nextDeferredDecal( 0 ),
-	numDecalMaterials( 0 )
+	numDecalMaterials( 0 ),
+	index( -1 ),
+	demoSerialWrite( 0 ),
+	demoSerialCurrent( 0 )
 {
 }
 
@@ -211,6 +216,7 @@ void idRenderModelDecal::ReUse()
 	firstDeferredDecal = 0;
 	nextDeferredDecal = 0;
 	numDecalMaterials = 0;
+	demoSerialCurrent++;
 }
 
 /*
@@ -242,6 +248,8 @@ void idRenderModelDecal::CreateDecalFromWinding( const idWinding& w, const idMat
 			firstDecal = nextDecal - MAX_DECALS;
 		}
 	}
+
+	demoSerialCurrent++;
 
 	decal_t& decal = decals[decalIndex];
 
@@ -290,6 +298,8 @@ void idRenderModelDecal::CreateDecalFromWinding( const idWinding& w, const idMat
 		decal.indexes[decal.numIndexes + 1] = 0;
 		decal.indexes[decal.numIndexes + 2] = 0;
 	}
+
+	decal.writtenToDemo = false;
 }
 
 /*
@@ -302,7 +312,7 @@ static void R_DecalPointCullStatic( byte* cullBits, const idPlane* planes, const
 	assert_16_byte_aligned( cullBits );
 	assert_16_byte_aligned( verts );
 
-#if defined(USE_INTRINSICS)
+#if defined(USE_INTRINSICS_SSE)
 	idODSStreamedArray< idDrawVert, 16, SBT_DOUBLE, 4 > vertsODS( verts, numVerts );
 
 	const __m128 vector_float_zero	= _mm_setzero_ps();
@@ -670,7 +680,7 @@ static void R_CopyDecalSurface( idDrawVert* verts, int numVerts, triIndex_t* ind
 	assert( ( ( decal->numIndexes * sizeof( triIndex_t ) ) & 15 ) == 0 );
 	assert_16_byte_aligned( fadeColor );
 
-#if defined(USE_INTRINSICS)
+#if defined(USE_INTRINSICS_SSE)
 
 	const __m128i vector_int_num_verts = _mm_shuffle_epi32( _mm_cvtsi32_si128( numVerts ), 0 );
 	const __m128i vector_short_num_verts = _mm_packs_epi32( vector_int_num_verts, vector_int_num_verts );
@@ -678,7 +688,7 @@ static void R_CopyDecalSurface( idDrawVert* verts, int numVerts, triIndex_t* ind
 	const __m128i vector_color_mask = _mm_set_epi32( 0, -1, 0, 0 );
 
 	// copy vertices and apply depth/time based fading
-	assert_offsetof( idDrawVert, color, DRAWVERT_COLOR_OFFSET );
+	assert_offsetof( idDrawVert, color, 6 * 4 );
 	for( int i = 0; i < decal->numVerts; i++ )
 	{
 		const idDrawVert& srcVert = decal->verts[i];
@@ -802,8 +812,8 @@ drawSurf_t* idRenderModelDecal::CreateDecalDrawSurf( const viewEntity_t* space, 
 	newTri->numVerts = maxVerts;
 	newTri->numIndexes = maxIndexes;
 
-	newTri->ambientCache = vertexCache.AllocVertex( NULL, ALIGN( maxVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
-	newTri->indexCache = vertexCache.AllocIndex( NULL, ALIGN( maxIndexes * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
+	newTri->ambientCache = vertexCache.AllocVertex( NULL, maxVerts );
+	newTri->indexCache = vertexCache.AllocIndex( NULL, maxIndexes );
 
 	idDrawVert* mappedVerts = ( idDrawVert* )vertexCache.MappedVertexBuffer( newTri->ambientCache );
 	triIndex_t* mappedIndexes = ( triIndex_t* )vertexCache.MappedIndexBuffer( newTri->indexCache );
@@ -882,7 +892,66 @@ idRenderModelDecal::ReadFromDemoFile
 */
 void idRenderModelDecal::ReadFromDemoFile( idDemoFile* f )
 {
-	// FIXME: implement
+	f->ReadUnsignedInt( firstDecal );
+	f->ReadUnsignedInt( nextDecal );
+
+	for( unsigned int i = firstDecal; i < nextDecal; i++ )
+	{
+		decal_t& decal = decals[ i & ( MAX_DECALS - 1 ) ];
+
+		bool decalWritten = false;
+		f->ReadBool( decalWritten );
+		if( !decalWritten )
+		{
+			continue;
+		}
+
+		f->ReadInt( decal.startTime ); // TODO: Figure out what this needs to be.
+
+		const char* matName = f->ReadHashString();
+		decal.material = matName[ 0 ] ? declManager->FindMaterial( matName ) : NULL;
+
+		f->ReadInt( decal.numVerts );
+		for( int j = 0; j < decal.numVerts; j++ )
+		{
+			f->Read( &decal.verts[ j ], sizeof( idDrawVert ) );
+		}
+
+		f->ReadInt( decal.numIndexes );
+		for( int j = 0; j < decal.numIndexes; j++ )
+		{
+			f->Read( &decal.indexes[ j ], sizeof( triIndex_t ) );
+		}
+
+		f->Read( decal.vertDepthFade, sizeof( float )*MAX_DECAL_VERTS );
+	}
+
+	f->ReadUnsignedInt( firstDeferredDecal );
+	f->ReadUnsignedInt( nextDeferredDecal );
+	for( unsigned int i = firstDeferredDecal; i < nextDeferredDecal; i++ )
+	{
+		decalProjectionParms_t& deferredDecal = deferredDecals[ i & ( MAX_DEFERRED_DECALS - 1 ) ];
+		f->ReadInt( deferredDecal.startTime );
+		f->ReadBool( deferredDecal.parallel );
+		f->ReadBool( deferredDecal.force );
+		f->Read( deferredDecal.boundingPlanes, sizeof( idPlane )*NUM_DECAL_BOUNDING_PLANES );
+		f->ReadVec4( deferredDecal.fadePlanes[ 0 ].ToVec4() );
+		f->ReadVec4( deferredDecal.fadePlanes[ 1 ].ToVec4() );
+		f->ReadVec4( deferredDecal.textureAxis[ 0 ].ToVec4() );
+		f->ReadVec4( deferredDecal.textureAxis[ 1 ].ToVec4() );
+		f->ReadVec3( deferredDecal.projectionOrigin );
+		f->ReadFloat( deferredDecal.fadeDepth );
+
+		const char* matName = f->ReadHashString();
+		deferredDecal.material = matName[ 0 ] ? declManager->FindMaterial( matName ) : NULL;
+	}
+
+	f->ReadUnsignedInt( numDecalMaterials );
+	for( unsigned int i = 0; i < numDecalMaterials; i++ )
+	{
+		const char* matName = f->ReadHashString();
+		decalMaterials[ i ] = matName[ 0 ] ? declManager->FindMaterial( matName ) : NULL;
+	}
 }
 
 /*
@@ -892,5 +961,72 @@ idRenderModelDecal::WriteToDemoFile
 */
 void idRenderModelDecal::WriteToDemoFile( idDemoFile* f ) const
 {
-	// FIXME: implement
+	unsigned int i = 0;
+	int j = 0;
+	int nDecal = nextDecal;
+	if( nextDecal - firstDecal > MAX_DECALS )
+	{
+		nDecal = nextDecal - MAX_DECALS;
+	}
+	f->WriteUnsignedInt( firstDecal );
+	f->WriteUnsignedInt( nextDecal );
+
+	for( unsigned int i = firstDecal; i < nextDecal; i++ )
+	{
+		const decal_t& decal = decals[ i & ( MAX_DECALS - 1 ) ];
+
+		if( decal.writtenToDemo )
+		{
+			f->WriteBool( false );
+			continue;
+		}
+
+		f->WriteBool( true );
+		f->WriteInt( decal.startTime );
+		f->WriteHashString( decal.material ? decal.material->GetName() : "" );
+
+		f->WriteInt( decal.numVerts );
+		if( decal.numVerts )
+		{
+			for( j = 0; j < decal.numVerts; j++ )
+			{
+				f->Write( &decal.verts[ j ], sizeof( idDrawVert ) );
+			}
+		}
+		f->WriteInt( decal.numIndexes );
+		if( decal.numIndexes )
+		{
+			for( j = 0; j < decal.numIndexes; j++ )
+			{
+				f->Write( &decal.indexes[ j ], sizeof( triIndex_t ) );
+			}
+		}
+		f->Write( decal.vertDepthFade, sizeof( float )*MAX_DECAL_VERTS );
+
+		decal.writtenToDemo = true;
+	}
+
+	f->WriteUnsignedInt( firstDeferredDecal );
+	f->WriteUnsignedInt( nextDeferredDecal );
+	for( i = firstDeferredDecal; i < nextDeferredDecal; i++ )
+	{
+		const decalProjectionParms_t& deferredDecal = deferredDecals[ i & ( MAX_DEFERRED_DECALS - 1 ) ];
+		f->WriteInt( deferredDecal.startTime );
+		f->WriteBool( deferredDecal.parallel );
+		f->WriteBool( deferredDecal.force );
+		f->Write( deferredDecal.boundingPlanes, sizeof( idPlane )*NUM_DECAL_BOUNDING_PLANES );
+		f->WriteVec4( deferredDecal.fadePlanes[ 0 ].ToVec4() );
+		f->WriteVec4( deferredDecal.fadePlanes[ 1 ].ToVec4() );
+		f->WriteVec4( deferredDecal.textureAxis[ 0 ].ToVec4() );
+		f->WriteVec4( deferredDecal.textureAxis[ 1 ].ToVec4() );
+		f->WriteVec3( deferredDecal.projectionOrigin );
+		f->WriteFloat( deferredDecal.fadeDepth );
+		f->WriteHashString( deferredDecal.material ? deferredDecal.material->GetName() : "" );
+	}
+
+	f->WriteUnsignedInt( numDecalMaterials );
+	for( i = 0; i < numDecalMaterials; i++ )
+	{
+		f->WriteHashString( decalMaterials[ i ] ? decalMaterials[ i ]->GetName() : "" );
+	}
 }

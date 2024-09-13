@@ -1,25 +1,25 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Doom 3 BFG Edition GPL Source Code
+Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
+Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
+Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
+along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
+In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
 
 If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
@@ -173,7 +173,7 @@ public:
 	virtual bool				SupportsBinaryModel() = 0;
 
 	// RB begin
-	virtual void				ExportOBJ( idFile* file, ID_TIME_T* _timeStamp = NULL ) const = 0;
+	virtual void				ExportOBJ( idFile* objFile, idFile* mtlFile, ID_TIME_T* _timeStamp = NULL ) = 0;
 	// RB end
 
 	// renderBump uses this to load the very high poly count models, skipping the
@@ -194,7 +194,7 @@ public:
 	// Creates the duplicated back side geometry for two sided, alpha tested, lit materials
 	// This does not need to be called if none of the surfaces added with AddSurface require
 	// light interaction, and all the triangles are already well formed.
-	virtual void				FinishSurfaces() = 0;
+	virtual void				FinishSurfaces( bool useMikktspace ) = 0;
 
 	// frees all the data, but leaves the class around for dangling references,
 	// which can regenerate the data with LoadModel()
@@ -217,10 +217,6 @@ public:
 	// will still touch their data to make sure they
 	// are kept loaded
 	virtual void				TouchData() = 0;
-
-	// RB begin
-	virtual void				CreateVertexCache() = 0;
-	// RB end
 
 	// dump any ambient caches on the model surfaces
 	virtual void				FreeVertexCache() = 0;

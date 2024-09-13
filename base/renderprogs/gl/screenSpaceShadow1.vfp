@@ -1,0 +1,150 @@
+!!ARBvp1.0
+OPTION ARB_position_invariant ;
+
+END
+
+#=========================================================================
+
+!!ARBfp1.0 
+#OPTION ARB_precision_hint_fastest;		# this needs full precision!
+OPTION ARB_fragment_program_shadow;
+
+# texture[0] = screen depth texture
+# texture[1] = jitter texture
+# texture[2] = shadow depth texture
+
+PARAM	positionToDepthTexScale		= program.local[0];	# fragment.position to screen depth texture transformation
+PARAM	zProject					= program.local[1];	# projection[10], projection[14], 0, 0
+PARAM	positionToViewSpace			= program.local[2];	# X add, Y add, X mul, Y mul
+PARAM	viewToLightS				= program.local[3];
+PARAM	viewToLightT				= program.local[4];
+PARAM	viewToLightR				= program.local[5];
+PARAM	viewToLightQ				= program.local[6];
+PARAM	positionToJitterTexScale	= program.local[7];	# fragment.position to jitter texture
+PARAM	jitterTexScale				= program.local[8];
+PARAM	jitterTexOffset				= program.local[9];
+
+TEMP	flip, shadow, jitterTex, R0, R1;
+
+PARAM	pointFive = { 0.5, 0.5, 0.5, 0.5 };
+
+
+# load the depth texture as a high precision intensity value in the range 0.0 to 1.0
+MUL		R0.xy, fragment.position, positionToDepthTexScale;
+TEX		R0, R0, texture[0], 2D;
+
+# convert to -1.0 to 1.0 NDC
+ADD		R0, R0, R0;
+SUB		R0, R0, 1;
+
+# calculate the view space z by deriving w from depth.  This will be negative.
+SUB		R0.z, -R0.z, zProject.x;
+RCP		R0.z, R0.z;
+MUL		R0.z, R0.z, zProject.y;
+
+# now make it a full xyz in view space (bake this into the following transform?)
+MAD		R0.xy, fragment.position, positionToViewSpace.zwzw, positionToViewSpace.xyxy;
+MUL		R0.xy, R0.xyxy, -R0.z;
+MOV		R0.w, 1;
+
+#------------------
+
+# transform view space xyz into light space
+DP4		R1.x, R0, viewToLightS;
+DP4		R1.y, R0, viewToLightT;
+DP4		R1.z, R0, viewToLightR;
+DP4		R1.w, R0, viewToLightQ;
+
+# calculate the shadow buffer factor
+
+RCP		flip.w, R1.w;
+MUL		flip.xyz, R1, flip.w;
+
+MAD		flip.xy, -pointFive, jitterTexScale, flip;			# bake the -5 bias into the offset
+
+
+#----------------------
+MAD		R0, fragment.position, positionToJitterTexScale, jitterTexOffset;
+TEX		jitterTex, R0, texture[1], 2D;
+MAD jitterTex, jitterTex, jitterTexScale, flip;
+TEX	shadow, jitterTex, texture[2], SHADOW2D;
+
+# write the shadow value to the alpha channel
+MOV		result.color, shadow.x;
+
+END;
+!!ARBvp1.0
+OPTION ARB_position_invariant ;
+
+END
+
+#=========================================================================
+
+!!ARBfp1.0 
+#OPTION ARB_precision_hint_fastest;		# this needs full precision!
+OPTION ARB_fragment_program_shadow;
+
+# texture[0] = screen depth texture
+# texture[1] = jitter texture
+# texture[2] = shadow depth texture
+
+PARAM	positionToDepthTexScale		= program.local[0];	# fragment.position to screen depth texture transformation
+PARAM	zProject					= program.local[1];	# projection[10], projection[14], 0, 0
+PARAM	positionToViewSpace			= program.local[2];	# X add, Y add, X mul, Y mul
+PARAM	viewToLightS				= program.local[3];
+PARAM	viewToLightT				= program.local[4];
+PARAM	viewToLightR				= program.local[5];
+PARAM	viewToLightQ				= program.local[6];
+PARAM	positionToJitterTexScale	= program.local[7];	# fragment.position to jitter texture
+PARAM	jitterTexScale				= program.local[8];
+PARAM	jitterTexOffset				= program.local[9];
+
+TEMP	flip, shadow, jitterTex, R0, R1;
+
+PARAM	pointFive = { 0.5, 0.5, 0.5, 0.5 };
+
+
+# load the depth texture as a high precision intensity value in the range 0.0 to 1.0
+MUL		R0.xy, fragment.position, positionToDepthTexScale;
+TEX		R0, R0, texture[0], 2D;
+
+# convert to -1.0 to 1.0 NDC
+ADD		R0, R0, R0;
+SUB		R0, R0, 1;
+
+# calculate the view space z by deriving w from depth.  This will be negative.
+SUB		R0.z, -R0.z, zProject.x;
+RCP		R0.z, R0.z;
+MUL		R0.z, R0.z, zProject.y;
+
+# now make it a full xyz in view space (bake this into the following transform?)
+MAD		R0.xy, fragment.position, positionToViewSpace.zwzw, positionToViewSpace.xyxy;
+MUL		R0.xy, R0.xyxy, -R0.z;
+MOV		R0.w, 1;
+
+#------------------
+
+# transform view space xyz into light space
+DP4		R1.x, R0, viewToLightS;
+DP4		R1.y, R0, viewToLightT;
+DP4		R1.z, R0, viewToLightR;
+DP4		R1.w, R0, viewToLightQ;
+
+# calculate the shadow buffer factor
+
+RCP		flip.w, R1.w;
+MUL		flip.xyz, R1, flip.w;
+
+MAD		flip.xy, -pointFive, jitterTexScale, flip;			# bake the -5 bias into the offset
+
+
+#----------------------
+MAD		R0, fragment.position, positionToJitterTexScale, jitterTexOffset;
+TEX		jitterTex, R0, texture[1], 2D;
+MAD jitterTex, jitterTex, jitterTexScale, flip;
+TEX	shadow, jitterTex, texture[2], SHADOW2D;
+
+# write the shadow value to the alpha channel
+MOV		result.color, shadow.x;
+
+END;

@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013 Robert Beckebans
+Copyright (C) 2013-2020 Robert Beckebans
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -30,7 +30,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "tr_local.h"
+#include "RenderCommon.h"
+//#include "libs/imgui/imgui.h"
 
 const float idGuiModel::STEREO_DEPTH_NEAR = 0.0f;
 const float idGuiModel::STEREO_DEPTH_MID  = 0.5f;
@@ -48,13 +49,6 @@ idGuiModel::idGuiModel()
 	{
 		shaderParms[i] = 1.0f;
 	}
-
-	// RB: added alternative interface for no glMapBuffer support
-#if defined(NO_GL_MAPBUFFER)
-	verts.SetNum( MAX_VERTS );
-	indexes.SetNum( MAX_INDEXES );
-#endif
-	// RB end
 }
 
 /*
@@ -95,16 +89,10 @@ idGuiModel::BeginFrame
 */
 void idGuiModel::BeginFrame()
 {
-	// RB: added alternative interface for no glMapBuffer support
-#if !defined(NO_GL_MAPBUFFER)
-	vertexBlock = vertexCache.AllocVertex( NULL, ALIGN( MAX_VERTS * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
-	indexBlock = vertexCache.AllocIndex( NULL, ALIGN( MAX_INDEXES * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
-
+	vertexBlock = vertexCache.AllocVertex( NULL, MAX_VERTS );
+	indexBlock = vertexCache.AllocIndex( NULL, MAX_INDEXES );
 	vertexPointer = ( idDrawVert* )vertexCache.MappedVertexBuffer( vertexBlock );
 	indexPointer = ( triIndex_t* )vertexCache.MappedIndexBuffer( indexBlock );
-#endif
-	// RB end
-
 	numVerts = 0;
 	numIndexes = 0;
 	Clear();
@@ -166,19 +154,10 @@ void idGuiModel::EmitSurfaces( float modelMatrix[16], float modelViewMatrix[16],
 		const idMaterial* shader = guiSurf.material;
 		drawSurf_t* drawSurf = ( drawSurf_t* )R_FrameAlloc( sizeof( *drawSurf ), FRAME_ALLOC_DRAW_SURFACE );
 
-		//vertexBlock = ;
-		//indexBlock = vertexCache.AllocIndex( NULL, ALIGN( MAX_INDEXES * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
-
 		drawSurf->numIndexes = guiSurf.numIndexes;
-
-#if defined(NO_GL_MAPBUFFER)
-		drawSurf->ambientCache = vertexCache.AllocVertex( &verts[guiSurf.firstVert], ALIGN( guiSurf.numVerts * sizeof( idDrawVert ), VERTEX_CACHE_ALIGN ) );
-		drawSurf->indexCache = vertexCache.AllocIndex( &indexes[guiSurf.firstIndex], ALIGN( guiSurf.firstIndex * sizeof( triIndex_t ), INDEX_CACHE_ALIGN ) );
-#else
 		drawSurf->ambientCache = vertexBlock;
 		// build a vertCacheHandle_t that points inside the allocated block
 		drawSurf->indexCache = indexBlock + ( ( int64_t )( guiSurf.firstIndex * sizeof( triIndex_t ) ) << VERTCACHE_OFFSET_SHIFT );
-#endif
 		drawSurf->shadowCache = 0;
 		drawSurf->jointCache = 0;
 		drawSurf->frontEndGeo = NULL;
@@ -256,7 +235,6 @@ Creates a view that covers the screen and emit the surfaces
 */
 void idGuiModel::EmitFullScreen()
 {
-
 	if( surfaces[0].numIndexes == 0 )
 	{
 		return;
@@ -289,24 +267,33 @@ void idGuiModel::EmitFullScreen()
 	viewDef->scissor.x2 = viewDef->viewport.x2 - viewDef->viewport.x1;
 	viewDef->scissor.y2 = viewDef->viewport.y2 - viewDef->viewport.y1;
 
+	// RB: IMPORTANT - the projectionMatrix has a few changes to make it work with Vulkan
 	viewDef->projectionMatrix[0 * 4 + 0] = 2.0f / SCREEN_WIDTH;
 	viewDef->projectionMatrix[0 * 4 + 1] = 0.0f;
 	viewDef->projectionMatrix[0 * 4 + 2] = 0.0f;
 	viewDef->projectionMatrix[0 * 4 + 3] = 0.0f;
 
 	viewDef->projectionMatrix[1 * 4 + 0] = 0.0f;
+#if defined(USE_VULKAN)
+	viewDef->projectionMatrix[1 * 4 + 1] = 2.0f / SCREEN_HEIGHT;
+#else
 	viewDef->projectionMatrix[1 * 4 + 1] = -2.0f / SCREEN_HEIGHT;
+#endif
 	viewDef->projectionMatrix[1 * 4 + 2] = 0.0f;
 	viewDef->projectionMatrix[1 * 4 + 3] = 0.0f;
 
 	viewDef->projectionMatrix[2 * 4 + 0] = 0.0f;
 	viewDef->projectionMatrix[2 * 4 + 1] = 0.0f;
-	viewDef->projectionMatrix[2 * 4 + 2] = -2.0f;
+	viewDef->projectionMatrix[2 * 4 + 2] = -1.0f;
 	viewDef->projectionMatrix[2 * 4 + 3] = 0.0f;
 
-	viewDef->projectionMatrix[3 * 4 + 0] = -1.0f;
+	viewDef->projectionMatrix[3 * 4 + 0] = -1.0f; // RB: was -2.0f
+#if defined(USE_VULKAN)
+	viewDef->projectionMatrix[3 * 4 + 1] = -1.0f;
+#else
 	viewDef->projectionMatrix[3 * 4 + 1] = 1.0f;
-	viewDef->projectionMatrix[3 * 4 + 2] = -1.0f;
+#endif
+	viewDef->projectionMatrix[3 * 4 + 2] = 0.0f; // RB: was 1.0f
 	viewDef->projectionMatrix[3 * 4 + 3] = 1.0f;
 
 	// make a tech5 renderMatrix for faster culling
@@ -346,6 +333,77 @@ void idGuiModel::EmitFullScreen()
 	R_AddDrawViewCmd( viewDef, true );
 }
 
+// RB begin
+/*
+================
+idGuiModel::ImGui_RenderDrawLists
+================
+*/
+/*
+void idGuiModel::EmitImGui( ImDrawData* drawData )
+{
+	// NOTE: this implementation does not support scissor clipping for the indivudal draw commands
+	// but it is sufficient for things like com_showFPS
+	const float sysWidth = renderSystem->GetWidth();
+	const float sysHeight = renderSystem->GetHeight();
+
+	idVec2 scaleToVirtual( ( float )SCREEN_WIDTH / sysWidth, ( float )SCREEN_HEIGHT / sysHeight );
+
+	for( int a = 0; a < drawData->CmdListsCount; a++ )
+	{
+		const ImDrawList* cmd_list = drawData->CmdLists[a];
+		const ImDrawIdx* indexBufferOffset = &cmd_list->IdxBuffer.front();
+
+		int numVerts = cmd_list->VtxBuffer.size();
+
+		for( int b = 0; b < cmd_list->CmdBuffer.size(); b++ )
+		{
+			const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[b];
+
+			int numIndexes = pcmd->ElemCount;
+
+			// support more than just the imGui Font texture
+			const idMaterial* mat = tr.imgGuiMaterial;
+			if( pcmd->TextureId && ( mat != ( const idMaterial* )pcmd->TextureId ) )
+			{
+				mat = ( const idMaterial* )pcmd->TextureId;
+			}
+
+			idDrawVert* verts = renderSystem->AllocTris( numVerts, indexBufferOffset, numIndexes, mat, STEREO_DEPTH_TYPE_NONE );
+			if( verts == NULL )
+			{
+				continue;
+			}
+
+			if( pcmd->UserCallback )
+			{
+				pcmd->UserCallback( cmd_list, pcmd );
+			}
+			else
+			{
+				for( int j = 0; j < numVerts; j++ )
+				{
+					const ImDrawVert* imVert = &cmd_list->VtxBuffer[j];
+
+					ALIGNTYPE16 idDrawVert tempVert;
+
+					//tempVert.xyz = idVec3( imVert->pos.x, imVert->pos.y, 0.0f );
+					tempVert.xyz.ToVec2() = idVec2( imVert->pos.x, imVert->pos.y ).Scale( scaleToVirtual );
+					tempVert.xyz.z = 0.0f;
+					tempVert.SetTexCoord( imVert->uv.x, imVert->uv.y );
+					tempVert.SetColor( imVert->col );
+
+					WriteDrawVerts16( &verts[j], &tempVert, 1 );
+				}
+			}
+
+			indexBufferOffset += pcmd->ElemCount;
+		}
+	}
+}
+*/
+// RB end
+
 /*
 =============
 AdvanceSurf
@@ -372,13 +430,6 @@ void idGuiModel::AdvanceSurf()
 	s.numIndexes = 0;
 	s.firstIndex = numIndexes;
 
-	// RB: added alternative interface for no glMapBuffer support
-#if defined(NO_GL_MAPBUFFER)
-	s.numVerts = 0;
-	s.firstVert = numVerts;
-#endif
-	// RB end
-
 	surfaces.Append( s );
 	surf = &surfaces[ surfaces.Num() - 1 ];
 }
@@ -388,76 +439,6 @@ void idGuiModel::AdvanceSurf()
 AllocTris
 =============
 */
-// RB: added alternative interface for no glMapBuffer support
-#if defined(NO_GL_MAPBUFFER)
-void idGuiModel::AllocTris( const idDrawVert* tempVerts, int vertCount, const triIndex_t* tempIndexes, int indexCount, const idMaterial* material, const uint64_t glState, const stereoDepthType_t stereoType )
-{
-	if( material == NULL )
-	{
-		return;
-	}
-	if( numIndexes + indexCount > MAX_INDEXES )
-	{
-		static int warningFrame = 0;
-		if( warningFrame != tr.frameCount )
-		{
-			warningFrame = tr.frameCount;
-			idLib::Warning( "idGuiModel::AllocTris: MAX_INDEXES exceeded" );
-		}
-		return;
-	}
-	if( numVerts + vertCount > MAX_VERTS )
-	{
-		static int warningFrame = 0;
-		if( warningFrame != tr.frameCount )
-		{
-			warningFrame = tr.frameCount;
-			idLib::Warning( "idGuiModel::AllocTris: MAX_VERTS exceeded" );
-		}
-		return;
-	}
-
-	// break the current surface if we are changing to a new material or we can't
-	// fit the data into our allocated block
-	if( material != surf->material || glState != surf->glState || stereoType != surf->stereoType )
-	{
-		if( surf->numIndexes )
-		{
-			AdvanceSurf();
-		}
-		surf->material = material;
-		surf->glState = glState;
-		surf->stereoType = stereoType;
-	}
-
-	int startVert = numVerts;
-	int startIndex = numIndexes;
-
-	numVerts += vertCount;
-	numIndexes += indexCount;
-
-	surf->numIndexes += indexCount;
-
-	if( ( startIndex & 1 ) || ( indexCount & 1 ) )
-	{
-		// slow for write combined memory!
-		// this should be very rare, since quads are always an even index count
-		for( int i = 0; i < indexCount; i++ )
-		{
-			indexes[startIndex + i] = startVert + tempIndexes[i];
-		}
-	}
-	else
-	{
-		for( int i = 0; i < indexCount; i += 2 )
-		{
-			WriteIndexPair( &indexes[startIndex + i], startVert + tempIndexes[i], startVert + tempIndexes[i + 1] );
-		}
-	}
-
-	WriteDrawVerts16( &verts[startVert], tempVerts, vertCount );
-}
-#else
 idDrawVert* idGuiModel::AllocTris( int vertCount, const triIndex_t* tempIndexes, int indexCount, const idMaterial* material, const uint64_t glState, const stereoDepthType_t stereoType )
 {
 	if( material == NULL )
@@ -525,5 +506,3 @@ idDrawVert* idGuiModel::AllocTris( int vertCount, const triIndex_t* tempIndexes,
 
 	return vertexPointer + startVert;
 }
-#endif // #if defined(USE_GLES2)
-// RB end

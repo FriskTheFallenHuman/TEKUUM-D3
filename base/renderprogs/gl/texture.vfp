@@ -1,0 +1,42 @@
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+
+MOV	result.texcoord[0], vertex.attrib[8];
+MOV	result.color, program.env[18];
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP R0;
+
+TEX R0, fragment.texcoord[0], texture[0], 2D;
+MUL	result.color, R0, fragment.color;
+
+END
+
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+
+MOV	result.texcoord[0], vertex.attrib[8];
+MOV	result.color, program.env[18];
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP R0;
+
+TEX R0, fragment.texcoord[0], texture[0], 2D;
+MUL	result.color, R0, fragment.color;
+
+END
+

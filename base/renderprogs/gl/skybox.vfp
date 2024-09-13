@@ -1,0 +1,60 @@
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+TEMP R0;
+
+SUB result.texcoord[0], vertex.position, program.env[5];
+
+# generate the vertex color, which can be 1.0, color, or 1.0 - color
+# for 1.0 : env[16] = 0, env[17] = 1
+# for color : env[16] = 1, env[17] = 0
+# for 1.0-color : env[16] = -1, env[17] = 1
+MAD	R0, vertex.color, program.env[16], program.env[17];
+
+# Then modulate by the global color value
+MUL result.color, program.env[18], R0;
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP R0;
+
+TEX R0, fragment.texcoord[0], texture[0], CUBE;
+MUL	result.color, R0, fragment.color;
+
+END
+
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+TEMP R0;
+
+SUB result.texcoord[0], vertex.position, program.env[5];
+
+# generate the vertex color, which can be 1.0, color, or 1.0 - color
+# for 1.0 : env[16] = 0, env[17] = 1
+# for color : env[16] = 1, env[17] = 0
+# for 1.0-color : env[16] = -1, env[17] = 1
+MAD	R0, vertex.color, program.env[16], program.env[17];
+
+# Then modulate by the global color value
+MUL result.color, program.env[18], R0;
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP R0;
+
+TEX R0, fragment.texcoord[0], texture[0], CUBE;
+MUL	result.color, R0, fragment.color;
+
+END
+

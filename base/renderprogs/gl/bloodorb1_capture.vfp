@@ -1,0 +1,60 @@
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+TEMP R0, R1;
+
+MUL R0, { 1, 1, 0.5, 0.5 }, program.local[0].xyxy;
+SUB R0.zw, 0.5, R0.zwzw;
+SWZ R1, R0, x, 0, 0, z;
+DP4	result.texcoord[0].x, vertex.attrib[8], R1;
+SWZ R1, R0, 0, y, 0, w;
+DP4	result.texcoord[0].y, vertex.attrib[8], R1;
+
+MOV	result.texcoord[1], vertex.attrib[8];
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP R0, R1, R2;
+
+TEX R0, fragment.texcoord[0], texture[0], 2D;
+TEX R1, fragment.texcoord[1], texture[1], 2D;
+TEX R2, fragment.texcoord[1], texture[2], 2D;
+
+LRP result.color, R2.a, R1, R0;
+
+END
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+TEMP R0, R1;
+
+MUL R0, { 1, 1, 0.5, 0.5 }, program.local[0].xyxy;
+SUB R0.zw, 0.5, R0.zwzw;
+SWZ R1, R0, x, 0, 0, z;
+DP4	result.texcoord[0].x, vertex.attrib[8], R1;
+SWZ R1, R0, 0, y, 0, w;
+DP4	result.texcoord[0].y, vertex.attrib[8], R1;
+
+MOV	result.texcoord[1], vertex.attrib[8];
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP R0, R1, R2;
+
+TEX R0, fragment.texcoord[0], texture[0], 2D;
+TEX R1, fragment.texcoord[1], texture[1], 2D;
+TEX R2, fragment.texcoord[1], texture[2], 2D;
+
+LRP result.color, R2.a, R1, R0;
+
+END

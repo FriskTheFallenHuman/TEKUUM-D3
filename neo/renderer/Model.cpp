@@ -1,25 +1,27 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Doom 3 BFG Edition GPL Source Code
+Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2014-2016 Kot in Action Creative Artel
+Copyright (C) 2012-2021 Robert Beckebans
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
+Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
+Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
+along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
+In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
 
 If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
@@ -30,12 +32,13 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 
-#include "tr_local.h"
+#include "RenderCommon.h"
 #include "Model_local.h"
 #include "Model_ase.h"
 #include "Model_lwo.h"
 #include "Model_ma.h"
 #include "Model_ColladaParser.h"
+#include "Model_obj.h"
 
 idCVar idRenderModelStatic::r_mergeModelSurfaces( "r_mergeModelSurfaces", "1", CVAR_BOOL | CVAR_RENDERER, "combine model surfaces with the same material" );
 idCVar idRenderModelStatic::r_slopVertex( "r_slopVertex", "0.01", CVAR_RENDERER, "merge xyz coordinates this far apart" );
@@ -281,7 +284,7 @@ void idRenderModelStatic::MakeDefaultModel()
 	tri->generateNormals = true;
 
 	AddSurface( surf );
-	FinishSurfaces();
+	FinishSurfaces( false );
 }
 
 /*
@@ -309,28 +312,35 @@ void idRenderModelStatic::InitFromFile( const char* fileName )
 
 	// FIXME: load new .proc map format
 
+	ID_TIME_T sourceTimeStamp;
+
 	name.ExtractFileExtension( extension );
 
 	if( extension.Icmp( "ase" ) == 0 )
 	{
-		loaded		= LoadASE( name );
+		loaded		= LoadASE( name, &sourceTimeStamp );
 		reloadable	= true;
 	}
-// RB: added dae
+	// RB: Collada DAE and Wavefront OBJ
 	else if( extension.Icmp( "dae" ) == 0 )
 	{
-		loaded		= LoadDAE( name );
+		loaded		= LoadDAE( name, &sourceTimeStamp );
 		reloadable	= true;
 	}
-// RB end
+	else if( extension.Icmp( "obj" ) == 0 )
+	{
+		loaded		= LoadOBJ( name, &sourceTimeStamp );
+		reloadable	= true;
+	}
+	// RB end
 	else if( extension.Icmp( "lwo" ) == 0 )
 	{
-		loaded		= LoadLWO( name );
+		loaded		= LoadLWO( name, &sourceTimeStamp );
 		reloadable	= true;
 	}
 	else if( extension.Icmp( "ma" ) == 0 )
 	{
-		loaded		= LoadMA( name );
+		loaded		= LoadMA( name, &sourceTimeStamp );
 		reloadable	= true;
 	}
 	else
@@ -349,8 +359,19 @@ void idRenderModelStatic::InitFromFile( const char* fileName )
 	// it is now available for use
 	purged = false;
 
+	// RB: this is 1.1.2016 10:00 AM
+	// a useful tool for this is https://www.unixtime.de/
+	const ID_TIME_T min2016 = 1451638800;
+
+	bool useMikktspace = false;
+	if( sourceTimeStamp > min2016 )
+	{
+		// HACK: assume this is a newer asset not by id Software and its normalmaps are baked using the mikktspace standard
+		useMikktspace = true;
+	}
+
 	// create the bounds for culling and dynamic surface creation
-	FinishSurfaces();
+	FinishSurfaces( useMikktspace );
 }
 
 /*
@@ -375,12 +396,13 @@ bool idRenderModelStatic::LoadBinaryModel( idFile* file, const ID_TIME_T sourceT
 	file->ReadBig( timeStamp );
 
 	// RB: source might be from pk4, so we ignore the time stamp and assume a release build
-	if( ( sourceTimeStamp != FILE_NOT_FOUND_TIMESTAMP ) && ( sourceTimeStamp != 0 ) && ( sourceTimeStamp != timeStamp ) /* && !fileSystem->InProductionMode()*/ )
+	if( ( sourceTimeStamp != FILE_NOT_FOUND_TIMESTAMP ) && ( sourceTimeStamp != 0 ) && ( sourceTimeStamp != timeStamp ) )
 	{
 		return false;
 	}
+	// RB end
 
-	//session->PacifierUpdate();
+	session->PacifierUpdate();
 
 	int numSurfaces;
 	file->ReadBig( numSurfaces );
@@ -722,24 +744,25 @@ void idRenderModelStatic::WriteBinaryModel( idFile* file, ID_TIME_T* _timeStamp 
 }
 
 // RB begin
-void idRenderModelStatic::ExportOBJ( idFile* file, ID_TIME_T* _timeStamp ) const
+void idRenderModelStatic::ExportOBJ( idFile* objFile, idFile* mtlFile, ID_TIME_T* _timeStamp )
 {
-	if( file == NULL )
+	if( objFile == NULL || mtlFile == NULL )
 	{
 		common->Printf( "Failed to ExportOBJ\n" );
 		return;
 	}
 
-	//file->Printf( "// generated by %s\n//\n\n", ENGINE_VERSION );
+	objFile->Printf( "# generated by %s\n\n", ENGINE_VERSION );
 
 	int numVerts = 0;
+	idList< const idMaterial* > materials;
 
 	for( int i = 0; i < surfaces.Num(); i++ )
 	{
 		// shadow models use numVerts but have no verts
 		if( ( surfaces[i].geometry != NULL ) && ( surfaces[i].geometry->numVerts > 0 ) && ( surfaces[i].geometry->numIndexes > 0 ) && ( surfaces[i].geometry->verts != NULL ) )
 		{
-			file->Printf( "o Geometry.%i\n", surfaces[i].id );
+			objFile->Printf( "o Geometry.%i\n", surfaces[i].id );
 
 			srfTriangles_t& tri = *surfaces[i].geometry;
 
@@ -757,21 +780,21 @@ void idRenderModelStatic::ExportOBJ( idFile* file, ID_TIME_T* _timeStamp ) const
 			{
 				for( int j = 0; j < tri.numVerts; j++ )
 				{
-					file->Printf( "v %1.6f %1.6f %1.6f\n", tri.verts[j].xyz.x, tri.verts[j].xyz.y, tri.verts[j].xyz.z );
+					objFile->Printf( "v %1.6f %1.6f %1.6f\n", tri.verts[j].xyz.x, tri.verts[j].xyz.y, tri.verts[j].xyz.z );
 				}
 
 				for( int j = 0; j < tri.numVerts; j++ )
 				{
 					const idVec2 vST =  tri.verts[j].GetTexCoord();
 
-					file->Printf( "vt %1.6f %1.6f\n", vST.x, vST.y );
+					objFile->Printf( "vt %1.6f %1.6f\n", vST.x, 1.0f - vST.y );
 				}
 
 				for( int j = 0; j < tri.numVerts; j++ )
 				{
-					const idVec3 n = tri.verts[j].GetNormal();
+					const idVec3 n = tri.verts[j].GetNormalRaw();
 
-					file->Printf( "vn %1.6f %1.6f %1.6f\n", n.x, n.y, n.z );
+					objFile->Printf( "vn %1.6f %1.6f %1.6f\n", n.x, n.y, n.z );
 				}
 
 				//file->WriteBigArray( tri.verts[j].st, 2 );
@@ -783,31 +806,60 @@ void idRenderModelStatic::ExportOBJ( idFile* file, ID_TIME_T* _timeStamp ) const
 
 			if( surfaces[i].shader != NULL && surfaces[i].shader->GetName() != NULL )
 			{
-				file->Printf( "usemtl %s\n", surfaces[i].shader->GetName() );
+				objFile->Printf( "usemtl %s\n", surfaces[i].shader->GetName() );
+
+				materials.AddUnique( surfaces[i].shader );
 			}
 
-			file->Printf( "s 1\n" );
+			objFile->Printf( "s 1\n" );
 
 			for( int j = 0; j < tri.numIndexes; j += 3 )
 			{
-				file->Printf( "f %i/%i/%i %i/%i/%i %i/%i/%i\n",
-							  tri.indexes[j + 2] + 1 + numVerts,
-							  tri.indexes[j + 2] + 1 + numVerts,
-							  tri.indexes[j + 2] + 1 + numVerts,
+				objFile->Printf( "f %i/%i/%i %i/%i/%i %i/%i/%i\n",
+								 tri.indexes[j + 2] + 1 + numVerts,
+								 tri.indexes[j + 2] + 1 + numVerts,
+								 tri.indexes[j + 2] + 1 + numVerts,
 
-							  tri.indexes[j + 1] + 1 + numVerts,
-							  tri.indexes[j + 1] + 1 + numVerts,
-							  tri.indexes[j + 1] + 1 + numVerts,
+								 tri.indexes[j + 1] + 1 + numVerts,
+								 tri.indexes[j + 1] + 1 + numVerts,
+								 tri.indexes[j + 1] + 1 + numVerts,
 
-							  tri.indexes[j + 0] + 1 + numVerts,
-							  tri.indexes[j + 0] + 1 + numVerts,
-							  tri.indexes[j + 0] + 1 + numVerts );
+								 tri.indexes[j + 0] + 1 + numVerts,
+								 tri.indexes[j + 0] + 1 + numVerts,
+								 tri.indexes[j + 0] + 1 + numVerts );
 			}
 
-			file->Printf( "\n" );
+			objFile->Printf( "\n" );
 
 			numVerts += tri.numVerts;
 		}
+	}
+
+	for( int i = 0; i < materials.Num(); i++ )
+	{
+		const idMaterial* material = materials[i];
+
+		mtlFile->Printf( "newmtl %s\n", material->GetName() );
+
+		if( material->GetFastPathDiffuseImage() )
+		{
+			idStr path = material->GetFastPathDiffuseImage()->GetName();
+			path.SlashesToBackSlashes();
+			path.DefaultFileExtension( ".tga" );
+
+			mtlFile->Printf( "\tmap_Kd //..\\..\\..\\%s\n", path.c_str() );
+		}
+		else if( material->GetEditorImage() )
+		{
+			idStr path = material->GetEditorImage()->GetName();
+			path.SlashesToBackSlashes();
+			path.DefaultFileExtension( ".tga" );
+
+			mtlFile->Printf( "\tmap_Kd //..\\..\\..\\%s\n", path.c_str() );
+		}
+
+
+		mtlFile->Printf( "\n" );
 	}
 }
 // RB end
@@ -1093,7 +1145,7 @@ Extends the bounds of deformed surfaces so they don't cull incorrectly at screen
 
 ================
 */
-void idRenderModelStatic::FinishSurfaces()
+void idRenderModelStatic::FinishSurfaces( bool useMikktspace )
 {
 	int			i;
 	int			totalVerts, totalIndexes;
@@ -1182,7 +1234,9 @@ void idRenderModelStatic::FinishSurfaces()
 	{
 		const modelSurface_t*	surf = &surfaces[i];
 
-		R_CleanupTriangles( surf->geometry, surf->geometry->generateNormals, true, surf->shader->UseUnsmoothedTangents() );
+		bool mikktspace = useMikktspace || surf->shader->UseMikkTSpace();
+
+		R_CleanupTriangles( surf->geometry, surf->geometry->generateNormals, true, surf->shader->UseUnsmoothedTangents(), mikktspace );
 		if( surf->shader->SurfaceCastsShadow() )
 		{
 			totalVerts += surf->geometry->numVerts;
@@ -1295,8 +1349,6 @@ bool idRenderModelStatic::ConvertDAEToModelSurfaces( const ColladaParser* dae )
 	matchVert_t* 		lastmv;
 	matchVert_t* 		mv;
 	idVec3				normal;
-	float				uOffset, vOffset, textureSin, textureCos;
-	float				uTiling, vTiling;
 	int* 				mergeTo;
 	byte* 				color;
 	static byte	identityColor[4] = { 255, 255, 255, 255 };
@@ -1705,27 +1757,6 @@ bool idRenderModelStatic::ConvertDAEToModelSurfaces( const ColladaParser* dae )
 			common->FatalError( "ConvertDAEToModelSurfaces: vertex miscount in DAE file %s", name.c_str() );
 		}
 
-		// an ASE allows the texture coordinates to be scaled, translated, and rotated
-		//if( ase->materials.Num() == 0 )
-		{
-			uOffset = vOffset = 0.0f;
-			uTiling = vTiling = 1.0f;
-			textureSin = 0.0f;
-			textureCos = 1.0f;
-		}
-		/*
-		else
-		{
-			material = ase->materials[object->materialRef];
-			uOffset = -material->uOffset;
-			vOffset = material->vOffset;
-			uTiling = material->uTiling;
-			vTiling = material->vTiling;
-			textureSin = idMath::Sin( material->angle );
-			textureCos = idMath::Cos( material->angle );
-		}
-		*/
-
 		// now allocate and generate the combined vertexes
 		R_AllocStaticTriSurfVerts( tri, tri->numVerts );
 		for( j = 0; j < tri->numVerts; j++ )
@@ -1736,13 +1767,12 @@ bool idRenderModelStatic::ConvertDAEToModelSurfaces( const ColladaParser* dae )
 			tri->verts[ j ].SetNormal( mv->normal );
 			*( unsigned* )tri->verts[j].color = *( unsigned* )mv->color;
 
-			//if( mesh->numTVFaces == mesh->numFaces && mesh->numTVertexes != 0 )
 			if( ( *mesh )->mTexCoords.Num() > 0 )
 			{
 				const idVec2& tv = ( *mesh )->mTexCoords[ mv->tv ];
-				float u = tv.x * uTiling + uOffset;
-				float v = tv.y * vTiling + vOffset;
-				tri->verts[ j ].SetTexCoord( u * textureCos + v * textureSin, u * -textureSin + v * textureCos );
+				float u = tv.x;
+				float v = tv.y;
+				tri->verts[ j ].SetTexCoord( u, v );
 			}
 		}
 
@@ -1768,6 +1798,364 @@ bool idRenderModelStatic::ConvertDAEToModelSurfaces( const ColladaParser* dae )
 
 	return true;
 }
+
+/*
+=================
+idRenderModelStatic::ConvertOBJToModelSurfaces
+=================
+*/
+bool idRenderModelStatic::ConvertOBJToModelSurfaces( const objModel_t* model )
+{
+	objObject_t* 	mesh;
+	const idMaterial* im1, *im2;
+	srfTriangles_t* tri;
+	int				objectNum;
+	int				i, j;
+	int				v, tv;
+	int* 			vRemap;
+	int* 			tvRemap;
+	matchVert_t* 	mvTable;	// all of the match verts
+	matchVert_t** 	mvHash;		// points inside mvTable for each xyz index
+	matchVert_t* 	lastmv;
+	matchVert_t* 	mv;
+	idVec3			normal;
+	int* 			mergeTo;
+	byte* 			color;
+	static byte	identityColor[4] = { 255, 255, 255, 255 };
+	modelSurface_t	surf, *modelSurf;
+
+	if( !model )
+	{
+		return false;
+	}
+	if( model->objects.Num() < 1 )
+	{
+		return false;
+	}
+
+	timeStamp = model->timeStamp;
+
+	// the modeling programs can save out multiple surfaces with a common
+	// material, but we would like to mege them together where possible
+	// meaning that this->NumSurfaces() <= ase->objects.currentElements
+	mergeTo = ( int* )_alloca( model->objects.Num() * sizeof( *mergeTo ) );
+	surf.geometry = NULL;
+	/*
+	if( model->materials.Num() == 0 )
+	{
+		// if we don't have any materials, dump everything into a single surface
+		surf.shader = tr.defaultMaterial;
+		surf.id = 0;
+		this->AddSurface( surf );
+		for( i = 0; i < ase->objects.Num(); i++ )
+		{
+			mergeTo[i] = 0;
+		}
+	}
+	else
+	*/
+	if( !r_mergeModelSurfaces.GetBool() )
+	{
+		// don't merge any
+		for( i = 0; i < model->objects.Num(); i++ )
+		{
+			mergeTo[i] = i;
+			mesh = model->objects[i];
+
+			surf.shader = declManager->FindMaterial( mesh->material );
+			surf.id = this->NumSurfaces();
+			this->AddSurface( surf );
+		}
+	}
+	else
+	{
+		// search for material matches
+		for( i = 0; i < model->objects.Num(); i++ )
+		{
+			mesh = model->objects[i];
+
+			im1 = declManager->FindMaterial( mesh->material );
+			if( im1->IsDiscrete() )
+			{
+				// flares, autosprites, etc
+				j = this->NumSurfaces();
+			}
+			else
+			{
+				for( j = 0; j < this->NumSurfaces(); j++ )
+				{
+					modelSurf = &this->surfaces[j];
+					im2 = modelSurf->shader;
+					if( im1 == im2 )
+					{
+						// merge this
+						mergeTo[i] = j;
+						break;
+					}
+				}
+			}
+			if( j == this->NumSurfaces() )
+			{
+				// didn't merge
+				mergeTo[i] = j;
+				surf.shader = im1;
+				surf.id = this->NumSurfaces();
+				this->AddSurface( surf );
+			}
+		}
+	}
+
+	idVectorSubset<idVec3, 3> vertexSubset;
+	idVectorSubset<idVec2, 2> texCoordSubset;
+
+	// build the surfaces
+	for( objectNum = 0; objectNum < model->objects.Num(); objectNum++ )
+	{
+		mesh = model->objects[objectNum];
+
+		im1 = declManager->FindMaterial( mesh->material );
+
+		bool normalsParsed = mesh->normals.Num();
+
+		// completely ignore any explict normals on surfaces with a renderbump command
+		// which will guarantee the best contours and least vertexes.
+		const char* rb = im1->GetRenderBump();
+		if( rb != NULL && rb[0] != '\0' )
+		{
+			normalsParsed = false;
+		}
+
+		// It seems like the tools our artists are using often generate
+		// verts and texcoords slightly separated that should be merged
+		// note that we really should combine the surfaces with common materials
+		// before doing this operation, because we can miss a slop combination
+		// if they are in different surfaces
+
+		vRemap = ( int* )R_StaticAlloc( mesh->vertexes.Num() * sizeof( vRemap[0] ) );
+
+		if( fastLoad )
+		{
+			// renderbump doesn't care about vertex count
+			for( j = 0; j < mesh->vertexes.Num(); j++ )
+			{
+				vRemap[j] = j;
+			}
+		}
+		else
+		{
+			float vertexEpsilon = r_slopVertex.GetFloat();
+			float expand = 2 * 32 * vertexEpsilon;
+			idVec3 mins, maxs;
+
+			SIMDProcessor->MinMax( mins, maxs, &mesh->vertexes[0], mesh->vertexes.Num() );
+
+			mins -= idVec3( expand, expand, expand );
+			maxs += idVec3( expand, expand, expand );
+
+			vertexSubset.Init( mins, maxs, 32, 1024 );
+			for( j = 0; j < mesh->vertexes.Num(); j++ )
+			{
+				vRemap[j] = vertexSubset.FindVector( &mesh->vertexes[0], j, vertexEpsilon );
+			}
+		}
+
+		tvRemap = ( int* )R_StaticAlloc( mesh->texcoords.Num() * sizeof( tvRemap[0] ) );
+
+		if( fastLoad )
+		{
+			// renderbump doesn't care about vertex count
+			for( j = 0; j < mesh->texcoords.Num(); j++ )
+			{
+				tvRemap[j] = j;
+			}
+		}
+		else
+		{
+			float texCoordEpsilon = r_slopTexCoord.GetFloat();
+			float expand = 2 * 32 * texCoordEpsilon;
+			idVec2 mins, maxs;
+
+			SIMDProcessor->MinMax( mins, maxs, &mesh->texcoords[0], mesh->texcoords.Num() );
+
+			mins -= idVec2( expand, expand );
+			maxs += idVec2( expand, expand );
+
+			texCoordSubset.Init( mins, maxs, 32, 1024 );
+
+			for( j = 0; j < mesh->texcoords.Num(); j++ )
+			{
+				tvRemap[j] = texCoordSubset.FindVector( &mesh->texcoords[0], j, texCoordEpsilon );
+			}
+		}
+
+		// we need to find out how many unique vertex / texcoord combinations
+		// there are, because ASE tracks them separately but we need them unified
+
+		// the maximum possible number of combined vertexes is the number of indexes
+		mvTable = ( matchVert_t* )R_ClearedStaticAlloc( mesh->indexes.Num() * sizeof( mvTable[0] ) );
+
+		// we will have a hash chain based on the xyz values
+		mvHash = ( matchVert_t** )R_ClearedStaticAlloc( mesh->vertexes.Num() * sizeof( mvHash[0] ) );
+
+		// allocate triangle surface
+		tri = R_AllocStaticTriSurf();
+		tri->numVerts = 0;
+		tri->numIndexes = 0;
+		R_AllocStaticTriSurfIndexes( tri, mesh->indexes.Num() );
+		tri->generateNormals = !normalsParsed;
+
+		// init default normal, color and tex coord index
+		normal.Zero();
+		color = identityColor;
+		tv = 0;
+
+		// find all the unique combinations
+		float normalEpsilon = 1.0f - r_slopNormal.GetFloat();
+
+		for( j = 0; j < ( mesh->indexes.Num() / 3 ); j++ )
+		{
+			// construct triangles in reverse order
+			for( int k = 2; k >= 0; k-- )
+			{
+				int index = j * 3 + k;
+
+				if( index < 0 || index >= mesh->vertexes.Num() )
+				{
+					common->Error( "ConvertOBJToModelSurfaces: bad vertex index in ASE file %s", name.c_str() );
+				}
+
+				// collapse the position if it was slightly offset
+				v = vRemap[index];
+
+				// we may or may not have texcoords to compare
+				if( mesh->texcoords.Num() != 0 )
+				{
+					tv = index;
+					//tv = mesh->faces[j].tVertexNum[k];
+
+					if( tv < 0 || tv >= mesh->texcoords.Num() )
+					{
+						common->Error( "ConvertOBJToModelSurfaces: bad tex coord index in ASE file %s", name.c_str() );
+					}
+					// collapse the tex coord if it was slightly offset
+					tv = tvRemap[tv];
+				}
+
+				// we may or may not have normals to compare
+				if( normalsParsed )
+				{
+					normal = mesh->normals[ index ];
+				}
+
+				// we may or may not have colors to compare
+				/*
+				if( mesh->colorsParsed )
+				{
+					color = mesh->faces[j].vertexColors[k];
+				}
+				*/
+
+				// find a matching vert
+				for( lastmv = NULL, mv = mvHash[v]; mv != NULL; lastmv = mv, mv = mv->next )
+				{
+					if( mv->tv != tv )
+					{
+						continue;
+					}
+					if( *( unsigned* )mv->color != *( unsigned* )color )
+					{
+						continue;
+					}
+					if( !normalsParsed )
+					{
+						// if we are going to create the normals, just
+						// matching texcoords is enough
+						break;
+					}
+					if( mv->normal * normal > normalEpsilon )
+					{
+						break;		// we already have this one
+					}
+				}
+				if( !mv )
+				{
+					// allocate a new match vert and link to hash chain
+					mv = &mvTable[ tri->numVerts ];
+					mv->v = v;
+					mv->tv = tv;
+					mv->normal = normal;
+					*( unsigned* )mv->color = *( unsigned* )color;
+					mv->next = NULL;
+					if( lastmv )
+					{
+						lastmv->next = mv;
+					}
+					else
+					{
+						mvHash[v] = mv;
+					}
+					tri->numVerts++;
+				}
+
+				tri->indexes[tri->numIndexes] = mv - mvTable;
+				tri->numIndexes++;
+			}
+		}
+
+		// allocate space for the indexes and copy them
+		if( tri->numIndexes > mesh->indexes.Num() )
+		{
+			common->FatalError( "ConvertOBJToModelSurfaces: index miscount in OBJ file %s", name.c_str() );
+		}
+		if( tri->numVerts > mesh->indexes.Num() )
+		{
+			common->FatalError( "ConvertOBJToModelSurfaces: vertex miscount in OBJ file %s", name.c_str() );
+		}
+
+		// now allocate and generate the combined vertexes
+		R_AllocStaticTriSurfVerts( tri, tri->numVerts );
+
+		for( j = 0; j < tri->numVerts; j++ )
+		{
+			mv = &mvTable[j];
+			tri->verts[ j ].Clear();
+			tri->verts[ j ].xyz = mesh->vertexes[ mv->v ];
+			tri->verts[ j ].SetNormal( mv->normal );
+
+			*( unsigned* )tri->verts[j].color = *( unsigned* )mv->color;
+
+			if( mesh->texcoords.Num() != 0 )
+			{
+				const idVec2& tv = mesh->texcoords[ mv->tv ];
+				float u = tv.x;
+				float v = tv.y;
+				tri->verts[j].SetTexCoord( u, v );
+			}
+		}
+
+		R_StaticFree( mvTable );
+		R_StaticFree( mvHash );
+		R_StaticFree( tvRemap );
+		R_StaticFree( vRemap );
+
+		// see if we need to merge with a previous surface of the same material
+		modelSurf = &this->surfaces[mergeTo[ objectNum ]];
+		srfTriangles_t*	mergeTri = modelSurf->geometry;
+		if( !mergeTri )
+		{
+			modelSurf->geometry = tri;
+		}
+		else
+		{
+			modelSurf->geometry = R_MergeTriangles( mergeTri, tri );
+			R_FreeStaticTriSurf( tri );
+			R_FreeStaticTriSurf( mergeTri );
+		}
+	}
+
+	return true;
+}
+// RB end
 
 /*
 =================
@@ -1884,8 +2272,12 @@ bool idRenderModelStatic::ConvertASEToModelSurfaces( const struct aseModel_s* as
 	{
 		object = ase->objects[objectNum];
 		mesh = &object->mesh;
-		material = ase->materials[object->materialRef];
-		im1 = declManager->FindMaterial( material->name );
+		//material = ase->materials[object->materialRef];
+		//im1 = declManager->FindMaterial( material->name );
+		//
+		// caedes dhewm3 fix for ASE meshes without materials (a lot of Doom 3 mods have this issue) 05-18-2021
+		material = ( ase->materials.Num() > object->materialRef ) ? ase->materials[object->materialRef] : NULL;
+		im1 = declManager->FindMaterial( material ? material->name : NULL );
 
 		bool normalsParsed = mesh->normalsParsed;
 
@@ -3143,7 +3535,7 @@ bool idRenderModelStatic::ConvertMAToModelSurfaces( const struct maModel_s* ma )
 idRenderModelStatic::LoadASE
 =================
 */
-bool idRenderModelStatic::LoadASE( const char* fileName )
+bool idRenderModelStatic::LoadASE( const char* fileName, ID_TIME_T* sourceTimeStamp )
 {
 	aseModel_t* ase;
 
@@ -3152,6 +3544,9 @@ bool idRenderModelStatic::LoadASE( const char* fileName )
 	{
 		return false;
 	}
+
+	// RB
+	*sourceTimeStamp = ase->timeStamp;
 
 	ConvertASEToModelSurfaces( ase );
 
@@ -3165,7 +3560,7 @@ bool idRenderModelStatic::LoadASE( const char* fileName )
 idRenderModelStatic::LoadLWO
 =================
 */
-bool idRenderModelStatic::LoadLWO( const char* fileName )
+bool idRenderModelStatic::LoadLWO( const char* fileName, ID_TIME_T* sourceTimeStamp )
 {
 	unsigned int failID;
 	int failPos;
@@ -3176,6 +3571,9 @@ bool idRenderModelStatic::LoadLWO( const char* fileName )
 	{
 		return false;
 	}
+
+	// RB
+	*sourceTimeStamp = fileSystem->GetTimestamp( fileName );
 
 	ConvertLWOToModelSurfaces( lwo );
 
@@ -3189,7 +3587,7 @@ bool idRenderModelStatic::LoadLWO( const char* fileName )
 idRenderModelStatic::LoadMA
 =================
 */
-bool idRenderModelStatic::LoadMA( const char* fileName )
+bool idRenderModelStatic::LoadMA( const char* fileName, ID_TIME_T* sourceTimeStamp )
 {
 	maModel_t* ma;
 
@@ -3199,6 +3597,9 @@ bool idRenderModelStatic::LoadMA( const char* fileName )
 		return false;
 	}
 
+	// RB
+	*sourceTimeStamp = ma->timeStamp;
+
 	ConvertMAToModelSurfaces( ma );
 
 	MA_Free( ma );
@@ -3207,7 +3608,7 @@ bool idRenderModelStatic::LoadMA( const char* fileName )
 }
 
 // RB: added COLLADA support
-bool idRenderModelStatic::LoadDAE( const char* fileName )
+bool idRenderModelStatic::LoadDAE( const char* fileName, ID_TIME_T* sourceTimeStamp )
 {
 	bool loaded = false;
 
@@ -3218,7 +3619,7 @@ bool idRenderModelStatic::LoadDAE( const char* fileName )
 		idTimer timer;
 		timer.Start();
 
-		ColladaParser parser( fileName );
+		ColladaParser parser( fileName, sourceTimeStamp );
 
 		loaded = ConvertDAEToModelSurfaces( &parser );
 
@@ -3234,6 +3635,31 @@ bool idRenderModelStatic::LoadDAE( const char* fileName )
 #endif
 
 	return loaded;
+}
+
+/*
+=================
+idRenderModelStatic::LoadOBJ
+=================
+*/
+bool idRenderModelStatic::LoadOBJ( const char* fileName, ID_TIME_T* sourceTimeStamp )
+{
+	objModel_t* obj;
+
+	obj = OBJ_Load( fileName );
+	if( obj == NULL )
+	{
+		return false;
+	}
+
+	// RB
+	*sourceTimeStamp = obj->timeStamp;
+
+	ConvertOBJToModelSurfaces( obj );
+
+	OBJ_Free( obj );
+
+	return true;
 }
 // RB end
 
@@ -3265,29 +3691,6 @@ void idRenderModelStatic::PurgeModel()
 
 	purged = true;
 }
-
-
-// RB begin
-void idRenderModelStatic::CreateVertexCache()
-{
-	if( IsLoaded() )
-	{
-		for( int j = 0; j < surfaces.Num(); j++ )
-		{
-			srfTriangles_t* tri = surfaces[j].geometry;
-			if( tri == NULL )
-			{
-				continue;
-			}
-
-			if( !vertexCache.CacheIsCurrent( tri->ambientCache ) )
-			{
-				R_CreateStaticBuffersForTri( *tri );
-			}
-		}
-	}
-}
-// RB end
 
 /*
 ==============
@@ -3358,7 +3761,9 @@ void idRenderModelStatic::ReadFromDemoFile( class idDemoFile* f )
 
 		this->AddSurface( surf );
 	}
-	this->FinishSurfaces();
+
+	// RB: don't use mikktspace here because it is slower
+	this->FinishSurfaces( false );
 }
 
 /*
@@ -3368,13 +3773,9 @@ idRenderModelStatic::WriteToDemoFile
 */
 void idRenderModelStatic::WriteToDemoFile( class idDemoFile* f )
 {
-	int	data[1];
-
 	// note that it has been updated
 	lastArchivedFrame = tr.frameCount;
 
-	data[0] = DC_DEFINE_MODEL;
-	f->WriteInt( data[0] );
 	f->WriteHashString( this->Name() );
 
 	int i, j, iData = surfaces.Num();

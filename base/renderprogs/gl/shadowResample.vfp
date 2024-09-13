@@ -1,0 +1,56 @@
+!!ARBvp1.0
+OPTION ARB_position_invariant ;
+
+END;
+
+
+!!ARBfp1.0 
+#OPTION ARB_precision_hint_fastest;		# we want full precision in this one
+
+# texture 0 is the view shadow factor texture, shadow in alpha
+# writes result.color.w as the resampled version
+
+PARAM	positionToDepthTexScale		= program.local[0];	# fragment.position to screen depth texture transformation
+
+PARAM	epsilon = { 0.001 };
+
+TEMP	R0, R1;
+
+MUL		R0, fragment.position, positionToDepthTexScale;
+TEX		R0, R0, texture[0], 2D;
+
+# if there is no shadow here kill the pixel so the stencil doesn't get updated
+SUB		R1.w, R0.w, epsilon.x;
+KIL		R1;
+
+MOV		result.color.w, R0.w;
+
+END;
+!!ARBvp1.0
+OPTION ARB_position_invariant ;
+
+END;
+
+
+!!ARBfp1.0 
+#OPTION ARB_precision_hint_fastest;		# we want full precision in this one
+
+# texture 0 is the view shadow factor texture, shadow in alpha
+# writes result.color.w as the resampled version
+
+PARAM	positionToDepthTexScale		= program.local[0];	# fragment.position to screen depth texture transformation
+
+PARAM	epsilon = { 0.001 };
+
+TEMP	R0, R1;
+
+MUL		R0, fragment.position, positionToDepthTexScale;
+TEX		R0, R0, texture[0], 2D;
+
+# if there is no shadow here kill the pixel so the stencil doesn't get updated
+SUB		R1.w, R0.w, epsilon.x;
+KIL		R1;
+
+MOV		result.color.w, R0.w;
+
+END;

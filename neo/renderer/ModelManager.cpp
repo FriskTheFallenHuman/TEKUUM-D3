@@ -1,25 +1,25 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Doom 3 BFG Edition GPL Source Code
+Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
+Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
+Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
+along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
+In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
 
 If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
@@ -30,7 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 #include "Model_local.h"
-#include "tr_local.h"	// just for R_FreeWorldInteractions and R_CreateWorldInteractions
+#include "RenderCommon.h"	// just for R_FreeWorldInteractions and R_CreateWorldInteractions
 
 idCVar binaryLoadRenderModels( "binaryLoadRenderModels", "1", 0, "enable binary load/write of render models" );
 idCVar preload_MapModels( "preload_MapModels", "1", CVAR_SYSTEM | CVAR_BOOL, "preload models during begin or end levelload" );
@@ -55,9 +55,6 @@ public:
 	virtual void			AddModel( idRenderModel* model );
 	virtual void			RemoveModel( idRenderModel* model );
 	virtual void			ReloadModels( bool forceAll = false );
-	// RB begin
-	virtual void			CreateModelVertexCaches();
-	// RB end
 	virtual void			FreeModelVertexCaches();
 	virtual void			WritePrecacheCommands( idFile* file );
 	virtual void			BeginLevelLoad();
@@ -308,11 +305,15 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 				idStr generatedFileName = "generated/rendermodels/";
 				generatedFileName.AppendPath( canonical );
 				generatedFileName.SetFileExtension( va( "b%s", extension.c_str() ) );
+
+				// Get the timestamp on the original file, if it's newer than what is stored in binary model, regenerate it
+				ID_TIME_T sourceTimeStamp = fileSystem->GetTimestamp( canonical );
+
 				if( model->SupportsBinaryModel() && binaryLoadRenderModels.GetBool() )
 				{
 					idFileLocal file( fileSystem->OpenFileReadMemory( generatedFileName ) );
 					model->PurgeModel();
-					if( !model->LoadBinaryModel( file, 0 ) )
+					if( !model->LoadBinaryModel( file, sourceTimeStamp ) )
 					{
 						model->LoadModel();
 					}
@@ -329,6 +330,7 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 				// in memory as well
 				model->TouchData();
 			}
+
 			model->SetLevelLoadReferenced( true );
 			return model;
 		}
@@ -340,9 +342,8 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 
 	idRenderModel* model = NULL;
 
-	// RB: added dae
-	if( ( extension.Icmp( "dae" ) == 0 ) || ( extension.Icmp( "ase" ) == 0 ) || ( extension.Icmp( "lwo" ) == 0 ) || ( extension.Icmp( "flt" ) == 0 ) || ( extension.Icmp( "ma" ) == 0 ) )
-		// RB end
+	// RB: Collada DAE and Wavefront OBJ
+	if( ( extension.Icmp( "dae" ) == 0 ) || ( extension.Icmp( "obj" ) == 0 ) || ( extension.Icmp( "ase" ) == 0 ) || ( extension.Icmp( "lwo" ) == 0 ) || ( extension.Icmp( "flt" ) == 0 ) || ( extension.Icmp( "ma" ) == 0 ) )
 	{
 		model = new idRenderModelStatic;
 	}
@@ -367,7 +368,6 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 
 	if( model != NULL )
 	{
-
 		generatedFileName = "generated/rendermodels/";
 		generatedFileName.AppendPath( canonical );
 		generatedFileName.SetFileExtension( va( "b%s", extension.c_str() ) );
@@ -387,12 +387,14 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 			{
 				model->InitFromFile( canonical );
 
+				// RB: default models shouldn't be cached as binary models
 				if( !model->IsDefaultModel() )
 				{
 					idFileLocal outputFile( fileSystem->OpenFileWrite( generatedFileName, "fs_basepath" ) );
 					idLib::Printf( "Writing %s\n", generatedFileName.c_str() );
 					model->WriteBinaryModel( outputFile );
 				}
+				// RB end
 			} /* else {
 				idLib::Printf( "loaded binary model %s from file %s\n", model->Name(), generatedFileName.c_str() );
 			} */
@@ -449,6 +451,14 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 		idStrStatic< MAX_OSPATH > exportedFileName;
 
 		exportedFileName = "exported/rendermodels/";
+
+		/*
+		if( com_editors & EDITOR_EXPORTDEFS )
+		{
+			exportedFileName = "_tb/";
+		}
+		*/
+
 		exportedFileName.AppendPath( canonical );
 		exportedFileName.SetFileExtension( ".obj" );
 
@@ -459,10 +469,13 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 
 		//if( timeStamp == FILE_NOT_FOUND_TIMESTAMP )
 		{
-			idFileLocal outputFile( fileSystem->OpenFileWrite( exportedFileName, "fs_basepath" ) );
+			idFileLocal objFile( fileSystem->OpenFileWrite( exportedFileName, "fs_basepath" ) );
 			idLib::Printf( "Writing %s\n", exportedFileName.c_str() );
 
-			model->ExportOBJ( outputFile );
+			exportedFileName.SetFileExtension( ".mtl" );
+			idFileLocal mtlFile( fileSystem->OpenFileWrite( exportedFileName, "fs_basepath" ) );
+
+			model->ExportOBJ( objFile, mtlFile );
 		}
 	}
 	// RB end
@@ -625,17 +638,6 @@ void idRenderModelManagerLocal::ReloadModels( bool forceAll )
 	R_ReCreateWorldReferences();
 }
 
-// RB begin
-void idRenderModelManagerLocal::CreateModelVertexCaches()
-{
-	for( int i = 0; i < models.Num(); i++ )
-	{
-		idRenderModel* model = models[i];
-		model->CreateVertexCache();
-	}
-}
-// RB end
-
 /*
 =================
 idRenderModelManagerLocal::FreeModelVertexCaches
@@ -774,6 +776,7 @@ void idRenderModelManagerLocal::EndLevelLoad()
 
 		if( !model->IsLevelLoadReferenced() && model->IsLoaded() && model->IsReloadable() )
 		{
+
 //			common->Printf( "purging %s\n", model->Name() );
 
 			purgeCount++;
@@ -785,18 +788,20 @@ void idRenderModelManagerLocal::EndLevelLoad()
 		}
 		else
 		{
+
 //			common->Printf( "keeping %s\n", model->Name() );
 
 			keepCount++;
 		}
 
-		//session->PacifierUpdate();
+		session->PacifierUpdate();
 	}
 
 	// load any new ones
 	for( int i = 0; i < models.Num(); i++ )
 	{
-		////session->PacifierUpdate();
+		session->PacifierUpdate();
+
 
 		idRenderModel* model = models[i];
 
@@ -804,11 +809,6 @@ void idRenderModelManagerLocal::EndLevelLoad()
 		{
 			loadCount++;
 			model->LoadModel();
-
-			//if( ( loadCount & 15 ) == 0 )
-			{
-				session->PacifierUpdate();
-			}
 		}
 	}
 
@@ -817,11 +817,15 @@ void idRenderModelManagerLocal::EndLevelLoad()
 	{
 		session->PacifierUpdate();
 
-		idRenderModel* model = models[i];
 
-		// RB begin
-		model->CreateVertexCache();
-		// RB end
+		idRenderModel* model = models[i];
+		if( model->IsLoaded() )
+		{
+			for( int j = 0; j < model->NumSurfaces(); j++ )
+			{
+				R_CreateStaticBuffersForTri( *( model->Surface( j )->geometry ) );
+			}
+		}
 	}
 
 

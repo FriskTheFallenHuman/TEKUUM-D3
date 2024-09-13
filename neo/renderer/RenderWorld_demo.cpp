@@ -1,25 +1,27 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Doom 3 BFG Edition GPL Source Code
+Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2014-2016 Robert Beckebans
+Copyright (C) 2014-2016 Kot in Action Creative Artel
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
+Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
+Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
+along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
+In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
 
 If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
@@ -29,9 +31,15 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "tr_local.h"
+#include "RenderCommon.h"
 
+idCVar r_writeDemoDecals( "r_writeDemoDecals", "1", CVAR_BOOL | CVAR_SYSTEM, "enable Writing of entity decals to demo files." );
+idCVar r_writeDemoOverlays( "r_writeDemoOverlays", "1", CVAR_BOOL | CVAR_SYSTEM, "enable Writing of entity Overlays to demo files." );
+
+//idCVar r_writeDemoGUI( "r_writeDemoGUI", "0", CVAR_BOOL | CVAR_SYSTEM, "enable Writing of GUI elements to demo files." );
 //#define WRITE_GUIS
+
+extern void WriteDeclCache( idDemoFile* f, int demoCategory, int demoCode, declType_t  declType );
 
 typedef struct
 {
@@ -112,6 +120,7 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile* readDemo, renderView_t
 	switch( dc )
 	{
 		case DC_LOADMAP:
+		{
 			// read the initial data
 			demoHeader_t	header;
 
@@ -132,13 +141,68 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile* readDemo, renderView_t
 			{
 				common->Printf( "DC_LOADMAP: %s\n", header.mapname );
 			}
+			// Clean up existing Renderer before loading the new map.
+			FreeWorld();
+			// Load up the new map.
 			InitFromMap( header.mapname );
 
 			newMap = true;		// we will need to set demoTimeOffset
 
 			break;
+		}
+		case DC_CACHE_SKINS:
+		{
+			int numSkins = 0;
+			readDemo->ReadInt( numSkins );
 
+			for( int i = 0; i < numSkins; ++i )
+			{
+				const char* declName = readDemo->ReadHashString();
+				declManager->FindSkin( declName, true );
+			}
+
+			if( r_showDemo.GetBool() )
+			{
+				common->Printf( "DC_CACHESKINS: %d\n", numSkins );
+			}
+			break;
+		}
+		case DC_CACHE_PARTICLES:
+		{
+			int numDecls = 0;
+			readDemo->ReadInt( numDecls );
+
+			for( int i = 0; i < numDecls; ++i )
+			{
+				const char* declName = readDemo->ReadHashString();
+				declManager->FindType( DECL_PARTICLE, declName, true );
+			}
+
+			if( r_showDemo.GetBool() )
+			{
+				common->Printf( "DC_CACHE_PARTICLES: %d\n", numDecls );
+			}
+			break;
+		}
+		case DC_CACHE_MATERIALS:
+		{
+			int numDecls = 0;
+			readDemo->ReadInt( numDecls );
+
+			for( int i = 0; i < numDecls; ++i )
+			{
+				const char* declName = readDemo->ReadHashString();
+				declManager->FindMaterial( declName, true );
+			}
+
+			if( r_showDemo.GetBool() )
+			{
+				common->Printf( "DC_CACHE_MATERIALS: %d\n", numDecls );
+			}
+			break;
+		}
 		case DC_RENDERVIEW:
+		{
 			readDemo->ReadInt( renderView->viewID );
 			readDemo->ReadFloat( renderView->fov_x );
 			readDemo->ReadFloat( renderView->fov_y );
@@ -150,6 +214,7 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile* readDemo, renderView_t
 			char tmp;
 			readDemo->ReadChar( tmp );
 			readDemo->ReadChar( tmp );
+			readDemo->ReadInt( renderView->time[0] );
 			readDemo->ReadInt( renderView->time[1] );
 			for( int i = 0; i < MAX_GLOBAL_SHADER_PARMS; i++ )
 			{
@@ -163,7 +228,8 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile* readDemo, renderView_t
 
 			if( r_showDemo.GetBool() )
 			{
-				common->Printf( "DC_RENDERVIEW: %i\n", renderView->time );
+				// foresthale 2014-05-19: /analyze fix - was time, changed to time[0]
+				common->Printf( "DC_RENDERVIEW: %i\n", renderView->time[ 0 ] );
 			}
 
 			// possibly change the time offset if this is from a new map
@@ -172,11 +238,14 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile* readDemo, renderView_t
 				*demoTimeOffset = renderView->time[1] - eventLoop->Milliseconds();
 			}
 			return false;
-
+		}
 		case DC_UPDATE_ENTITYDEF:
+		{
 			ReadRenderEntity();
 			break;
+		}
 		case DC_DELETE_ENTITYDEF:
+		{
 			if( !readDemo->ReadInt( h ) )
 			{
 				return false;
@@ -187,10 +256,14 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile* readDemo, renderView_t
 			}
 			FreeEntityDef( h );
 			break;
+		}
 		case DC_UPDATE_LIGHTDEF:
+		{
 			ReadRenderLight();
 			break;
+		}
 		case DC_DELETE_LIGHTDEF:
+		{
 			if( !readDemo->ReadInt( h ) )
 			{
 				return false;
@@ -201,42 +274,45 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile* readDemo, renderView_t
 			}
 			FreeLightDef( h );
 			break;
-
+		}
 		case DC_CAPTURE_RENDER:
+		{
 			if( r_showDemo.GetBool() )
 			{
 				common->Printf( "DC_CAPTURE_RENDER\n" );
 			}
 			renderSystem->CaptureRenderToImage( readDemo->ReadHashString() );
 			break;
-
+		}
 		case DC_CROP_RENDER:
+		{
 			if( r_showDemo.GetBool() )
 			{
 				common->Printf( "DC_CROP_RENDER\n" );
 			}
-			int	size[3];
-			readDemo->ReadInt( size[0] );
-			readDemo->ReadInt( size[1] );
-			readDemo->ReadInt( size[2] );
-			renderSystem->CropRenderSize( size[0], size[1] );
+			int	width, height;
+			readDemo->ReadInt( width );
+			readDemo->ReadInt( height );
+			renderSystem->CropRenderSize( width, height );
 			break;
-
+		}
 		case DC_UNCROP_RENDER:
+		{
 			if( r_showDemo.GetBool() )
 			{
 				common->Printf( "DC_UNCROP\n" );
 			}
 			renderSystem->UnCrop();
 			break;
-
+		}
 		case DC_GUI_MODEL:
+		{
 			if( r_showDemo.GetBool() )
 			{
 				common->Printf( "DC_GUI_MODEL\n" );
 			}
 			break;
-
+		}
 		case DC_DEFINE_MODEL:
 		{
 			idRenderModel*	model = renderModelManager->AllocModel();
@@ -253,6 +329,63 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile* readDemo, renderView_t
 			}
 			break;
 		}
+		case DC_UPDATE_DECAL:
+		{
+			if( !readDemo->ReadInt( h ) )
+			{
+				return false;
+			}
+			int		data[ 2 ];
+			readDemo->ReadInt( data[ 0 ] );
+			readDemo->ReadInt( data[ 1 ] );
+			decals[ h ].entityHandle = data[ 0 ];
+			decals[ h ].lastStartTime = data[ 1 ];
+			decals[ h ].decals->ReadFromDemoFile( readDemo );
+			break;
+		}
+		case DC_DELETE_DECAL:
+		{
+			if( !readDemo->ReadInt( h ) )
+			{
+				return false;
+			}
+
+			int		data[ 2 ];
+			readDemo->ReadInt( data[ 0 ] );
+			readDemo->ReadInt( data[ 1 ] );
+			decals[ h ].entityHandle = data[ 0 ];
+			decals[ h ].lastStartTime = data[ 1 ];
+			decals[ h ].decals->ReUse();
+			break;
+		}
+		case DC_UPDATE_OVERLAY:
+		{
+			if( !readDemo->ReadInt( h ) )
+			{
+				return false;
+			}
+			int		data[ 2 ];
+			readDemo->ReadInt( data[ 0 ] );
+			readDemo->ReadInt( data[ 1 ] );
+			overlays[ h ].entityHandle = data[ 0 ];
+			overlays[ h ].lastStartTime = data[ 1 ];
+			overlays[ h ].overlays->ReadFromDemoFile( readDemo );
+			break;
+		}
+		case DC_DELETE_OVERLAY:
+		{
+			if( !readDemo->ReadInt( h ) )
+			{
+				return false;
+			}
+			int		data[ 2 ];
+			readDemo->ReadInt( data[ 0 ] );
+			readDemo->ReadInt( data[ 1 ] );
+			overlays[ h ].entityHandle = data[ 0 ];
+			overlays[ h ].lastStartTime = data[ 1 ];
+			overlays[ h ].overlays->ReUse();
+			break;
+		}
 		case DC_SET_PORTAL_STATE:
 		{
 			int		data[2];
@@ -263,14 +396,19 @@ bool		idRenderWorldLocal::ProcessDemoCommand( idDemoFile* readDemo, renderView_t
 			{
 				common->Printf( "DC_SET_PORTAL_STATE: %i %i\n", data[0], data[1] );
 			}
+			break;
 		}
-
-		break;
 		case DC_END_FRAME:
+		{
+			if( r_showDemo.GetBool() )
+			{
+				common->Printf( "DC_END_FRAME\n" );
+			}
 			return true;
-
+		}
 		default:
-			common->Error( "Bad token in demo stream" );
+			common->Error( "Bad demo render command '%d' in demo stream", dc );
+			break;
 	}
 
 	return false;
@@ -290,26 +428,71 @@ void	idRenderWorldLocal::WriteLoadMap()
 	{
 		return;
 	}
-
-	session->WriteDemo()->WriteInt( DS_RENDER );
-	session->WriteDemo()->WriteInt( DC_LOADMAP );
+	idDemoFile* f = session->WriteDemo();
+	f->WriteInt( DS_RENDER );
+	f->WriteInt( DC_LOADMAP );
 
 	demoHeader_t	header;
 	strncpy( header.mapname, mapName.c_str(), sizeof( header.mapname ) - 1 );
 	header.version = 4;
 	header.sizeofRenderEntity = sizeof( renderEntity_t );
 	header.sizeofRenderLight = sizeof( renderLight_t );
-	session->WriteDemo()->WriteInt( header.version );
-	session->WriteDemo()->WriteInt( header.sizeofRenderEntity );
-	session->WriteDemo()->WriteInt( header.sizeofRenderLight );
+	f->WriteInt( header.version );
+	f->WriteInt( header.sizeofRenderEntity );
+	f->WriteInt( header.sizeofRenderLight );
 	for( int i = 0; i < 256; i++ )
 	{
-		session->WriteDemo()->WriteChar( header.mapname[i] );
+		f->WriteChar( header.mapname[ i ] );
 	}
 
 	if( r_showDemo.GetBool() )
 	{
-		common->Printf( "write DC_DELETE_LIGHTDEF: %s\n", mapName.c_str() );
+		common->Printf( "write DC_LOADMAP: %s\n", mapName.c_str() );
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+
+	WriteDeclCache( f, DS_RENDER, DC_CACHE_SKINS, DECL_SKIN );
+
+	if( r_showDemo.GetBool() )
+	{
+		common->Printf( "write DC_CACHESKINS: %s\n", mapName.c_str() );
+	}
+
+	WriteDeclCache( f, DS_RENDER, DC_CACHE_PARTICLES, DECL_PARTICLE );
+
+	if( r_showDemo.GetBool() )
+	{
+		common->Printf( "write DC_CACHEPARTICLES: %s\n", mapName.c_str() );
+	}
+
+	WriteDeclCache( f, DS_RENDER, DC_CACHE_MATERIALS, DECL_MATERIAL );
+
+	if( r_showDemo.GetBool() )
+	{
+		common->Printf( "write DC_CACHEPARTICLES: %s\n", mapName.c_str() );
+	}
+
+	for( int i = 0; i < lightDefs.Num(); i++ )
+	{
+		idRenderLightLocal* light = lightDefs[ i ];
+		if( light )
+		{
+			WriteRenderLight( f, light->index, &light->parms );
+		}
+	}
+
+	for( int i = 0; i < entityDefs.Num(); i++ )
+	{
+		if( entityDefs[ i ] )
+		{
+			WriteRenderEntity( f, entityDefs[ i ] );
+		}
+	}
+
+	if( r_showDemo.GetBool() )
+	{
+		common->Printf( "write DC_CACHESKIN: %s\n", mapName.c_str() );
 	}
 }
 
@@ -333,14 +516,13 @@ void	idRenderWorldLocal::WriteVisibleDefs( const viewDef_t* viewDef )
 	{
 		idRenderEntityLocal* ent = viewEnt->entityDef;
 
-		if( ent->archived )
+		if( !ent || ent->archived )
 		{
 			// still up to date
 			continue;
 		}
-
 		// write it out
-		WriteRenderEntity( ent->index, &ent->parms );
+		WriteRenderEntity( session->WriteDemo(), ent );
 		ent->archived = true;
 	}
 
@@ -354,7 +536,7 @@ void	idRenderWorldLocal::WriteVisibleDefs( const viewDef_t* viewDef )
 			continue;
 		}
 		// write it out
-		WriteRenderLight( light->index, &light->parms );
+		WriteRenderLight( session->WriteDemo(), light->index, &light->parms );
 		light->archived = true;
 	}
 }
@@ -389,6 +571,7 @@ void	idRenderWorldLocal::WriteRenderView( const renderView_t* renderView )
 	// binary compatibility with old win32 version writing padded structures directly to disk
 	session->WriteDemo()->WriteUnsignedChar( 0 );
 	session->WriteDemo()->WriteUnsignedChar( 0 );
+	session->WriteDemo()->WriteInt( renderView->time[0] );
 	session->WriteDemo()->WriteInt( renderView->time[1] );
 	for( i = 0; i < MAX_GLOBAL_SHADER_PARMS; i++ )
 	{
@@ -398,7 +581,8 @@ void	idRenderWorldLocal::WriteRenderView( const renderView_t* renderView )
 
 	if( r_showDemo.GetBool() )
 	{
-		common->Printf( "write DC_RENDERVIEW: %i\n", renderView->time );
+		// foresthale 2014-05-19: /analyze fix - was time, changed to time[0]
+		common->Printf( "write DC_RENDERVIEW: %i\n", renderView->time[0] );
 	}
 }
 
@@ -457,7 +641,7 @@ void	idRenderWorldLocal::WriteFreeLight( qhandle_t handle )
 WriteRenderLight
 ================
 */
-void	idRenderWorldLocal::WriteRenderLight( qhandle_t handle, const renderLight_t* light )
+void	idRenderWorldLocal::WriteRenderLight( idDemoFile* f, qhandle_t handle, const renderLight_t* light )
 {
 
 	// only the main renderWorld writes stuff to demos, not the wipes or
@@ -467,46 +651,61 @@ void	idRenderWorldLocal::WriteRenderLight( qhandle_t handle, const renderLight_t
 		return;
 	}
 
-	session->WriteDemo()->WriteInt( DS_RENDER );
-	session->WriteDemo()->WriteInt( DC_UPDATE_LIGHTDEF );
-	session->WriteDemo()->WriteInt( handle );
+	f->WriteInt( DS_RENDER );
+	f->WriteInt( DC_UPDATE_LIGHTDEF );
+	f->WriteInt( handle );
 
-	session->WriteDemo()->WriteMat3( light->axis );
-	session->WriteDemo()->WriteVec3( light->origin );
-	session->WriteDemo()->WriteInt( light->suppressLightInViewID );
-	session->WriteDemo()->WriteInt( light->allowLightInViewID );
-	session->WriteDemo()->WriteBool( light->noShadows );
-	session->WriteDemo()->WriteBool( light->noSpecular );
-	session->WriteDemo()->WriteBool( light->pointLight );
-	session->WriteDemo()->WriteBool( light->parallel );
-	session->WriteDemo()->WriteVec3( light->lightRadius );
-	session->WriteDemo()->WriteVec3( light->lightCenter );
-	session->WriteDemo()->WriteVec3( light->target );
-	session->WriteDemo()->WriteVec3( light->right );
-	session->WriteDemo()->WriteVec3( light->up );
-	session->WriteDemo()->WriteVec3( light->start );
-	session->WriteDemo()->WriteVec3( light->end );
-	session->WriteDemo()->WriteInt( ( int& )light->prelightModel );
-	session->WriteDemo()->WriteInt( light->lightId );
-	session->WriteDemo()->WriteInt( ( int& )light->shader );
+	f->WriteMat3( light->axis );
+	f->WriteVec3( light->origin );
+	f->WriteInt( light->suppressLightInViewID );
+	f->WriteInt( light->allowLightInViewID );
+	f->WriteBool( light->noShadows );
+	f->WriteBool( light->noSpecular );
+	f->WriteBool( light->pointLight );
+	f->WriteBool( light->parallel );
+	f->WriteVec3( light->lightRadius );
+	f->WriteVec3( light->lightCenter );
+	f->WriteVec3( light->target );
+	f->WriteVec3( light->right );
+	f->WriteVec3( light->up );
+	f->WriteVec3( light->start );
+	f->WriteVec3( light->end );
+	f->WriteInt( light->lightId );
+	f->WriteInt( ( int& )light->prelightModel );
+	f->WriteInt( ( int& )light->shader );
 	for( int i = 0; i < MAX_ENTITY_SHADER_PARMS; i++ )
 	{
-		session->WriteDemo()->WriteFloat( light->shaderParms[i] );
+		f->WriteFloat( light->shaderParms[ i ] );
 	}
-	session->WriteDemo()->WriteInt( ( int& )light->referenceSound );
+	f->WriteInt( ( int& )light->referenceSound );
 
 	if( light->prelightModel )
 	{
-		session->WriteDemo()->WriteHashString( light->prelightModel->Name() );
+		f->WriteInt( 1 );
+		f->WriteHashString( light->prelightModel->Name() );
+	}
+	else
+	{
+		f->WriteInt( 0 );
 	}
 	if( light->shader )
 	{
-		session->WriteDemo()->WriteHashString( light->shader->GetName() );
+		f->WriteInt( 1 );
+		f->WriteHashString( light->shader->GetName() );
+	}
+	else
+	{
+		f->WriteInt( 0 );
 	}
 	if( light->referenceSound )
 	{
 		int	index = light->referenceSound->Index();
-		session->WriteDemo()->WriteInt( index );
+		f->WriteInt( 1 );
+		f->WriteInt( index );
+	}
+	else
+	{
+		f->WriteInt( 0 );
 	}
 
 	if( r_showDemo.GetBool() )
@@ -523,13 +722,22 @@ ReadRenderLight
 void	idRenderWorldLocal::ReadRenderLight( )
 {
 	renderLight_t	light;
-	int				index;
+	int				index, i;
 
 	session->ReadDemo()->ReadInt( index );
 	if( index < 0 )
 	{
 		common->Error( "ReadRenderLight: index < 0 " );
 	}
+
+	if( r_showDemo.GetBool() )
+	{
+		common->Printf( "DC_UPDATE_LIGHTDEF: init %i\n", index );
+	}
+	/* Initialize Pointers */
+	light.prelightModel = NULL;
+	light.shader = NULL;
+	light.referenceSound = NULL;
 
 	session->ReadDemo()->ReadMat3( light.axis );
 	session->ReadDemo()->ReadVec3( light.origin );
@@ -546,23 +754,28 @@ void	idRenderWorldLocal::ReadRenderLight( )
 	session->ReadDemo()->ReadVec3( light.up );
 	session->ReadDemo()->ReadVec3( light.start );
 	session->ReadDemo()->ReadVec3( light.end );
-	session->ReadDemo()->ReadInt( ( int& )light.prelightModel );
 	session->ReadDemo()->ReadInt( light.lightId );
+	session->ReadDemo()->ReadInt( ( int& )light.prelightModel );
 	session->ReadDemo()->ReadInt( ( int& )light.shader );
 	for( int i = 0; i < MAX_ENTITY_SHADER_PARMS; i++ )
 	{
-		session->ReadDemo()->ReadFloat( light.shaderParms[i] );
+		session->ReadDemo()->ReadFloat( light.shaderParms[ i ] );
 	}
 	session->ReadDemo()->ReadInt( ( int& )light.referenceSound );
-	if( light.prelightModel )
+
+	session->ReadDemo()->ReadInt( i );
+	if( i )
 	{
 		light.prelightModel = renderModelManager->FindModel( session->ReadDemo()->ReadHashString() );
 	}
-	if( light.shader )
+	session->ReadDemo()->ReadInt( i );
+	if( i )
 	{
 		light.shader = declManager->FindMaterial( session->ReadDemo()->ReadHashString() );
 	}
-	if( light.referenceSound )
+
+	session->ReadDemo()->ReadInt( i );
+	if( i )
 	{
 		int	index;
 		session->ReadDemo()->ReadInt( index );
@@ -582,7 +795,223 @@ void	idRenderWorldLocal::ReadRenderLight( )
 WriteRenderEntity
 ================
 */
-void	idRenderWorldLocal::WriteRenderEntity( qhandle_t handle, const renderEntity_t* ent )
+void	idRenderWorldLocal::WriteRenderEntity( idDemoFile* f, idRenderEntityLocal* entity )
+{
+	// only the main renderWorld writes stuff to demos, not the wipes or
+	// menu renders
+	if( this != session->RW() )
+	{
+		return;
+	}
+
+	if( entity->decals && entity->decals->demoSerialCurrent != entity->decals->demoSerialWrite )
+	{
+		entity->decals->demoSerialWrite = entity->decals->demoSerialCurrent;
+		WriteRenderDecal( f, entity->decals->index );
+	}
+
+	if( entity->overlays && entity->overlays->demoSerialCurrent != entity->overlays->demoSerialWrite )
+	{
+		entity->overlays->demoSerialWrite = entity->overlays->demoSerialCurrent;
+		WriteRenderOverlay( f, entity->overlays->index );
+	}
+
+	f->WriteInt( DS_RENDER );
+	f->WriteInt( DC_UPDATE_ENTITYDEF );
+	f->WriteInt( entity->index );
+	entity->WriteToDemoFile( f );
+
+	// write decal ref
+	if( entity->decals )
+	{
+		f->WriteBool( true );
+		f->WriteInt( entity->decals->index );
+	}
+	else
+	{
+		f->WriteBool( false );
+	}
+
+	// write overlay ref
+	if( entity->overlays )
+	{
+		f->WriteBool( true );
+		f->WriteInt( entity->overlays->index );
+	}
+	else
+	{
+		f->WriteBool( false );
+	}
+}
+
+
+/*
+================
+ReadRenderEntity
+================
+*/
+void idRenderWorldLocal::ReadRenderEntity()
+{
+	renderEntity_t ent;
+	int index;
+
+	session->ReadDemo()->ReadInt( index );
+	//tr.pc.c_entityUpdates++;
+	while( index >= entityDefs.Num() )
+	{
+		entityDefs.Append( NULL );
+	}
+
+	idRenderEntityLocal* def = entityDefs[ index ];
+	if( def == NULL )
+	{
+		def = new idRenderEntityLocal;
+		def->world = this;
+		def->index = index;
+		entityDefs[ index ] = def;
+	}
+	def->ReadFromDemoFile( session->ReadDemo() );
+
+	// decals
+	bool hasDecal = false, hasOverlay = false;
+
+	session->ReadDemo()->ReadBool( hasDecal );
+	if( hasDecal )
+	{
+		int index = 0;
+		session->ReadDemo()->ReadInt( index );
+
+		if( r_writeDemoDecals.GetBool() )
+		{
+			def->decals = decals[ index ].decals;
+		}
+	}
+
+	session->ReadDemo()->ReadBool( hasOverlay );
+	if( hasOverlay )
+	{
+		int index = 0;
+		session->ReadDemo()->ReadInt( index );
+
+		if( r_writeDemoOverlays.GetBool() )
+		{
+			def->overlays = overlays[ index ].overlays;
+		}
+	}
+}
+
+void idRenderWorldLocal::WriteRenderDecal( idDemoFile* f, qhandle_t handle )
+{
+	// only the main renderWorld writes stuff to demos, not the wipes or
+	// menu renders
+	if( this != session->RW() )
+	{
+		return;
+	}
+
+	if( handle < 0 || !f )
+	{
+		return;
+	}
+	if( !r_writeDemoDecals.GetBool() )
+	{
+		return;
+	}
+
+	// actually update the decal.
+	f->WriteInt( DS_RENDER );
+	f->WriteInt( DC_UPDATE_DECAL );
+	f->WriteInt( handle );
+	f->WriteInt( decals[ handle ].entityHandle );
+	f->WriteInt( decals[ handle ].lastStartTime );
+	decals[ handle ].decals->WriteToDemoFile( f );
+}
+
+void idRenderWorldLocal::WriteFreeDecal( idDemoFile* f, qhandle_t handle )
+{
+	// only the main renderWorld writes stuff to demos, not the wipes or
+	// menu renders
+	if( this != session->RW() )
+	{
+		return;
+	}
+
+	if( !r_writeDemoDecals.GetBool() )
+	{
+		return;
+	}
+
+	// When Decals are Freed, all that really happens is they get reallocated.
+	f->WriteInt( DS_RENDER );
+	f->WriteInt( DC_DELETE_DECAL );
+	f->WriteInt( handle );
+	f->WriteInt( decals[ handle ].entityHandle );
+	f->WriteInt( decals[ handle ].lastStartTime );
+
+	if( r_showDemo.GetBool() )
+	{
+		common->Printf( "write DC_DELETE_DECAL: %i\n", handle );
+	}
+}
+
+void idRenderWorldLocal::WriteRenderOverlay( idDemoFile* f, qhandle_t handle )
+{
+	// only the main renderWorld writes stuff to demos, not the wipes or
+	// menu renders
+	if( this != session->RW() )
+	{
+		return;
+	}
+
+	if( handle < 0 || !f || !r_writeDemoOverlays.GetBool() )
+	{
+		return;
+	}
+
+	// actually update the decal.
+	f->WriteInt( DS_RENDER );
+	f->WriteInt( DC_UPDATE_OVERLAY );
+	f->WriteInt( handle );
+	f->WriteInt( overlays[ handle ].entityHandle );
+	f->WriteInt( overlays[ handle ].lastStartTime );
+	overlays[ handle ].overlays->WriteToDemoFile( f );
+
+	if( r_showDemo.GetBool() )
+	{
+		common->Printf( "write DC_UPDATE_OVERLAY: %i\n", handle );
+	}
+}
+
+void idRenderWorldLocal::WriteFreeOverlay( idDemoFile* f, qhandle_t handle )
+{
+	// only the main renderWorld writes stuff to demos, not the wipes or
+	// menu renders
+	if( this != session->RW() )
+	{
+		return;
+	}
+
+	if( !r_writeDemoOverlays.GetBool() )
+	{
+		return;
+	}
+
+	// When Decals are Freed, all that really happens is they get reallocated.
+	f->WriteInt( DS_RENDER );
+	f->WriteInt( DC_DELETE_OVERLAY );
+	f->WriteInt( handle );
+	f->WriteInt( overlays[ handle ].entityHandle );
+	f->WriteInt( overlays[ handle ].lastStartTime );
+
+	if( r_showDemo.GetBool() )
+	{
+		common->Printf( "write DC_DELETE_OVERLAY: %i\n", handle );
+	}
+}
+
+
+// RB begin
+void	idRenderWorldLocal::WriteFreeEnvprobe( qhandle_t handle )
 {
 
 	// only the main renderWorld writes stuff to demos, not the wipes or
@@ -593,229 +1022,12 @@ void	idRenderWorldLocal::WriteRenderEntity( qhandle_t handle, const renderEntity
 	}
 
 	session->WriteDemo()->WriteInt( DS_RENDER );
-	session->WriteDemo()->WriteInt( DC_UPDATE_ENTITYDEF );
+	session->WriteDemo()->WriteInt( DC_DELETE_ENVPROBEDEF );
 	session->WriteDemo()->WriteInt( handle );
 
-	session->WriteDemo()->WriteInt( ( int& )ent->hModel );
-	session->WriteDemo()->WriteInt( ent->entityNum );
-	session->WriteDemo()->WriteInt( ent->bodyId );
-	session->WriteDemo()->WriteVec3( ent->bounds[0] );
-	session->WriteDemo()->WriteVec3( ent->bounds[1] );
-	session->WriteDemo()->WriteInt( ( int& )ent->callback );
-	session->WriteDemo()->WriteInt( ( int& )ent->callbackData );
-	session->WriteDemo()->WriteInt( ent->suppressSurfaceInViewID );
-	session->WriteDemo()->WriteInt( ent->suppressShadowInViewID );
-	session->WriteDemo()->WriteInt( ent->suppressShadowInLightID );
-	session->WriteDemo()->WriteInt( ent->allowSurfaceInViewID );
-	session->WriteDemo()->WriteVec3( ent->origin );
-	session->WriteDemo()->WriteMat3( ent->axis );
-	session->WriteDemo()->WriteInt( ( int& )ent->customShader );
-	session->WriteDemo()->WriteInt( ( int& )ent->referenceShader );
-	session->WriteDemo()->WriteInt( ( int& )ent->customSkin );
-	session->WriteDemo()->WriteInt( ( int& )ent->referenceSound );
-	for( int i = 0; i < MAX_ENTITY_SHADER_PARMS; i++ )
-	{
-		session->WriteDemo()->WriteFloat( ent->shaderParms[i] );
-	}
-	for( int i = 0; i < MAX_RENDERENTITY_GUI; i++ )
-	{
-		session->WriteDemo()->WriteInt( ( int& )ent->gui[i] );
-	}
-	session->WriteDemo()->WriteInt( ( int& )ent->remoteRenderView );
-	session->WriteDemo()->WriteInt( ent->numJoints );
-	session->WriteDemo()->WriteInt( ( int& )ent->joints );
-	session->WriteDemo()->WriteFloat( ent->modelDepthHack );
-	session->WriteDemo()->WriteBool( ent->noSelfShadow );
-	session->WriteDemo()->WriteBool( ent->noShadow );
-	session->WriteDemo()->WriteBool( ent->noDynamicInteractions );
-	session->WriteDemo()->WriteBool( ent->weaponDepthHack );
-	session->WriteDemo()->WriteInt( ent->forceUpdate );
-
-	if( ent->customShader )
-	{
-		session->WriteDemo()->WriteHashString( ent->customShader->GetName() );
-	}
-	if( ent->customSkin )
-	{
-		session->WriteDemo()->WriteHashString( ent->customSkin->GetName() );
-	}
-	if( ent->hModel )
-	{
-		session->WriteDemo()->WriteHashString( ent->hModel->Name() );
-	}
-	if( ent->referenceShader )
-	{
-		session->WriteDemo()->WriteHashString( ent->referenceShader->GetName() );
-	}
-	if( ent->referenceSound )
-	{
-		int	index = ent->referenceSound->Index();
-		session->WriteDemo()->WriteInt( index );
-	}
-	if( ent->numJoints )
-	{
-		for( int i = 0; i < ent->numJoints; i++ )
-		{
-			float* data = ent->joints[i].ToFloatPtr();
-			for( int j = 0; j < 12; ++j )
-			{
-				session->WriteDemo()->WriteFloat( data[j] );
-			}
-		}
-	}
-
-	/*
-	if ( ent->decals ) {
-		ent->decals->WriteToDemoFile( session->ReadDemo() );
-	}
-	if ( ent->overlays ) {
-		ent->overlays->WriteToDemoFile( session->WriteDemo() );
-	}
-	*/
-
-#ifdef WRITE_GUIS
-	if( ent->gui )
-	{
-		ent->gui->WriteToDemoFile( session->WriteDemo() );
-	}
-	if( ent->gui2 )
-	{
-		ent->gui2->WriteToDemoFile( session->WriteDemo() );
-	}
-	if( ent->gui3 )
-	{
-		ent->gui3->WriteToDemoFile( session->WriteDemo() );
-	}
-#endif
-
-	// RENDERDEMO_VERSION >= 2 ( Doom3 1.2 )
-	session->WriteDemo()->WriteInt( ent->timeGroup );
-	session->WriteDemo()->WriteInt( ent->xrayIndex );
-
 	if( r_showDemo.GetBool() )
 	{
-		common->Printf( "write DC_UPDATE_ENTITYDEF: %i = %s\n", handle, ent->hModel ? ent->hModel->Name() : "NULL" );
+		common->Printf( "write DC_DELETE_ENVPROBEDEF: %i\n", handle );
 	}
 }
-
-/*
-================
-ReadRenderEntity
-================
-*/
-void	idRenderWorldLocal::ReadRenderEntity()
-{
-	renderEntity_t		ent;
-	int				index, i;
-
-	session->ReadDemo()->ReadInt( index );
-	if( index < 0 )
-	{
-		common->Error( "ReadRenderEntity: index < 0" );
-	}
-
-	session->ReadDemo()->ReadInt( ( int& )ent.hModel );
-	session->ReadDemo()->ReadInt( ent.entityNum );
-	session->ReadDemo()->ReadInt( ent.bodyId );
-	session->ReadDemo()->ReadVec3( ent.bounds[0] );
-	session->ReadDemo()->ReadVec3( ent.bounds[1] );
-	session->ReadDemo()->ReadInt( ( int& )ent.callback );
-	session->ReadDemo()->ReadInt( ( int& )ent.callbackData );
-	session->ReadDemo()->ReadInt( ent.suppressSurfaceInViewID );
-	session->ReadDemo()->ReadInt( ent.suppressShadowInViewID );
-	session->ReadDemo()->ReadInt( ent.suppressShadowInLightID );
-	session->ReadDemo()->ReadInt( ent.allowSurfaceInViewID );
-	session->ReadDemo()->ReadVec3( ent.origin );
-	session->ReadDemo()->ReadMat3( ent.axis );
-	session->ReadDemo()->ReadInt( ( int& )ent.customShader );
-	session->ReadDemo()->ReadInt( ( int& )ent.referenceShader );
-	session->ReadDemo()->ReadInt( ( int& )ent.customSkin );
-	session->ReadDemo()->ReadInt( ( int& )ent.referenceSound );
-	for( i = 0; i < MAX_ENTITY_SHADER_PARMS; i++ )
-	{
-		session->ReadDemo()->ReadFloat( ent.shaderParms[i] );
-	}
-	for( i = 0; i < MAX_RENDERENTITY_GUI; i++ )
-	{
-		session->ReadDemo()->ReadInt( ( int& )ent.gui[i] );
-	}
-	session->ReadDemo()->ReadInt( ( int& )ent.remoteRenderView );
-	session->ReadDemo()->ReadInt( ent.numJoints );
-	session->ReadDemo()->ReadInt( ( int& )ent.joints );
-	session->ReadDemo()->ReadFloat( ent.modelDepthHack );
-	session->ReadDemo()->ReadBool( ent.noSelfShadow );
-	session->ReadDemo()->ReadBool( ent.noShadow );
-	session->ReadDemo()->ReadBool( ent.noDynamicInteractions );
-	session->ReadDemo()->ReadBool( ent.weaponDepthHack );
-	session->ReadDemo()->ReadInt( ent.forceUpdate );
-	ent.callback = NULL;
-	if( ent.customShader )
-	{
-		ent.customShader = declManager->FindMaterial( session->ReadDemo()->ReadHashString() );
-	}
-	if( ent.customSkin )
-	{
-		ent.customSkin = declManager->FindSkin( session->ReadDemo()->ReadHashString() );
-	}
-	if( ent.hModel )
-	{
-		ent.hModel = renderModelManager->FindModel( session->ReadDemo()->ReadHashString() );
-	}
-	if( ent.referenceShader )
-	{
-		ent.referenceShader = declManager->FindMaterial( session->ReadDemo()->ReadHashString() );
-	}
-	if( ent.referenceSound )
-	{
-		int	index;
-		session->ReadDemo()->ReadInt( index );
-		ent.referenceSound = session->SW()->EmitterForIndex( index );
-	}
-	if( ent.numJoints )
-	{
-		ent.joints = ( idJointMat* )Mem_Alloc16( SIMD_ROUND_JOINTS( ent.numJoints ) * sizeof( ent.joints[0] ) );
-		for( int i = 0; i < ent.numJoints; i++ )
-		{
-			float* data = ent.joints[i].ToFloatPtr();
-			for( int j = 0; j < 12; ++j )
-			{
-				session->ReadDemo()->ReadFloat( data[j] );
-			}
-		}
-		SIMD_INIT_LAST_JOINT( ent.joints, ent.numJoints );
-	}
-
-	ent.callbackData = NULL;
-
-	/*
-	if ( ent.decals ) {
-		ent.decals = idRenderModelDecal::Alloc();
-		ent.decals->ReadFromDemoFile( session->ReadDemo() );
-	}
-	if ( ent.overlays ) {
-		ent.overlays = idRenderModelOverlay::Alloc();
-		ent.overlays->ReadFromDemoFile( session->ReadDemo() );
-	}
-	*/
-
-	for( i = 0; i < MAX_RENDERENTITY_GUI; i++ )
-	{
-		if( ent.gui[ i ] )
-		{
-			ent.gui[ i ] = uiManager->Alloc();
-#ifdef WRITE_GUIS
-			ent.gui[ i ]->ReadFromDemoFile( session->ReadDemo() );
-#endif
-		}
-	}
-
-	session->ReadDemo()->ReadInt( ent.timeGroup );
-	session->ReadDemo()->ReadInt( ent.xrayIndex );
-
-	UpdateEntityDef( index, &ent );
-
-	if( r_showDemo.GetBool() )
-	{
-		common->Printf( "DC_UPDATE_ENTITYDEF: %i = %s\n", index, ent.hModel ? ent.hModel->Name() : "NULL" );
-	}
-}
+// RB end

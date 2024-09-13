@@ -3,7 +3,8 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013 Robert Beckebans
+Copyright (C) 2014-2016 Robert Beckebans
+Copyright (C) 2014-2016 Kot in Action Creative Artel
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
@@ -30,7 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "tr_local.h"
+#include "RenderCommon.h"
 
 /*
 ===================
@@ -162,6 +163,7 @@ idRenderWorldLocal::idRenderWorldLocal()
 		decals[i].entityHandle = -1;
 		decals[i].lastStartTime = 0;
 		decals[i].decals = new idRenderModelDecal();
+		decals[i].decals->index = i;
 	}
 
 	for( int i = 0; i < overlays.Num(); i++ )
@@ -169,6 +171,7 @@ idRenderWorldLocal::idRenderWorldLocal()
 		overlays[i].entityHandle = -1;
 		overlays[i].lastStartTime = 0;
 		overlays[i].overlays = new idRenderModelOverlay();
+		overlays[ i ].overlays->index = i;
 	}
 }
 
@@ -347,11 +350,7 @@ void idRenderWorldLocal::UpdateEntityDef( qhandle_t entityHandle, const renderEn
 	def->parms = *re;
 
 	def->lastModifiedFrameNum = tr.frameCount;
-	if( session->WriteDemo() && def->archived )
-	{
-		WriteFreeEntity( entityHandle );
-		def->archived = false;
-	}
+	def->archived = false;
 
 	// optionally immediately issue any callbacks
 	if( !r_useEntityCallbacks.GetBool() && def->parms.callback != NULL )
@@ -369,13 +368,6 @@ void idRenderWorldLocal::UpdateEntityDef( qhandle_t entityHandle, const renderEn
 	// based on the model bounds, add references in each area
 	// that may contain the updated surface
 	R_CreateEntityRefs( def );
-
-	// RB begin
-	if( r_usePrecomputedLight.GetBool() )
-	{
-		SetupEntityGridLighting( def );
-	}
-	// RB end
 }
 
 /*
@@ -619,6 +611,155 @@ const renderLight_t* idRenderWorldLocal::GetRenderLight( qhandle_t lightHandle )
 	return &def->parms;
 }
 
+
+// RB begin
+qhandle_t idRenderWorldLocal::AddEnvprobeDef( const renderEnvironmentProbe_t* ep )
+{
+	// try and reuse a free spot
+	int envprobeHandle = envprobeDefs.FindNull();
+
+	if( envprobeHandle == -1 )
+	{
+		envprobeHandle = envprobeDefs.Append( NULL );
+
+		// TODO
+		//if( interactionTable && envprobeDefs.Num() > interactionTableHeight )
+		//{
+		//	ResizeEnvprobeInteractionTable();
+		//}
+	}
+
+	UpdateEnvprobeDef( envprobeHandle, ep );
+
+	return envprobeHandle;
+}
+
+/*
+=================
+UpdateEnvprobeDef
+
+The generation of all the derived interaction data will
+usually be deferred until it is visible in a scene
+
+Does not write to the demo file, which will only be done for visible lights
+=================
+*/
+void idRenderWorldLocal::UpdateEnvprobeDef( qhandle_t envprobeHandle, const renderEnvironmentProbe_t* ep )
+{
+	if( r_skipUpdates.GetBool() )
+	{
+		return;
+	}
+
+	tr.pc.c_envprobeUpdates++;
+
+	// create new slots if needed
+	if( envprobeHandle < 0 || envprobeHandle > LUDICROUS_INDEX )
+	{
+		common->Error( "idRenderWorld::UpdateEnvprobeDef: index = %i", envprobeHandle );
+	}
+	while( envprobeHandle >= envprobeDefs.Num() )
+	{
+		envprobeDefs.Append( NULL );
+	}
+
+	bool justUpdate = false;
+	RenderEnvprobeLocal* probe = envprobeDefs[envprobeHandle];
+	if( probe )
+	{
+		// if the shape of the envprobe stays the same, we don't need to dump
+		// any of our derived data, because shader parms are calculated every frame
+		if( ep->origin == probe->parms.origin )
+		{
+			justUpdate = true;
+		}
+		else
+		{
+			probe->envprobeHasMoved = true;
+			R_FreeEnvprobeDefDerivedData( probe );
+		}
+	}
+	else
+	{
+		// create a new one
+		probe = new RenderEnvprobeLocal;
+		envprobeDefs[envprobeHandle] = probe;
+
+		probe->world = this;
+		probe->index = envprobeHandle;
+	}
+
+	probe->parms = *ep;
+	probe->lastModifiedFrameNum = tr.frameCount;
+	if( session->WriteDemo() && probe->archived )
+	{
+		WriteFreeEnvprobe( envprobeHandle );
+		probe->archived = false;
+	}
+
+	if( !justUpdate )
+	{
+		R_CreateEnvprobeRefs( probe );
+	}
+}
+
+/*
+====================
+FreeEnvprobeDef
+
+Frees all references and lit surfaces from the light, and
+NULL's out it's entry in the world list
+====================
+*/
+void idRenderWorldLocal::FreeEnvprobeDef( qhandle_t envprobeHandle )
+{
+	RenderEnvprobeLocal*	probe;
+
+	if( envprobeHandle < 0 || envprobeHandle >= envprobeDefs.Num() )
+	{
+		common->Printf( "idRenderWorld::FreeEnvprobeDef: invalid handle %i [0, %i]\n", envprobeHandle, envprobeDefs.Num() );
+		return;
+	}
+
+	probe = envprobeDefs[envprobeHandle];
+	if( !probe )
+	{
+		common->Printf( "idRenderWorld::FreeEnvprobeDef: handle %i is NULL\n", envprobeHandle );
+		return;
+	}
+
+	R_FreeEnvprobeDefDerivedData( probe );
+
+	if( session->WriteDemo() && probe->archived )
+	{
+		WriteFreeEnvprobe( envprobeHandle );
+	}
+
+	delete probe;
+	envprobeDefs[envprobeHandle] = NULL;
+}
+
+const renderEnvironmentProbe_t* idRenderWorldLocal::GetRenderEnvprobe( qhandle_t envprobeHandle ) const
+{
+	RenderEnvprobeLocal* def;
+
+	if( envprobeHandle < 0 || envprobeHandle >= envprobeDefs.Num() )
+	{
+		common->Printf( "idRenderWorld::GetRenderEnvprobe: handle %i > %i\n", envprobeHandle, envprobeDefs.Num() );
+		return NULL;
+	}
+
+	def = envprobeDefs[envprobeHandle];
+	if( !def )
+	{
+		common->Printf( "idRenderWorld::GetRenderEnvprobe: handle %i is NULL\n", envprobeHandle );
+		return NULL;
+	}
+
+	return &def->parms;
+}
+// RB end
+
 /*
 ================
 idRenderWorldLocal::ProjectDecalOntoWorld
@@ -684,6 +825,7 @@ void idRenderWorldLocal::ProjectDecalOntoWorld( const idFixedWinding& winding, c
 				def->decals = AllocDecal( def->index, startTime );
 			}
 			def->decals->AddDeferredDecal( localParms );
+			def->archived = false;
 		}
 	}
 }
@@ -739,6 +881,7 @@ void idRenderWorldLocal::ProjectDecal( qhandle_t entityHandle, const idFixedWind
 		def->decals = AllocDecal( def->index, startTime );
 	}
 	def->decals->AddDeferredDecal( localParms );
+	def->archived = false;
 }
 
 /*
@@ -777,6 +920,7 @@ void idRenderWorldLocal::ProjectOverlay( qhandle_t entityHandle, const idPlane l
 		def->overlays = AllocOverlay( def->index, startTime );
 	}
 	def->overlays->AddDeferredOverlay( localParms );
+	def->archived = false;
 }
 
 /*
@@ -810,7 +954,10 @@ idRenderModelDecal* idRenderWorldLocal::AllocDecal( qhandle_t newEntityHandle, i
 	decals[oldest].entityHandle = newEntityHandle;
 	decals[oldest].lastStartTime = startTime;
 	decals[oldest].decals->ReUse();
-
+	if( session->WriteDemo() )
+	{
+		WriteFreeDecal( session->WriteDemo(), oldest );
+	}
 	return decals[oldest].decals;
 }
 
@@ -897,7 +1044,7 @@ to handle mirrors,
 */
 void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 {
-	if( !R_IsInitialized() )
+	if( !tr.IsInitialized() )
 	{
 		return;
 	}
@@ -957,12 +1104,6 @@ void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 	parms->isSubview = false;
 	parms->initialViewAreaOrigin = renderView->vieworg;
 	parms->renderWorld = this;
-
-#if 1
-	// use this time for any subsequent 2D rendering, so damage blobs/etc
-	// can use level time
-	tr.frameShaderTime = parms->renderView.time[0] * 0.001f;
-#endif
 
 	// see if the view needs to reverse the culling sense in mirrors
 	// or environment cube sides
@@ -1098,6 +1239,23 @@ exitPortal_t idRenderWorldLocal::GetPortal( int areaNum, int portalNum )
 
 	memset( &ret, 0, sizeof( ret ) );
 	return ret;
+}
+
+/*
+===================
+RB: idRenderWorldLocal::AreaBounds
+===================
+*/
+idBounds idRenderWorldLocal::AreaBounds( int areaNum ) const
+{
+	if( areaNum < 0 || areaNum > numPortalAreas )
+	{
+		common->Error( "idRenderWorld::GetPortal: areaNum > numAreas" );
+	}
+
+	portalArea_t* area = &portalAreas[areaNum];
+
+	return area->globalBounds;
 }
 
 /*
@@ -1747,6 +1905,35 @@ void idRenderWorldLocal::AddLightRefToArea( idRenderLightLocal* light, portalAre
 	area->lightRefs.areaNext = lref;
 }
 
+// RB begin
+void idRenderWorldLocal::AddEnvprobeRefToArea( RenderEnvprobeLocal* probe, portalArea_t* area )
+{
+	areaReference_t*	lref;
+
+	for( lref = probe->references; lref != NULL; lref = lref->ownerNext )
+	{
+		if( lref->area == area )
+		{
+			return;
+		}
+	}
+
+	// add a envproberef to this area
+	lref = areaReferenceAllocator.Alloc();
+	lref->envprobe = probe;
+	lref->area = area;
+	lref->ownerNext = probe->references;
+	probe->references = lref;
+	tr.pc.c_lightReferences++;
+
+	// doubly linked list so we can free them easily later
+	area->envprobeRefs.areaNext->areaPrev = lref;
+	lref->areaNext = area->envprobeRefs.areaNext;
+	lref->areaPrev = &area->envprobeRefs;
+	area->envprobeRefs.areaNext = lref;
+}
+// RB end
+
 /*
 ===================
 idRenderWorldLocal::GenerateAllInteractions
@@ -1757,7 +1944,7 @@ If this isn't called, they will all be dynamically generated
 */
 void idRenderWorldLocal::GenerateAllInteractions()
 {
-	if( !R_IsInitialized() )
+	if( !tr.IsInitialized() )
 	{
 		return;
 	}
@@ -1777,7 +1964,7 @@ void idRenderWorldLocal::GenerateAllInteractions()
 	int	size =  interactionTableWidth * interactionTableHeight * sizeof( *interactionTable );
 	interactionTable = ( idInteraction** )R_ClearedStaticAlloc( size );
 
-	// itterate through all lights
+	// iterate through all lights
 	int	count = 0;
 	for( int i = 0; i < this->lightDefs.Num(); i++ )
 	{
@@ -1962,6 +2149,67 @@ void idRenderWorldLocal::PushFrustumIntoTree( idRenderEntityLocal* def, idRender
 
 	PushFrustumIntoTree_r( def, light, corners, 0 );
 }
+
+
+// RB begin
+void idRenderWorldLocal::PushEnvprobeIntoTree_r( RenderEnvprobeLocal* probe, int nodeNum )
+{
+	if( nodeNum < 0 )
+	{
+		int areaNum = -1 - nodeNum;
+		portalArea_t* area = &portalAreas[ areaNum ];
+		if( area->viewCount == tr.viewCount )
+		{
+			return;	// already added a reference here
+		}
+		area->viewCount = tr.viewCount;
+
+		if( probe != NULL )
+		{
+			AddEnvprobeRefToArea( probe, area );
+		}
+
+		return;
+	}
+
+	areaNode_t* node = areaNodes + nodeNum;
+
+	// if we know that all possible children nodes only touch an area
+	// we have already marked, we can early out
+	if( node->commonChildrenArea != CHILDREN_HAVE_MULTIPLE_AREAS && r_useNodeCommonChildren.GetBool() )
+	{
+		// note that we do NOT try to set a reference in this area
+		// yet, because the test volume may yet wind up being in the
+		// solid part, which would cause bounds slightly poked into
+		// a wall to show up in the next room
+		if( portalAreas[ node->commonChildrenArea ].viewCount == tr.viewCount )
+		{
+			return;
+		}
+	}
+
+
+	int cull = node->plane.Side( probe->parms.origin );
+
+	if( cull != PLANESIDE_BACK )
+	{
+		nodeNum = node->children[0];
+		if( nodeNum != 0 )  	// 0 = solid
+		{
+			PushEnvprobeIntoTree_r( probe, nodeNum );
+		}
+	}
+
+	if( cull != PLANESIDE_FRONT )
+	{
+		nodeNum = node->children[1];
+		if( nodeNum != 0 )  	// 0 = solid
+		{
+			PushEnvprobeIntoTree_r( probe, nodeNum );
+		}
+	}
+}
+// RB end
 
 //===================================================================
 

@@ -31,7 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "Session_local.h"
 #include "../ui/Rectangle.h"
-#include "../renderer/tr_local.h"
+#include "../renderer/RenderCommon.h"
 
 
 idCVar joy_mergedThreshold( "joy_mergedThreshold", "1", CVAR_BOOL | CVAR_ARCHIVE, "If the thresholds aren't merged, you drift more off center" );

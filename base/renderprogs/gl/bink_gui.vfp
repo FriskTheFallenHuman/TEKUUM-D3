@@ -1,0 +1,78 @@
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+MOV	result.texcoord[0], vertex.attrib[8];
+MAD result.texcoord[1], vertex.attrib[4], 2, -1;
+MOV result.color, vertex.color;
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP Y, Cr, Cb, p, R0, R1;
+
+PARAM	crc = { 1.595794678, -0.813476563, 0 };
+PARAM	crb = { 0, -0.391448975, 2.017822266 };
+PARAM	adj = { -0.87065506, 0.529705048, -1.081668854 };
+PARAM	YScalar = { 1.164123535, 1.164123535, 1.164123535 };
+
+TEX Y, fragment.texcoord[0], texture[0], 2D;
+TEX Cr, fragment.texcoord[0], texture[1], 2D;
+TEX Cb, fragment.texcoord[0], texture[2], 2D;
+
+MUL p, YScalar, Y.x;
+MAD p, crc, Cr.x, p;
+MAD p, crb, Cb.x, p;
+ADD p, adj, p;
+
+MOV R0, p;
+MOV R0.w, 1;
+
+MAD R1, R0, fragment.color, fragment.texcoord[1];
+
+MOV result.color, R1;
+MUL result.color.xyz, R1, R1.w;
+
+END
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+MOV	result.texcoord[0], vertex.attrib[8];
+MAD result.texcoord[1], vertex.attrib[4], 2, -1;
+MOV result.color, vertex.color;
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP Y, Cr, Cb, p, R0, R1;
+
+PARAM	crc = { 1.595794678, -0.813476563, 0 };
+PARAM	crb = { 0, -0.391448975, 2.017822266 };
+PARAM	adj = { -0.87065506, 0.529705048, -1.081668854 };
+PARAM	YScalar = { 1.164123535, 1.164123535, 1.164123535 };
+
+TEX Y, fragment.texcoord[0], texture[0], 2D;
+TEX Cr, fragment.texcoord[0], texture[1], 2D;
+TEX Cb, fragment.texcoord[0], texture[2], 2D;
+
+MUL p, YScalar, Y.x;
+MAD p, crc, Cr.x, p;
+MAD p, crb, Cb.x, p;
+ADD p, adj, p;
+
+MOV R0, p;
+MOV R0.w, 1;
+
+MAD R1, R0, fragment.color, fragment.texcoord[1];
+
+MOV result.color, R1;
+MUL result.color.xyz, R1, R1.w;
+
+END

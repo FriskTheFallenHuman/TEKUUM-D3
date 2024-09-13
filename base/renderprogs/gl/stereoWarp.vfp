@@ -1,0 +1,150 @@
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+# texture maps the two stereo views to the screen with an optional fractional subtraction of the
+# opposite side to reduce LCD shutter glasses ghosting
+
+
+MOV	result.texcoord[0], vertex.attrib[8];
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP T1, R0, R1;
+
+#	float	radialLength = sqrt( gl_TexCoord[0].s * gl_TexCoord[0].s + gl_TexCoord[0].t * gl_TexCoord[0].t );
+#	// get it down into the 0 - PI/2 range
+#	float	range = gl_TexCoord[0].z;
+#	float	scaledRadialLength = radialLength * range;
+#	float	tanScaled = tan( scaledRadialLength );
+#	float	rescaled = tanScaled / range;
+#
+#	vec2	radialDir = normalize( gl_TexCoord[0].st );
+#	vec2	warped = vec2( 0.5, 0.5 ) + vec2( /* 640.0/800.0* */ 0.5, 0.5 ) * radialDir * rescaled;
+
+
+PARAM	screenWarp_range   = 1.05;
+PARAM	screenWarp_rangeInverse   = 0.95;
+PARAM	screenWarp_slide   = 0.07;
+PARAM	screenWarp_stretch = { 1.4, 1.4, 0, 0 };
+
+# radialLength is the undistorted length from the center to the fragment
+TEMP	radialLength;
+SUB		T1, fragment.texcoord[0], 0.5;
+MUL		T1, T1, screenWarp_stretch;
+DP3		radialLength, T1, T1;
+RSQ		R0, radialLength.y;
+RCP		radialLength.x, R0.x;
+
+# radialTextureDir is the normalized vector from the center to the fragment,
+# distortion will just scale this vector
+TEMP	radialTextureDir;
+MUL		radialTextureDir, T1, R0.x;
+
+# scale radial length before taking the tangent to control the degree of warping
+MUL		radialLength.x, radialLength.x, screenWarp_range;
+
+# invert for dividing after the tangent
+RCP		radialLength.y, radialLength.x;
+
+# calculate tangent of radiallength
+TEMP	sinCos;
+
+SCS		sinCos, radialLength.x;			# .x = cos .y = sin
+RCP		sinCos.z, sinCos.x;				# .z = 1/cos
+MUL		sinCos.w, sinCos.y, sinCos.z;	# .w = sin/cos = tan
+
+# divide the tangent by the original radialLength
+TEMP	rescaled;
+MUL		rescaled.x, sinCos.w, screenWarp_rangeInverse;	# = tan / range
+
+TEMP	warped;
+MUL		warped, radialTextureDir, rescaled.x;
+MUL		warped, warped, { 0.5, 0.5 };
+ADD		warped, warped, { 0.5, 0.5 };
+
+# load this texture
+#TEX		result.color, fragment.texcoord[0], texture[0], 2D;
+TEX		result.color, warped, texture[0], 2D;
+
+END
+
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+# texture maps the two stereo views to the screen with an optional fractional subtraction of the
+# opposite side to reduce LCD shutter glasses ghosting
+
+
+MOV	result.texcoord[0], vertex.attrib[8];
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP T1, R0, R1;
+
+#	float	radialLength = sqrt( gl_TexCoord[0].s * gl_TexCoord[0].s + gl_TexCoord[0].t * gl_TexCoord[0].t );
+#	// get it down into the 0 - PI/2 range
+#	float	range = gl_TexCoord[0].z;
+#	float	scaledRadialLength = radialLength * range;
+#	float	tanScaled = tan( scaledRadialLength );
+#	float	rescaled = tanScaled / range;
+#
+#	vec2	radialDir = normalize( gl_TexCoord[0].st );
+#	vec2	warped = vec2( 0.5, 0.5 ) + vec2( /* 640.0/800.0* */ 0.5, 0.5 ) * radialDir * rescaled;
+
+
+PARAM	screenWarp_range   = 1.05;
+PARAM	screenWarp_rangeInverse   = 0.95;
+PARAM	screenWarp_slide   = 0.07;
+PARAM	screenWarp_stretch = { 1.4, 1.4, 0, 0 };
+
+# radialLength is the undistorted length from the center to the fragment
+TEMP	radialLength;
+SUB		T1, fragment.texcoord[0], 0.5;
+MUL		T1, T1, screenWarp_stretch;
+DP3		radialLength, T1, T1;
+RSQ		R0, radialLength.y;
+RCP		radialLength.x, R0.x;
+
+# radialTextureDir is the normalized vector from the center to the fragment,
+# distortion will just scale this vector
+TEMP	radialTextureDir;
+MUL		radialTextureDir, T1, R0.x;
+
+# scale radial length before taking the tangent to control the degree of warping
+MUL		radialLength.x, radialLength.x, screenWarp_range;
+
+# invert for dividing after the tangent
+RCP		radialLength.y, radialLength.x;
+
+# calculate tangent of radiallength
+TEMP	sinCos;
+
+SCS		sinCos, radialLength.x;			# .x = cos .y = sin
+RCP		sinCos.z, sinCos.x;				# .z = 1/cos
+MUL		sinCos.w, sinCos.y, sinCos.z;	# .w = sin/cos = tan
+
+# divide the tangent by the original radialLength
+TEMP	rescaled;
+MUL		rescaled.x, sinCos.w, screenWarp_rangeInverse;	# = tan / range
+
+TEMP	warped;
+MUL		warped, radialTextureDir, rescaled.x;
+MUL		warped, warped, { 0.5, 0.5 };
+ADD		warped, warped, { 0.5, 0.5 };
+
+# load this texture
+#TEX		result.color, fragment.texcoord[0], texture[0], 2D;
+TEX		result.color, warped, texture[0], 2D;
+
+END
+

@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 #include "Session_local.h"
+#include "../renderer/Image.h"
 
 /*
 
@@ -83,7 +84,7 @@ void	idSessionLocal::DrawWipeModel()
 
 	float fade = ( float )( latchedTic - wipeStartTic ) / ( wipeStopTic - wipeStartTic );
 	renderSystem->SetColor4( 1, 1, 1, fade );
-	renderSystem->DrawStretchPic( 0, 0, 640, 480, 0, 0, 1, 1, wipeMaterial );
+	renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 1, 1, wipeMaterial );
 }
 
 /*
@@ -112,7 +113,7 @@ void idSessionLocal::Draw()
 		// clear the background, in case the tested gui is transparent
 		// NOTE that you can't use this for aviGame recording, it will tick at real com_frameTime between screenshots..
 		renderSystem->SetColor( colorBlack );
-		renderSystem->DrawStretchPic( 0, 0, 640, 480, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
+		renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 1, 1, whiteMaterial );
 		guiTest->Redraw( com_frameTime );
 	}
 	else if( guiActive && !guiActive->State().GetBool( "gameDraw" ) )
@@ -125,15 +126,18 @@ void idSessionLocal::Draw()
 		}
 
 		// draw the menus full screen
+		/*
 		if( guiActive == guiTakeNotes && !com_skipGameDraw.GetBool() )
 		{
 			game->Draw( GetLocalClientNum() );
 		}
-
+		*/
 		guiActive->Redraw( com_frameTime );
 	}
 	else if( readDemo )
 	{
+		// SRS - Advance demo inside Frame() instead of Draw() to support smp mode playback
+		// AdvanceRenderDemo( true );
 		rw->RenderScene( &currentDemoRenderView );
 		renderSystem->DrawDemoPics();
 	}
@@ -145,20 +149,24 @@ void idSessionLocal::Draw()
 		{
 			// draw the game view
 			int	start = Sys_Milliseconds();
-			gameDraw = game->Draw( GetLocalClientNum() );
+			if( game )
+			{
+				gameDraw = game->Draw( GetLocalClientNum() );
+			}
 			int end = Sys_Milliseconds();
 			time_gameDraw += ( end - start );	// note time used for com_speeds
 		}
 		if( !gameDraw )
 		{
 			renderSystem->SetColor( colorBlack );
-			renderSystem->DrawStretchPic( 0, 0, 640, 480, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
+			renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 1, 1, whiteMaterial );
 		}
 
 		// save off the 2D drawing from the game
 		if( writeDemo )
 		{
 			renderSystem->WriteDemoPics();
+			renderSystem->WriteEndFrame();
 		}
 	}
 	else
@@ -179,8 +187,8 @@ void idSessionLocal::Draw()
 				emptyDrawCount = 0;
 				StartMenu();
 			}
-			renderSystem->SetColor4( 0, 0, 0, 1 );
-			renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
+			renderSystem->SetColor( colorBlack );
+			renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 1, 1, whiteMaterial );
 		}
 #else
 		// draw the console full screen - this should only ever happen in developer builds
@@ -244,58 +252,20 @@ void idSessionLocal::UpdateScreen( bool captureToImage, bool outOfSequence, bool
 		Sys_GrabMouseCursor( false );
 	}
 
-//#define USE_OLD_SYNCING
-
-#if defined(USE_OLD_SYNCING)
-	//renderSystem->BeginFrame( renderSystem->GetScreenWidth(), renderSystem->GetScreenHeight() );
-	const emptyCommand_t* cmd = renderSystem->SwapCommandBuffers_FinishCommandBuffers();
-#endif
-
 	// draw everything
 	Draw();
 
-#if 0 //!defined(__ANDROID__)
+	// foresthale 2014-03-01: note: the only place that has captureToImage=true is idAutoRender::StartBackgroundAutoSwaps
 	if( captureToImage )
 	{
 		renderSystem->CaptureRenderToImage( "_currentRender", false );
 	}
-#endif
-
-	// RB begin
-
-#if defined(USE_OLD_SYNCING)
-	renderSystem->RenderCommandBuffers( cmd );
-
-	if( com_speeds.GetBool() || com_showFPS.GetInteger() == 1 )
-	{
-		renderSystem->SwapCommandBuffers_FinishRendering( &time_frontend, &time_backend, &time_shadows, &time_gpu, swapBuffers );
-	}
-	else
-	{
-		renderSystem->SwapCommandBuffers_FinishRendering( NULL, NULL, NULL, NULL, swapBuffers );
-	}
-#else
-	// BFG style
 
 	// this should exit right after vsync, with the GPU idle and ready to draw
-	const emptyCommand_t* cmd;
-
-	if( com_speeds.GetBool() || com_showFPS.GetInteger() == 1 )
-	{
-		cmd = renderSystem->SwapCommandBuffers( &time_frontend, &time_backend, &time_shadows, &time_gpu, swapBuffers );
-	}
-	else
-	{
-		cmd = renderSystem->SwapCommandBuffers( NULL, NULL, NULL, NULL, swapBuffers );
-	}
+	const emptyCommand_t* cmd = renderSystem->SwapCommandBuffers( &time_frontend, &time_backend, &time_shadows, &time_gpu, NULL, NULL );
 
 	// get the GPU busy with new commands
 	renderSystem->RenderCommandBuffers( cmd );
-#endif
-
-#undef USE_OLD_SYNCING
-
-	// RB end
 
 	insideUpdateScreen = false;
 }
@@ -351,7 +321,7 @@ void idSessionLocal::Frame()
 			int c = aviDemoFrameCount - aviTicStart;
 			while( c-- )
 			{
-				renderSystem->TakeScreenshot( com_aviDemoWidth.GetInteger(), com_aviDemoHeight.GetInteger(), name, com_aviDemoSamples.GetInteger(), NULL );
+				renderSystem->TakeScreenshot( com_aviDemoWidth.GetInteger(), com_aviDemoHeight.GetInteger(), name, com_aviDemoSamples.GetInteger(), NULL, TGA );
 				name = va( "demos/%s/%s_%05i.tga", aviDemoShortName.c_str(), aviDemoShortName.c_str(), ++aviTicStart );
 			}
 		}
@@ -361,7 +331,7 @@ void idSessionLocal::Frame()
 		console->ClearNotifyLines();
 
 		// this will call Draw, possibly multiple times if com_aviDemoSamples is > 1
-		renderSystem->TakeScreenshot( com_aviDemoWidth.GetInteger(), com_aviDemoHeight.GetInteger(), name, com_aviDemoSamples.GetInteger(), NULL );
+		renderSystem->TakeScreenshot( com_aviDemoWidth.GetInteger(), com_aviDemoHeight.GetInteger(), name, com_aviDemoSamples.GetInteger(), NULL, TGA );
 	}
 
 	//--------------------------------------------
@@ -567,7 +537,6 @@ void idSessionLocal::Frame()
 
 #endif
 
-#if defined(USE_CDKEY)
 	if( authEmitTimeout )
 	{
 		// waiting for a game auth
@@ -596,7 +565,6 @@ void idSessionLocal::Frame()
 			SetCDKeyGuiVars();
 		}
 	}
-#endif
 
 	// send frame and mouse events to active guis
 	GuiFrameEvents();

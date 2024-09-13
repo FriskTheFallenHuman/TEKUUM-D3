@@ -1,0 +1,76 @@
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+# texture maps the two stereo views to the screen with an optional fractional subtraction of the
+# opposite side to reduce LCD shutter glasses ghosting
+
+
+MOV	result.texcoord[0], vertex.attrib[8];
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP T1, R0, R1;
+
+# load this side
+TEX R0, fragment.texcoord[0], texture[0], 2D;
+
+# load the opposite side
+TEX R1, fragment.texcoord[0], texture[1], 2D;
+
+SUB	R1, R1, R0;
+
+# final = (1.0 - deghost ) * ( deghost + base + deghost * delta )
+TEMP	compress;
+SUB		compress, 1, program.env[18];
+TEMP	subtract;
+MUL		subtract, R1, program.env[18];
+TEMP	color;
+ADD		color, program.env[18], R0;
+ADD		color, color, subtract;
+MUL		result.color, color, compress;
+
+END
+
+!!ARBvp1.0 OPTION ARB_position_invariant ;
+
+# texture maps the two stereo views to the screen with an optional fractional subtraction of the
+# opposite side to reduce LCD shutter glasses ghosting
+
+
+MOV	result.texcoord[0], vertex.attrib[8];
+
+END
+
+
+#======================================================================
+
+!!ARBfp1.0 
+OPTION ARB_precision_hint_fastest;
+
+TEMP T1, R0, R1;
+
+# load this side
+TEX R0, fragment.texcoord[0], texture[0], 2D;
+
+# load the opposite side
+TEX R1, fragment.texcoord[0], texture[1], 2D;
+
+SUB	R1, R1, R0;
+
+# final = (1.0 - deghost ) * ( deghost + base + deghost * delta )
+TEMP	compress;
+SUB		compress, 1, program.env[18];
+TEMP	subtract;
+MUL		subtract, R1, program.env[18];
+TEMP	color;
+ADD		color, program.env[18], R0;
+ADD		color, color, subtract;
+MUL		result.color, color, compress;
+
+END
+

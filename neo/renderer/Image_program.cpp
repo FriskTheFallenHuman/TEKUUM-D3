@@ -1,25 +1,25 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Doom 3 BFG Edition GPL Source Code
+Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
+Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
+Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
+along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
+In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
 
 If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
@@ -56,7 +56,7 @@ Manager
 
 // tr_imageprogram.c
 
-#include "tr_local.h"
+#include "RenderCommon.h"
 
 /*
 
@@ -187,6 +187,24 @@ static void R_InvertAlpha( byte* data, int width, int height )
 
 /*
 =================
+R_InvertGreen
+=================
+*/
+static void R_InvertGreen( byte* data, int width, int height )
+{
+	int		i;
+	int		c;
+
+	c = width * height * 4;
+
+	for( i = 0 ; i < c ; i += 4 )
+	{
+		data[i + 1] = 255 - data[i + 1];
+	}
+}
+
+/*
+=================
 R_InvertColor
 =================
 */
@@ -216,13 +234,6 @@ static void R_AddNormalMaps( byte* data1, int width1, int height1, byte* data2, 
 {
 	int		i, j;
 	byte*	newMap;
-
-	// RB begin
-	if( data2 == NULL )
-	{
-		return;
-	}
-	// RB end
 
 	// resample pic2 to the same size as pic1
 	if( width2 != width1 || height2 != height1 )
@@ -403,7 +414,7 @@ static void AppendToken( idToken& token )
 MatchAndAppendToken
 ===================
 */
-static void MatchAndAppendToken( idTokenParser& src, const char* match )
+static void MatchAndAppendToken( idLexer& src, const char* match )
 {
 	if( !src.ExpectTokenString( match ) )
 	{
@@ -422,12 +433,11 @@ If both pic and timestamps are NULL, it will just advance past it, which can be
 used to parse an image program from a text stream.
 ===================
 */
-static bool R_ParseImageProgram_r( idTokenParser& src, byte** pic, int* width, int* height,
+static bool R_ParseImageProgram_r( idLexer& src, byte** pic, int* width, int* height,
 								   ID_TIME_T* timestamps, textureUsage_t* usage )
 {
 	idToken		token;
-	float		scale;
-	ID_TIME_T		timestamp;
+	ID_TIME_T	timestamp;
 
 	src.ReadToken( &token );
 
@@ -461,7 +471,7 @@ static bool R_ParseImageProgram_r( idTokenParser& src, byte** pic, int* width, i
 
 		src.ReadToken( &token );
 		AppendToken( token );
-		scale = token.GetFloatValue();
+		float scale = token.GetFloatValue();
 
 		// process it
 		if( pic )
@@ -616,6 +626,23 @@ static bool R_ParseImageProgram_r( idTokenParser& src, byte** pic, int* width, i
 		return true;
 	}
 
+	// RB: invertGreen to allow flipping the Y-Axis of normal maps
+	if( !token.Icmp( "invertGreen" ) )
+	{
+		MatchAndAppendToken( src, "(" );
+
+		R_ParseImageProgram_r( src, pic, width, height, timestamps, usage );
+
+		// process it
+		if( pic )
+		{
+			R_InvertGreen( *pic, *width, *height );
+		}
+
+		MatchAndAppendToken( src, ")" );
+		return true;
+	}
+
 	if( !token.Icmp( "invertColor" ) )
 	{
 		MatchAndAppendToken( src, "(" );
@@ -644,7 +671,7 @@ static bool R_ParseImageProgram_r( idTokenParser& src, byte** pic, int* width, i
 		if( pic )
 		{
 			int		c;
-			c = *width** height * 4;
+			c = *width * *height * 4;
 			for( i = 0 ; i < c ; i += 4 )
 			{
 				( *pic )[i + 1] =
@@ -669,7 +696,7 @@ static bool R_ParseImageProgram_r( idTokenParser& src, byte** pic, int* width, i
 		if( pic )
 		{
 			int		c;
-			c = *width** height * 4;
+			c = *width * *height * 4;
 			for( i = 0 ; i < c ; i += 4 )
 			{
 				( *pic )[i + 3] = ( ( *pic )[i + 0] + ( *pic )[i + 1] + ( *pic )[i + 2] ) / 3;
@@ -691,7 +718,7 @@ static bool R_ParseImageProgram_r( idTokenParser& src, byte** pic, int* width, i
 	}
 
 	// load it as an image
-	R_LoadImage( token.c_str(), pic, width, height, &timestamp, true );
+	R_LoadImage( token.c_str(), pic, width, height, &timestamp, true, usage );
 
 	if( timestamp == -1 )
 	{
@@ -723,19 +750,13 @@ void R_LoadImageProgram( const char* name, byte** pic, int* width, int* height, 
 	src.LoadMemory( name, strlen( name ), name );
 	src.SetFlags( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_NOSTRINGESCAPECHARS | LEXFL_ALLOWPATHNAMES );
 
-	// RB begin
-	idTokenParser src2;
-	src2.LoadFromLexer( src, "temp" );
-	src2.StartParsing( "temp" );
-
 	parseBuffer[0] = 0;
 	if( timestamps )
 	{
 		*timestamps = 0;
 	}
 
-	R_ParseImageProgram_r( src2, pic, width, height, timestamps, usage );
-	// RB end
+	R_ParseImageProgram_r( src, pic, width, height, timestamps, usage );
 
 	src.FreeSource();
 }
@@ -745,7 +766,7 @@ void R_LoadImageProgram( const char* name, byte** pic, int* width, int* height, 
 R_ParsePastImageProgram
 ===================
 */
-const char* R_ParsePastImageProgram( idTokenParser& src )
+const char* R_ParsePastImageProgram( idLexer& src )
 {
 	parseBuffer[0] = 0;
 	R_ParseImageProgram_r( src, NULL, NULL, NULL, NULL, NULL );

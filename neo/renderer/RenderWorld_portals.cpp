@@ -30,7 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "tr_local.h"
+#include "RenderCommon.h"
 
 // if we hit this many planes, we will just stop cropping the
 // view down, which is still correct, just conservative
@@ -414,6 +414,7 @@ void idRenderWorldLocal::AddAreaToView( int areaNum, const portalStack_t* ps )
 	// add the models and lights, using more precise culling to the planes
 	AddAreaViewEntities( areaNum, ps );
 	AddAreaViewLights( areaNum, ps );
+	AddAreaViewEnvprobes( areaNum, ps ); // RB
 }
 
 /*
@@ -759,6 +760,7 @@ void idRenderWorldLocal::FindViewLightsAndEntities()
 	// clear the visible lightDef and entityDef lists
 	tr.viewDef->viewLights = NULL;
 	tr.viewDef->viewEntitys = NULL;
+	tr.viewDef->viewEnvprobes = NULL; // RB
 
 	// all areas are initially not visible, but each portal
 	// chain that leads to them will expand the visible rectangle
@@ -1157,59 +1159,3 @@ int idRenderWorldLocal::GetPortalState( qhandle_t portal )
 	return doublePortals[portal - 1].blockingBits;
 }
 
-/*
-=====================
-idRenderWorldLocal::ShowPortals
-
-Debugging tool, won't work correctly with SMP or when mirrors are present
-=====================
-*/
-void idRenderWorldLocal::ShowPortals()
-{
-#if !defined(USE_GLES2) && !defined(USE_GLES3)
-	int			i, j;
-	portalArea_t*	area;
-	portal_t*	p;
-	idWinding*	w;
-
-	// flood out through portals, setting area viewCount
-	for( i = 0; i < numPortalAreas; i++ )
-	{
-		area = &portalAreas[i];
-		if( area->viewCount != tr.viewCount )
-		{
-			continue;
-		}
-		for( p = area->portals; p; p = p->next )
-		{
-			w = p->w;
-			if( !w )
-			{
-				continue;
-			}
-
-			if( portalAreas[ p->intoArea ].viewCount != tr.viewCount )
-			{
-				// red = can't see
-				GL_Color( 1, 0, 0 );
-			}
-			else
-			{
-				// green = see through
-				GL_Color( 0, 1, 0 );
-			}
-
-			// RB begin
-			renderProgManager.CommitUniforms();
-			// RB end
-
-			glBegin( GL_LINE_LOOP );
-			for( j = 0; j < w->GetNumPoints(); j++ )
-			{
-				glVertex3fv( ( *w )[j].ToFloatPtr() );
-			}
-			glEnd();
-		}
-	}
-#endif
-}

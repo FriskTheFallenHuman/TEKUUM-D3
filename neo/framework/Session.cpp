@@ -280,8 +280,8 @@ idSessionLocal::idSessionLocal
 idSessionLocal::idSessionLocal()
 {
 	guiInGame = guiMainMenu = guiIntro \
-							  = guiRestartMenu = guiLoading = guiGameOver = guiActive \
-									  = guiTest = guiMsg = guiMsgRestore = guiTakeNotes = NULL;
+							  = guiRestartMenu = guiLoading = guiActive \
+									  = guiTest = guiMsg = guiMsgRestore = NULL;
 
 	menuSoundWorld = NULL;
 
@@ -667,83 +667,6 @@ void idSessionLocal::TimeCmdDemo( const char* demoName )
 
 /*
 ===============
-TakeViewNotes_f
-===============
-*/
-void TakeViewNotes_f( const idCmdArgs& args )
-{
-	const char* p = ( args.Argc() > 1 ) ? args.Argv( 1 ) : "";
-	sessLocal.TakeNotes( p );
-}
-
-/*
-===============
-TakeViewNotes2_f
-===============
-*/
-void TakeViewNotes2_f( const idCmdArgs& args )
-{
-	const char* p = ( args.Argc() > 1 ) ? args.Argv( 1 ) : "";
-	sessLocal.TakeNotes( p, true );
-}
-
-/*
-===============
-idSessionLocal::TakeNotes
-===============
-*/
-void idSessionLocal::TakeNotes( const char* p, bool extended )
-{
-	if( !mapSpawned )
-	{
-		common->Printf( "No map loaded!\n" );
-		return;
-	}
-
-	if( extended )
-	{
-		guiTakeNotes = uiManager->FindGui( "guis/takeNotes2.gui", true, false, true );
-
-#if 0
-		const char* people[] =
-		{
-			"Nobody", "Adam", "Brandon", "David", "PHook", "Jay", "Jake",
-			"PatJ", "Brett", "Ted", "Darin", "Brian", "Sean"
-		};
-#else
-		const char* people[] =
-		{
-			"Tim", "Kenneth", "Robert",
-			"Matt", "Mal", "Jerry", "Steve", "Pat",
-			"Xian", "Ed", "Fred", "James", "Eric", "Andy", "Seneca", "Patrick", "Kevin",
-			"MrElusive", "Jim", "Brian", "John", "Adrian", "Nobody"
-		};
-#endif
-		const int numPeople = sizeof( people ) / sizeof( people[0] );
-
-		idListGUI* guiList_people = uiManager->AllocListGUI();
-		guiList_people->Config( guiTakeNotes, "person" );
-		for( int i = 0; i < numPeople; i++ )
-		{
-			guiList_people->Push( people[i] );
-		}
-		uiManager->FreeListGUI( guiList_people );
-
-	}
-	else
-	{
-		guiTakeNotes = uiManager->FindGui( "guis/takeNotes.gui", true, false, true );
-	}
-
-	SetGUI( guiTakeNotes, NULL );
-	guiActive->SetStateString( "note", "" );
-	guiActive->SetStateString( "notefile", p );
-	guiActive->SetStateBool( "extended", extended );
-	guiActive->Activate( true, com_frameTime );
-}
-
-/*
-===============
 Session_Hitch_f
 ===============
 */
@@ -1108,9 +1031,6 @@ void idSessionLocal::Init()
 
 	cmdSystem->AddCommand( "testGUI", Session_TestGUI_f, CMD_FL_SYSTEM, "tests a gui" );
 
-	cmdSystem->AddCommand( "takeViewNotes", TakeViewNotes_f, CMD_FL_SYSTEM, "take notes about the current map from the current view" );
-	cmdSystem->AddCommand( "takeViewNotes2", TakeViewNotes2_f, CMD_FL_SYSTEM, "extended take view notes" );
-
 	cmdSystem->AddCommand( "rescanSI", Session_RescanSI_f, CMD_FL_SYSTEM, "internal - rescan serverinfo cvars and tell game" );
 
 	cmdSystem->AddCommand( "promptKey", Session_PromptKey_f, CMD_FL_SYSTEM, "prompt and sets the CD Key" );
@@ -1136,9 +1056,7 @@ void idSessionLocal::Init()
 	guiMainMenu_MapList->Config( guiMainMenu, "mapList" );
 	idAsyncNetwork::client.serverList.GUIConfig( guiMainMenu, "serverList" );
 	guiRestartMenu = uiManager->FindGui( "guis/restart.gui", true, false, true );
-	guiGameOver = uiManager->FindGui( "guis/gameover.gui", true, false, true );
 	guiMsg = uiManager->FindGui( "guis/msg.gui", true, false, true );
-	guiTakeNotes = uiManager->FindGui( "guis/takeNotes.gui", true, false, true );
 	guiIntro = uiManager->FindGui( "guis/intro.gui", true, false, true );
 
 	whiteMaterial = declManager->FindMaterial( "_white" );

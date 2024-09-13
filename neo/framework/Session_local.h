@@ -106,6 +106,18 @@ public:
 	// RB end
 
 	virtual void		PacifierUpdate();
+	// foresthale 2014-05-30: a special binarize pacifier has to be shown in
+	// some cases, which includes filename and ETA information, note that
+	// the progress function takes 0-1 float, not 0-100, and can be called
+	// very quickly (it will check that enough time has passed when updating)
+	virtual void		PacifierBinarizeFilename( const char* filename, const char* reason );
+	virtual void		PacifierBinarizeInfo( const char* info );
+	virtual void		PacifierBinarizeMiplevel( int level, int maxLevel );
+	virtual void		PacifierBinarizeProgress( float progress );
+	virtual void		PacifierBinarizeEnd();
+	// for images in particular we can measure more accurately this way (to deal with mipmaps)
+	virtual void		PacifierBinarizeProgressTotal( int total );
+	virtual void		PacifierBinarizeProgressIncrement( int step );
 
 	virtual void		Frame();
 
@@ -229,6 +241,18 @@ public:
 	// console print that happens
 	int					lastPacifierTime;
 
+	// foresthale 2014-05-30: a special binarize pacifier has to be shown in some cases, which includes filename and ETA information
+	bool				pacifierBinarizeActive;
+	int					pacifierBinarizeStartTime;
+	float				pacifierBinarizeProgress;
+	float				pacifierBinarizeTimeLeft;
+	idStr				pacifierBinarizeFilename;
+	idStr				pacifierBinarizeInfo;
+	int					pacifierBinarizeMiplevel;
+	int					pacifierBinarizeMiplevelTotal;
+	int					pacifierBinarizeProgressTotal;
+	int					pacifierBinarizeProgressCurrent;
+
 	// this is the information required to be set before ExecuteMapChange() is called,
 	// which can be saved off at any time with the following commands so it can all be played back
 	mapSpawnData_t		mapSpawnData;
@@ -288,9 +312,7 @@ public:
 	idUserInterface* 	guiRestartMenu;
 	idUserInterface* 	guiLoading;
 	idUserInterface* 	guiIntro;
-	idUserInterface* 	guiGameOver;
 	idUserInterface* 	guiTest;
-	idUserInterface* 	guiTakeNotes;
 
 	idUserInterface* 	guiMsg;
 	idUserInterface* 	guiMsgRestore;				// store the calling GUI for restore
@@ -371,9 +393,7 @@ public:
 	void				HandleIntroMenuCommands( const char* menuCommand );
 	void				HandleRestartMenuCommands( const char* menuCommand );
 	void				HandleMsgCommands( const char* menuCommand );
-	void				HandleNoteCommands( const char* menuCommand );
 	void				GetSaveGameList( idStrList& fileList, idList<fileTIME_T>& fileTimes );
-	void				TakeNotes( const char* p, bool extended = false );
 	void				UpdateMPLevelShot();
 
 	void				SetSaveGameGuiVars();

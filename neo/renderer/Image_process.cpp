@@ -1,25 +1,26 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+Doom 3 BFG Edition GPL Source Code
+Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
+Copyright (C) 2021 Robert Beckebans
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
+Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
+Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
+along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
 
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
+In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
 
 If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
@@ -29,7 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 
-#include "tr_local.h"
+#include "RenderCommon.h"
 
 /*
 ================
@@ -527,6 +528,31 @@ void R_VerticalFlip( byte* data, int width, int height )
 	}
 }
 
+// RB: halfFloat_t helper
+struct ColorRGB16F
+{
+	uint16_t	red;
+	uint16_t	green;
+	uint16_t	blue;
+};
+
+void R_VerticalFlipRGB16F( byte* data, int width, int height )
+{
+	int			i, j;
+	ColorRGB16F	temp;
+
+	for( i = 0; i < width; i++ )
+	{
+		for( j = 0; j < height / 2; j++ )
+		{
+			temp = *( ( ColorRGB16F* )data + j * width + i );
+
+			*( ( ColorRGB16F* )data + j * width + i ) = *( ( ColorRGB16F* )data + ( height - 1 - j ) * width + i );
+			*( ( ColorRGB16F* )data + ( height - 1 - j ) * width + i ) = temp;
+		}
+	}
+}
+
 void R_RotatePic( byte* data, int width )
 {
 	int		i, j;
@@ -538,6 +564,7 @@ void R_RotatePic( byte* data, int width )
 	{
 		for( j = 0 ; j < width ; j++ )
 		{
+			// apparently rotates the picture and then it flips the picture horitzontally
 			*( temp + i * width + j ) = *( ( int* )data + j * width + i );
 		}
 	}
@@ -547,3 +574,57 @@ void R_RotatePic( byte* data, int width )
 	R_StaticFree( temp );
 }
 
+// transforms in both ways, the images from a cube map,
+// in both the Env map and the Skybox map systems.
+void R_ApplyCubeMapTransforms( int iter, byte* data, int size )
+{
+	if( ( iter == 1 ) || ( iter == 2 ) )
+	{
+		R_VerticalFlip( data, size, size );
+	}
+	if( ( iter == 0 ) || ( iter == 1 ) || ( iter == 4 ) || ( iter == 5 ) )
+	{
+		R_RotatePic( data, size ); // apparently not only rotates but also flips horitzontally
+	}
+	if( iter == 1 )
+	{
+		R_VerticalFlip( data, size, size );
+	}
+	else if( iter == 3 )      // that's so just for having less lines
+	{
+		R_HorizontalFlip( data, size, size );
+	}
+}
+
+
+// This is the most efficient way to atlas a mip chain to a 2d texture
+// https://twitter.com/SebAaltonen/status/1327188239451611139
+
+idVec4 R_CalculateMipRect( uint dimensions, uint mip )
+{
+	uint pixels_mip = dimensions >> mip;
+	idVec4 uv_rect = idVec4( 0, 0, pixels_mip, pixels_mip );
+
+	if( mip > 0 )
+	{
+		uv_rect.x = dimensions;
+		uv_rect.y = dimensions - pixels_mip * 2;
+	}
+
+	return uv_rect;
+}
+
+int R_CalculateUsedAtlasPixels( int dimensions )
+{
+	int numPixels = 0;
+	const int numMips = idMath::BitsForInteger( dimensions );
+
+	for( int mip = 0; mip < numMips; mip++ )
+	{
+		idVec4 dstRect = R_CalculateMipRect( dimensions, mip );
+
+		numPixels += ( dstRect.z * dstRect.w );
+	}
+
+	return numPixels;
+}

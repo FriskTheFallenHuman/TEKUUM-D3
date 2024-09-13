@@ -53,11 +53,11 @@ assert_sizeof( byte,	1 );
 assert_sizeof( int8_t,	1 );
 assert_sizeof( uint8_t,	1 );
 assert_sizeof( int16_t,	2 );
-assert_sizeof( uint16_t,2 );
+assert_sizeof( uint16_t, 2 );
 assert_sizeof( int32_t,	4 );
-assert_sizeof( uint32_t,4 );
+assert_sizeof( uint32_t, 4 );
 assert_sizeof( int64_t,	8 );
-assert_sizeof( uint64_t,8 );
+assert_sizeof( uint64_t, 8 );
 
 #define MAX_TYPE( x )			( ( ( ( 1 << ( ( sizeof( x ) - 1 ) * 8 - 1 ) ) - 1 ) << 8 ) | 255 )
 #define MIN_TYPE( x )			( - MAX_TYPE( x ) - 1 )
