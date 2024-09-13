@@ -279,6 +279,7 @@ idEvent* idEvent::Alloc( const idEventDef* evdef, int numargs, va_list args )
 	else
 	{
 		ev->data = NULL;
+		return ev;
 	}
 
 	format = evdef->GetArgFormat();
@@ -772,17 +773,19 @@ void idEvent::Restore( idRestoreGame* savefile )
 		// read the event name
 		savefile->ReadString( name );
 		event->eventdef = idEventDef::FindEvent( name );
-		if( !event->eventdef )
+		if( event->eventdef == NULL )
 		{
 			savefile->Error( "idEvent::Restore: unknown event '%s'", name.c_str() );
+			return;
 		}
 
 		// read the classtype
 		savefile->ReadString( name );
 		event->typeinfo = idClass::GetClass( name );
-		if( !event->typeinfo )
+		if( event->typeinfo == NULL )
 		{
 			savefile->Error( "idEvent::Restore: unknown class '%s' on event '%s'", name.c_str(), event->eventdef->GetName() );
+			return;
 		}
 
 		savefile->ReadObject( event->object );

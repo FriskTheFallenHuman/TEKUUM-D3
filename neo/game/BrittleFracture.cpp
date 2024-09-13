@@ -277,6 +277,12 @@ void idBrittleFracture::Spawn()
 	angularVelocityScale = spawnArgs.GetFloat( "angularVelocityScale", "40" );
 	fxFracture = spawnArgs.GetString( "fx" );
 
+	// make sure that max is greater than min  ( otherwise negative number square root happens )
+	if( maxShatterRadius < minShatterRadius )
+	{
+		idLib::Warning( "BrittleFracture, minShatterRadius(%2f) is greater than maxShatterRadius(%2f). Unknown results will ensue.", minShatterRadius, maxShatterRadius );
+	}
+
 	// get rigid body properties
 	shardMass = spawnArgs.GetFloat( "shardMass", "20" );
 	shardMass = idMath::ClampFloat( 0.001f, 1000.0f, shardMass );
@@ -887,7 +893,7 @@ void idBrittleFracture::DropShard( shard_t* shard, const idVec3& point, const id
 
 	dir2 = origin - point;
 	dist = dir2.Normalize();
-	f = dist > maxShatterRadius ? 1.0f : idMath::Sqrt( dist - minShatterRadius ) * ( 1.0f / idMath::Sqrt( maxShatterRadius - minShatterRadius ) );
+	f = dist > maxShatterRadius ? 1.0f : idMath::Sqrt( idMath::Fabs( dist - minShatterRadius ) ) * ( 1.0f / idMath::Sqrt( idMath::Fabs( maxShatterRadius - minShatterRadius ) ) );
 
 	// setup the physics
 	shard->physicsObj.SetSelf( this );

@@ -1198,9 +1198,10 @@ idMover::Event_MoveTo
 */
 void idMover::Event_MoveTo( idEntity* ent )
 {
-	if( !ent )
+	if( ent == NULL )
 	{
 		gameLocal.Warning( "Entity not found" );
+		return;
 	}
 
 	dest_position = GetLocalCoordinates( ent->GetPhysics()->GetOrigin() );
@@ -2015,7 +2016,6 @@ void idElevator::Event_TeamBlocked( idEntity* blockedEntity, idEntity* blockingE
 		}
 	}
 }
-
 
 /*
 ===============
@@ -3012,7 +3012,6 @@ void idMover_Binary::Event_Reached_BinaryMover()
 		{
 			PostEventSec( &EV_Activate, wait, this );
 		}
-
 		SetBlocked( false );
 	}
 	else
@@ -3969,7 +3968,7 @@ void idDoor::Use( idEntity* other, idEntity* activator )
 		if( syncLock.Length() )
 		{
 			idEntity* sync = gameLocal.FindEntity( syncLock );
-			if( sync && sync->IsType( idDoor::Type ) )
+			if( sync != NULL && sync->IsType( idDoor::Type ) )
 			{
 				if( static_cast<idDoor*>( sync )->IsOpen() )
 				{
@@ -4023,7 +4022,7 @@ void idDoor::Lock( int f )
 				{
 					// in this case the sound trigger never got spawned
 					const char* sndtemp = door->spawnArgs.GetString( "snd_locked" );
-					if( sndtemp && *sndtemp )
+					if( sndtemp != NULL && *sndtemp != '\0' )
 					{
 						door->PostEventMS( &EV_Door_SpawnSoundTrigger, 0 );
 					}
@@ -4196,7 +4195,7 @@ void idDoor::Event_SpawnDoorTrigger()
 	}
 
 	const char* sndtemp = spawnArgs.GetString( "snd_locked" );
-	if( spawnArgs.GetInt( "locked" ) && sndtemp && *sndtemp )
+	if( spawnArgs.GetInt( "locked" ) && sndtemp != NULL && *sndtemp != '\0' )
 	{
 		PostEventMS( &EV_Door_SpawnSoundTrigger, 0 );
 	}
@@ -4884,6 +4883,7 @@ void idMover_Periodic::Restore( idRestoreGame* savefile )
 	savefile->ReadStaticObject( physicsObj );
 	RestorePhysics( &physicsObj );
 }
+
 
 /*
 ================

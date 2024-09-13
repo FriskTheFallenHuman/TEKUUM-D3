@@ -235,6 +235,10 @@ void idProjectile::Create( idEntity* owner, const idVec3& start, const idVec3& d
 		renderLight.lightRadius[0] =
 			renderLight.lightRadius[1] =
 				renderLight.lightRadius[2] = spawnArgs.GetFloat( "light_radius" );
+#ifdef ID_PC
+		renderLight.lightRadius *= 1.5f;
+		renderLight.forceShadows = true;
+#endif
 		spawnArgs.GetVector( "light_color", "1 1 1", light_color );
 		renderLight.shaderParms[0] = light_color[0];
 		renderLight.shaderParms[1] = light_color[1];
@@ -810,7 +814,7 @@ void idProjectile::Fizzle()
 
 	// fizzle FX
 	const char* psystem = spawnArgs.GetString( "smoke_fuse" );
-	if( psystem && *psystem )
+	if( psystem != NULL && *psystem != '\0' )
 	{
 //FIXME:SMOKE		gameLocal.particles->SpawnParticles( GetPhysics()->GetOrigin(), vec3_origin, psystem );
 	}
@@ -934,7 +938,7 @@ void idProjectile::Explode( const trace_t& collision, idEntity* ignore )
 	}
 
 	int surfaceType = collision.c.material != NULL ? collision.c.material->GetSurfaceType() : SURFTYPE_METAL;
-	if( !( fxname && *fxname ) )
+	if( !( fxname != NULL && *fxname != '\0' ) )
 	{
 		if( ( surfaceType == SURFTYPE_NONE ) || ( surfaceType == SURFTYPE_METAL ) || ( surfaceType == SURFTYPE_STONE ) )
 		{
@@ -972,6 +976,10 @@ void idProjectile::Explode( const trace_t& collision, idEntity* ignore )
 		renderLight.lightRadius[0] =
 			renderLight.lightRadius[1] =
 				renderLight.lightRadius[2] = spawnArgs.GetFloat( "explode_light_radius" );
+#ifdef ID_PC
+		renderLight.lightRadius *= 2.0f;
+		renderLight.forceShadows = true;
+#endif
 		spawnArgs.GetVector( "explode_light_color", "1 1 1", lightColor );
 		renderLight.shaderParms[SHADERPARM_RED] = lightColor.x;
 		renderLight.shaderParms[SHADERPARM_GREEN] = lightColor.y;
@@ -1040,9 +1048,10 @@ void idProjectile::Explode( const trace_t& collision, idEntity* ignore )
 				dir.Normalize();
 
 				gameLocal.SpawnEntityDef( *debris, &ent, false );
-				if( !ent || !ent->IsType( idDebris::Type ) )
+				if( ent == NULL || !ent->IsType( idDebris::Type ) )
 				{
 					gameLocal.Error( "'projectile_debris' is not an idDebris" );
+					return;
 				}
 
 				idDebris* debris = static_cast<idDebris*>( ent );
@@ -1064,9 +1073,10 @@ void idProjectile::Explode( const trace_t& collision, idEntity* ignore )
 				dir.Normalize();
 
 				gameLocal.SpawnEntityDef( *debris, &ent, false );
-				if( !ent || !ent->IsType( idDebris::Type ) )
+				if( ent == NULL || !ent->IsType( idDebris::Type ) )
 				{
 					gameLocal.Error( "'projectile_shrapnel' is not an idDebris" );
+					break;
 				}
 
 				idDebris* debris = static_cast<idDebris*>( ent );
@@ -1751,7 +1761,7 @@ void idSoulCubeMissile::KillTarget( const idVec3& dir )
 			smokeKillTime = gameLocal.time;
 		}
 		ownerEnt = owner.GetEntity();
-		if( ( act->health > 0 ) && ownerEnt && ownerEnt->IsType( idPlayer::Type ) && ( ownerEnt->health > 0 ) && !act->spawnArgs.GetBool( "boss" ) )
+		if( ( act->health > 0 ) && ownerEnt != NULL && ownerEnt->IsType( idPlayer::Type ) && ( ownerEnt->health > 0 ) && !act->spawnArgs.GetBool( "boss" ) )
 		{
 			static_cast<idPlayer*>( ownerEnt )->GiveHealthPool( act->health );
 		}
@@ -1805,7 +1815,7 @@ void idSoulCubeMissile::Think()
 				PostEventSec( &EV_Remove, 2.0f );
 
 				ownerEnt = owner.GetEntity();
-				if( ownerEnt && ownerEnt->IsType( idPlayer::Type ) )
+				if( ownerEnt != NULL && ownerEnt->IsType( idPlayer::Type ) )
 				{
 					static_cast<idPlayer*>( ownerEnt )->SetSoulCubeProjectile( NULL );
 				}
@@ -1890,7 +1900,7 @@ void idSoulCubeMissile::Launch( const idVec3& start, const idVec3& dir, const id
 	UpdateVisuals();
 
 	ownerEnt = owner.GetEntity();
-	if( ownerEnt && ownerEnt->IsType( idPlayer::Type ) )
+	if( ownerEnt != NULL && ownerEnt->IsType( idPlayer::Type ) )
 	{
 		static_cast<idPlayer*>( ownerEnt )->SetSoulCubeProjectile( this );
 	}
@@ -1951,7 +1961,7 @@ void idBFGProjectile::Spawn()
 	memset( &secondModel, 0, sizeof( secondModel ) );
 	secondModelDefHandle = -1;
 	const char* temp = spawnArgs.GetString( "model_two" );
-	if( temp && *temp )
+	if( temp != NULL && *temp != '\0' )
 	{
 		secondModel.hModel = renderModelManager->FindModel( temp );
 		secondModel.bounds = secondModel.hModel->Bounds( &secondModel );
@@ -2154,7 +2164,7 @@ void idBFGProjectile::Launch( const idVec3& start, const idVec3& dir, const idVe
 	memset( &secondModel, 0, sizeof( secondModel ) );
 	secondModelDefHandle = -1;
 	const char* temp = spawnArgs.GetString( "model_two" );
-	if( temp && *temp )
+	if( temp != NULL && *temp != '\0' )
 	{
 		secondModel.hModel = renderModelManager->FindModel( temp );
 		secondModel.bounds = secondModel.hModel->Bounds( &secondModel );
@@ -2252,7 +2262,7 @@ void idBFGProjectile::Explode( const trace_t& collision, idEntity* ignore )
 	idEntity* 	ownerEnt;
 
 	ownerEnt = owner.GetEntity();
-	if( ownerEnt && ownerEnt->IsType( idPlayer::Type ) )
+	if( ownerEnt != NULL && ownerEnt->IsType( idPlayer::Type ) )
 	{
 		player = static_cast< idPlayer* >( ownerEnt );
 	}

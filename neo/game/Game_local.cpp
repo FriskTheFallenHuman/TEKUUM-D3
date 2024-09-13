@@ -298,9 +298,10 @@ void idGameLocal::Init()
 
 	// set up the aas
 	dict = FindEntityDefDict( "aas_types" );
-	if( !dict )
+	if( dict == NULL )
 	{
 		Error( "Unable to find entityDef for 'aas_types'" );
+		return;
 	}
 
 	// allocate space for the aas
@@ -448,6 +449,8 @@ void idGameLocal::SaveGame( idFile* f )
 	program.Save( &savegame );
 
 	savegame.WriteInt( g_skill.GetInteger() );
+
+	savegame.WriteDecls();
 
 	savegame.WriteDict( &serverInfo );
 
@@ -878,7 +881,6 @@ Initializes all map variables common to both save games and spawned games.
 */
 void idGameLocal::LoadMap( const char* mapName, int randseed )
 {
-	int i;
 	bool sameMap = ( mapFile && idStr::Icmp( mapFileName, mapName ) == 0 );
 
 	// clear the sound system
@@ -972,7 +974,7 @@ void idGameLocal::LoadMap( const char* mapName, int randseed )
 	playerConnectedAreas.i = -1;
 
 	// load navigation system for all the different monster sizes
-	for( i = 0; i < aasNames.Num(); i++ )
+	for( int i = 0; i < aasNames.Num(); i++ )
 	{
 		aasList[ i ]->Init( idStr( mapFileName ).SetFileExtension( aasNames[ i ] ).c_str(), mapFile->GetGeometryCRC() );
 	}
@@ -980,9 +982,27 @@ void idGameLocal::LoadMap( const char* mapName, int randseed )
 	// clear the smoke particle free list
 	smokeParticles->Init();
 
-	// cache miscellanious media references
+	// cache miscellaneous media references
 	FindEntityDef( "preCacheExtras", false );
+	FindEntityDef( "ammo_types", false );
+	FindEntityDef( "ammo_names", false );
 
+	FindEntityDef( "damage_noair", false );
+	FindEntityDef( "damage_moverCrush", false );
+	FindEntityDef( "damage_crush", false );
+	FindEntityDef( "damage_triggerhurt_1000", false );
+	FindEntityDef( "damage_telefrag", false );
+	FindEntityDef( "damage_suicide", false );
+	FindEntityDef( "damage_explosion", false );
+	FindEntityDef( "damage_generic", false );
+	FindEntityDef( "damage_painTrigger", false );
+	FindEntityDef( "damage_thrown_ragdoll", false );
+	FindEntityDef( "damage_gib", false );
+	FindEntityDef( "damage_softfall", false );
+	FindEntityDef( "damage_hardfall", false );
+	FindEntityDef( "damage_fatalfall", false );
+
+	declManager->FindMaterial( "itemHighlightShell" );
 	if( !sameMap )
 	{
 		mapFile->RemovePrimitiveData();
@@ -1238,6 +1258,75 @@ void idGameLocal::MapPopulate()
 
 /*
 ===================
+RB idGameLocal::PopulateEnvironmentProbes
+===================
+*/
+void idGameLocal::PopulateEnvironmentProbes()
+{
+	idEntity* ent;
+
+	// check if there are already environment probes defined by the artist
+	int numEnvprobes = 0;
+
+	for( ent = spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() )
+	{
+		if( ent->IsType( idEnvProbes::Type ) )
+		{
+			numEnvprobes++;
+		}
+	}
+
+	if( numEnvprobes > 0 )
+	{
+		return;
+	}
+
+	const idDict* envProbeDef = gameLocal.FindEntityDefDict( "env_probe", false );
+	if( !envProbeDef )
+	{
+		Printf( "entityDef env_probe missing in base/def/" );
+		return;
+	}
+
+	// naive approach: place an env probe into the center of each BSP area
+
+	int	numAreas = gameRenderWorld->NumAreas();
+
+	for( int i = 0; i < numAreas; i++ )
+	{
+		idBounds areaBounds = gameRenderWorld->AreaBounds( i );
+
+		idVec3 point = areaBounds.GetCenter();
+		point.SnapInt();
+
+		int areaNum = gameRenderWorld->PointInArea( point );
+		if( areaNum < 0 )
+		{
+			Warning( "PopulateEnvironmentProbes: location '%i' is not in a valid area\n", i );
+			continue;
+		}
+
+		idDict args;
+		args.Set( "classname", "env_probe" );
+		args.Set( "origin", point.ToString() );
+
+		idStr name;
+		name.Format( "env_probe_area_%i", i );
+		name = gameEdit->GetUniqueEntityName( name );
+
+		args.Set( "name", name );
+
+		gameLocal.SpawnEntityDef( args, &ent );
+		if( !ent )
+		{
+			gameLocal.Error( "Couldn't spawn 'env_probe'" );
+		}
+	}
+}
+// RB end
+
+/*
+===================
 idGameLocal::InitFromNewMap
 ===================
 */
@@ -1266,8 +1355,10 @@ void idGameLocal::InitFromNewMap( const char* mapName, idRenderWorld* renderWorl
 
 	MapPopulate();
 
-	mpGame.Reset();
+	// RB
+	PopulateEnvironmentProbes();
 
+	mpGame.Reset();
 	mpGame.Precache();
 
 	// free up any unused animations
@@ -1328,7 +1419,14 @@ bool idGameLocal::InitFromSaveGame( const char* mapName, idRenderWorld* renderWo
 	g_skill.SetInteger( i );
 
 	// precache the player
-	FindEntityDef( "player_doommarine", false );
+	if( isMultiplayer )
+	{
+		FindEntityDef( "player_doommarine_mp", false );
+	}
+	else
+	{
+		FindEntityDef( gameLocal.world->spawnArgs.GetString( "def_player", "player_doommarine" ), false );
+	}
 
 	// precache any media specified in the map
 	for( i = 0; i < mapFile->GetNumEntities(); i++ )
@@ -1345,6 +1443,8 @@ bool idGameLocal::InitFromSaveGame( const char* mapName, idRenderWorld* renderWo
 			}
 		}
 	}
+
+	savegame.ReadDecls();
 
 	savegame.ReadDict( &si );
 	SetServerInfo( si );
@@ -1503,7 +1603,6 @@ bool idGameLocal::InitFromSaveGame( const char* mapName, idRenderWorld* renderWo
 	savegame.RestoreObjects();
 
 	mpGame.Reset();
-
 	mpGame.Precache();
 
 	// free up any unused animations
@@ -1601,6 +1700,8 @@ void idGameLocal::MapShutdown()
 
 	clip.Shutdown();
 	idClipModel::ClearTraceModelCache();
+
+	collisionModelManager->FreeMap();		// Fixes an issue where when maps were reloaded the materials wouldn't get their surfaceFlags re-set.  Now we free the map collision model forcing materials to be reparsed.
 
 	ShutdownAsyncNetwork();
 
@@ -1792,11 +1893,13 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 		if( kv->GetValue().Length() )
 		{
 			declManager->MediaPrint( "Precaching model %s\n", kv->GetValue().c_str() );
+
 			// precache model/animations
 			if( declManager->FindType( DECL_MODELDEF, kv->GetValue(), false ) == NULL )
 			{
 				// precache the render model
 				renderModelManager->FindModel( kv->GetValue() );
+
 				// precache .cm files only
 				collisionModelManager->LoadModel( kv->GetValue() );
 			}
@@ -1805,13 +1908,13 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 	}
 
 	kv = dict->FindKey( "s_shader" );
-	if( kv && kv->GetValue().Length() )
+	if( kv != NULL && kv->GetValue().Length() )
 	{
 		declManager->FindType( DECL_SOUND, kv->GetValue() );
 	}
 
 	kv = dict->MatchPrefix( "snd", NULL );
-	while( kv )
+	while( kv != NULL )
 	{
 		if( kv->GetValue().Length() )
 		{
@@ -1847,13 +1950,13 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 	}
 
 	kv = dict->FindKey( "texture" );
-	if( kv && kv->GetValue().Length() )
+	if( kv != NULL && kv->GetValue().Length() )
 	{
 		declManager->FindType( DECL_MATERIAL, kv->GetValue() );
 	}
 
 	kv = dict->MatchPrefix( "mtr", NULL );
-	while( kv )
+	while( kv != NULL )
 	{
 		if( kv->GetValue().Length() )
 		{
@@ -1864,7 +1967,7 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 
 	// handles hud icons
 	kv = dict->MatchPrefix( "inv_icon", NULL );
-	while( kv )
+	while( kv != NULL )
 	{
 		if( kv->GetValue().Length() )
 		{
@@ -1876,7 +1979,7 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 	// handles teleport fx.. this is not ideal but the actual decision on which fx to use
 	// is handled by script code based on the teleport number
 	kv = dict->MatchPrefix( "teleport", NULL );
-	if( kv && kv->GetValue().Length() )
+	if( kv != NULL && kv->GetValue().Length() )
 	{
 		int teleportType = atoi( kv->GetValue() );
 		const char* p = ( teleportType ) ? va( "fx/teleporter%i.fx", teleportType ) : "fx/teleporter.fx";
@@ -1884,7 +1987,7 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 	}
 
 	kv = dict->MatchPrefix( "fx", NULL );
-	while( kv )
+	while( kv != NULL )
 	{
 		if( kv->GetValue().Length() )
 		{
@@ -1895,7 +1998,7 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 	}
 
 	kv = dict->MatchPrefix( "smoke", NULL );
-	while( kv )
+	while( kv != NULL )
 	{
 		if( kv->GetValue().Length() )
 		{
@@ -1911,7 +2014,7 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 	}
 
 	kv = dict->MatchPrefix( "skin", NULL );
-	while( kv )
+	while( kv != NULL )
 	{
 		if( kv->GetValue().Length() )
 		{
@@ -1922,7 +2025,7 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 	}
 
 	kv = dict->MatchPrefix( "def", NULL );
-	while( kv )
+	while( kv != NULL )
 	{
 		if( kv->GetValue().Length() )
 		{
@@ -1931,8 +2034,25 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 		kv = dict->MatchPrefix( "def", kv );
 	}
 
+	// Should have been def_monster_damage!!
+	kv = dict->FindKey( "monster_damage" );
+	if( kv != NULL && kv->GetValue().Length() )
+	{
+		FindEntityDef( kv->GetValue(), false );
+	}
+
+	kv = dict->MatchPrefix( "item", NULL );
+	while( kv != NULL )
+	{
+		if( kv->GetValue().Length() )
+		{
+			FindEntityDefDict( kv->GetValue().c_str(), false );
+		}
+		kv = dict->MatchPrefix( "item", kv );
+	}
+
 	kv = dict->MatchPrefix( "pda_name", NULL );
-	while( kv )
+	while( kv != NULL )
 	{
 		if( kv->GetValue().Length() )
 		{
@@ -1942,7 +2062,7 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 	}
 
 	kv = dict->MatchPrefix( "video", NULL );
-	while( kv )
+	while( kv != NULL )
 	{
 		if( kv->GetValue().Length() )
 		{
@@ -1952,13 +2072,23 @@ void idGameLocal::CacheDictionaryMedia( const idDict* dict )
 	}
 
 	kv = dict->MatchPrefix( "audio", NULL );
-	while( kv )
+	while( kv != NULL )
 	{
 		if( kv->GetValue().Length() )
 		{
 			declManager->FindType( DECL_AUDIO, kv->GetValue().c_str(), false );
 		}
 		kv = dict->MatchPrefix( "audio", kv );
+	}
+
+	kv = dict->MatchPrefix( "email", NULL );
+	while( kv != NULL )
+	{
+		if( kv->GetValue().Length() )
+		{
+			declManager->FindType( DECL_EMAIL, kv->GetValue().c_str(), false );
+		}
+		kv = dict->MatchPrefix( "email", kv );
 	}
 }
 
@@ -2002,7 +2132,15 @@ void idGameLocal::SpawnPlayer( int clientNum )
 
 	args.SetInt( "spawn_entnum", clientNum );
 	args.Set( "name", va( "player%d", clientNum + 1 ) );
-	args.Set( "classname", isMultiplayer ? "player_doommarine_mp" : "player_doommarine" );
+	args.Set( "classname", isMultiplayer ? "player_doommarine_mp" : gameLocal.world->spawnArgs.GetString( "def_player", "player_doommarine" ) );
+
+	// It's important that we increment numClients before calling SpawnEntityDef, because some
+	// entities want to check gameLocal.numClients to see who to operate on (such as target_removeweapons)
+	if( clientNum >= numClients )
+	{
+		numClients = clientNum + 1;
+	}
+
 	if( !SpawnEntityDef( args, &ent ) || !entities[ clientNum ] )
 	{
 		Error( "Failed to spawn player as '%s'", args.GetString( "classname" ) );
@@ -2013,12 +2151,6 @@ void idGameLocal::SpawnPlayer( int clientNum )
 	{
 		Error( "'%s' spawned the player as a '%s'.  Player spawnclass must be a subclass of idPlayer.", args.GetString( "classname" ), ent->GetClassname() );
 	}
-
-	if( clientNum >= numClients )
-	{
-		numClients = clientNum + 1;
-	}
-
 	mpGame.SpawnPlayer( clientNum );
 }
 
@@ -2729,6 +2861,9 @@ bool idGameLocal::Draw( int clientNum )
 		return mpGame.Draw( clientNum );
 	}
 
+	// chose the optimized or legacy device context code
+	uiManager->SetDrawingDC();
+
 	idPlayer* player = static_cast<idPlayer*>( entities[ clientNum ] );
 
 	if( !player )
@@ -3019,7 +3154,10 @@ void idGameLocal::RunDebugInfo()
 			}
 			if( viewTextBounds.IntersectsBounds( entBounds ) )
 			{
-				gameRenderWorld->DrawText( ent->name.c_str(), entBounds.GetCenter(), 0.1f, colorWhite, axis, 1 );
+				//if( ent->IsType( idEnvProbes::Type ) )
+				{
+					gameRenderWorld->DrawText( ent->name.c_str(), entBounds.GetCenter(), 0.1f, colorWhite, axis, 1 );
+				}
 				gameRenderWorld->DrawText( va( "#%d", ent->entityNumber ), entBounds.GetCenter() + up, 0.1f, colorWhite, axis, 1 );
 			}
 		}
@@ -3259,8 +3397,6 @@ idGameLocal::CheatsOk
 */
 bool idGameLocal::CheatsOk( bool requirePlayer )
 {
-	idPlayer* player;
-
 	if( isMultiplayer && !cvarSystem->GetCVarBool( "net_allowCheats" ) )
 	{
 		Printf( "Not allowed in multiplayer.\n" );
@@ -3272,8 +3408,8 @@ bool idGameLocal::CheatsOk( bool requirePlayer )
 		return true;
 	}
 
-	player = GetLocalPlayer();
-	if( !requirePlayer || ( player && ( player->health > 0 ) ) )
+	idPlayer* player = GetLocalPlayer();
+	if( !requirePlayer || ( player != NULL && ( player->health > 0 ) ) )
 	{
 		return true;
 	}
@@ -3539,21 +3675,18 @@ bool idGameLocal::InhibitEntitySpawn( idDict& spawnArgs )
 		spawnArgs.GetBool( "not_hard", "0", result );
 	}
 
-	const char* name;
-#ifndef ID_DEMO_BUILD
 	if( g_skill.GetInteger() == 3 )
 	{
-		name = spawnArgs.GetString( "classname" );
+		const char* name = spawnArgs.GetString( "classname" );
 		if( idStr::Icmp( name, "item_medkit" ) == 0 || idStr::Icmp( name, "item_medkit_small" ) == 0 )
 		{
 			result = true;
 		}
 	}
-#endif
 
 	if( gameLocal.isMultiplayer )
 	{
-		name = spawnArgs.GetString( "classname" );
+		const char* name = spawnArgs.GetString( "classname" );
 		if( idStr::Icmp( name, "weapon_bfg" ) == 0 || idStr::Icmp( name, "weapon_soulcube" ) == 0 )
 		{
 			result = true;

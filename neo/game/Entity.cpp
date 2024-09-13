@@ -397,7 +397,7 @@ void idEntity::UpdateChangeableSpawnArgs( const idDict* source )
 	}
 	cameraTarget = NULL;
 	target = source->GetString( "cameraTarget" );
-	if( target && target[0] )
+	if( target != NULL && target[0] != '\0' )
 	{
 		// update the camera taget
 		PostEventMS( &EV_UpdateCameraTarget, 0 );
@@ -518,7 +518,7 @@ void idEntity::Spawn()
 
 	cameraTarget = NULL;
 	temp = spawnArgs.GetString( "cameraTarget" );
-	if( temp && temp[0] )
+	if( temp != NULL && temp[0] != '\0' )
 	{
 		// update the camera taget
 		PostEventMS( &EV_UpdateCameraTarget, 0 );
@@ -1094,6 +1094,9 @@ void idEntity::BecomeInactive( int flags )
 				teamMaster->BecomeInactive( TH_PHYSICS );
 			}
 		}
+		// Becoming inactive automagically turns on motion blur again
+		renderEntity.skipMotionBlur = false;
+		BecomeActive( TH_UPDATEVISUALS );
 	}
 }
 
@@ -1614,7 +1617,7 @@ bool idEntity::UpdateRenderEntity( renderEntity_s* renderEntity, const renderVie
 	}
 
 	idAnimator* animator = GetAnimator();
-	if( animator )
+	if( animator != NULL )
 	{
 		return animator->CreateFrame( gameLocal.time, false );
 	}
@@ -1634,9 +1637,10 @@ bool idEntity::ModelCallback( renderEntity_s* renderEntity, const renderView_t* 
 	idEntity* ent;
 
 	ent = gameLocal.entities[ renderEntity->entityNum ];
-	if( !ent )
+	if( ent == NULL )
 	{
 		gameLocal.Error( "idEntity::ModelCallback: callback with NULL game entity" );
+		return false;
 	}
 
 	return ent->UpdateRenderEntity( renderEntity, renderView );
@@ -2860,8 +2864,8 @@ idEntity::RunPhysics
 */
 bool idEntity::RunPhysics()
 {
-	int			i, reachedTime, startTime, endTime;
-	idEntity* 	part, *blockedPart, *blockingEntity;
+	int			i, reachedTime;
+	idEntity* 	part = NULL, *blockedPart = NULL, *blockingEntity = NULL;
 	bool		moved;
 
 	// don't run physics if not enabled
@@ -2881,8 +2885,8 @@ bool idEntity::RunPhysics()
 		return false;
 	}
 
-	startTime = gameLocal.previousTime;
-	endTime = gameLocal.time;
+	const int startTime = gameLocal.previousTime;
+	const int endTime = gameLocal.time;
 
 	gameLocal.push.InitSavingPushedEntityPositions();
 	blockedPart = NULL;
@@ -2987,11 +2991,20 @@ bool idEntity::RunPhysics()
 		return false;
 	}
 
+	// Disable motion blur if this object pushes the local player
+	renderEntity.skipMotionBlur = false;
+
 	// set pushed
 	for( i = 0; i < gameLocal.push.GetNumPushedEntities(); i++ )
 	{
 		idEntity* ent = gameLocal.push.GetPushedEntity( i );
 		ent->physics->SetPushed( endTime - startTime );
+	}
+
+	// Propogate skipMotionBlur to all team members
+	for( part = this; part != NULL; part = part->teamChain )
+	{
+		part->renderEntity.skipMotionBlur = renderEntity.skipMotionBlur;
 	}
 
 	if( gameLocal.isClient )
@@ -3388,9 +3401,10 @@ void idEntity::Damage( idEntity* inflictor, idEntity* attacker, const idVec3& di
 	}
 
 	const idDict* damageDef = gameLocal.FindEntityDefDict( damageDefName );
-	if( !damageDef )
+	if( damageDef == NULL )
 	{
 		gameLocal.Error( "Unknown damageDef '%s'\n", damageDefName );
+		return;
 	}
 
 	int	damage = damageDef->GetInt( "damage" );
@@ -3647,9 +3661,10 @@ void idEntity::ClearSignal( idThread* thread, signalNum_t signalnum )
 	if( ( signalnum < 0 ) || ( signalnum >= NUM_SIGNALS ) )
 	{
 		gameLocal.Error( "Signal out of range" );
+		return;
 	}
 
-	if( !signals )
+	if( signals == NULL )
 	{
 		return;
 	}
@@ -3673,9 +3688,10 @@ void idEntity::ClearSignalThread( signalNum_t signalnum, idThread* thread )
 	if( ( signalnum < 0 ) || ( signalnum >= NUM_SIGNALS ) )
 	{
 		gameLocal.Error( "Signal out of range" );
+		return;
 	}
 
-	if( !signals )
+	if( signals == NULL )
 	{
 		return;
 	}
@@ -4431,9 +4447,10 @@ void idEntity::Event_SpawnBind()
 			if( spawnArgs.GetString( "bindToJoint", "", &joint ) && *joint )
 			{
 				parentAnimator = parent->GetAnimator();
-				if( !parentAnimator )
+				if( parentAnimator == NULL )
 				{
 					gameLocal.Error( "Cannot bind to joint '%s' on '%s'.  Entity does not support skeletal models.", joint, name.c_str() );
+					return;
 				}
 				bindJoint = parentAnimator->GetJointHandle( joint );
 				if( bindJoint == INVALID_JOINT )
@@ -4530,6 +4547,7 @@ void idEntity::Event_GetShaderParm( int parmnum )
 	if( ( parmnum < 0 ) || ( parmnum >= MAX_ENTITY_SHADER_PARMS ) )
 	{
 		gameLocal.Error( "shader parm index (%d) out of range", parmnum );
+		return;
 	}
 
 	idThread::ReturnFloat( renderEntity.shaderParms[ parmnum ] );
@@ -4921,6 +4939,7 @@ idEntity::Event_SetKey
 void idEntity::Event_SetKey( const char* key, const char* value )
 {
 	spawnArgs.Set( key, value );
+	UpdateChangeableSpawnArgs( NULL );
 }
 
 /*
@@ -5068,13 +5087,13 @@ void idEntity::Event_UpdateCameraTarget()
 
 	cameraTarget = gameLocal.FindEntity( target );
 
-	if( cameraTarget )
+	if( cameraTarget != NULL )
 	{
 		kv = cameraTarget->spawnArgs.MatchPrefix( "target", NULL );
 		while( kv )
 		{
 			idEntity* ent = gameLocal.FindEntity( kv->GetValue() );
-			if( ent && idStr::Icmp( ent->GetEntityDefName(), "target_null" ) == 0 )
+			if( ent != NULL && idStr::Icmp( ent->GetEntityDefName(), "target_null" ) == 0 )
 			{
 				dir = ent->GetPhysics()->GetOrigin() - cameraTarget->GetPhysics()->GetOrigin();
 				dir.Normalize();
@@ -5153,9 +5172,10 @@ void idEntity::Event_Wait( float time )
 {
 	idThread* thread = idThread::CurrentThread();
 
-	if( !thread )
+	if( thread == NULL )
 	{
 		gameLocal.Error( "Event 'wait' called from outside thread" );
+		return;
 	}
 
 	thread->WaitSec( time );
@@ -5192,24 +5212,28 @@ void idEntity::Event_CallFunction( const char* funcname )
 	idThread* thread;
 
 	thread = idThread::CurrentThread();
-	if( !thread )
+	if( thread == NULL )
 	{
 		gameLocal.Error( "Event 'callFunction' called from outside thread" );
+		return;
 	}
 
 	func = scriptObject.GetFunction( funcname );
-	if( !func )
+	if( func == NULL )
 	{
 		gameLocal.Error( "Unknown function '%s' in '%s'", funcname, scriptObject.GetTypeName() );
+		return;
 	}
 
 	if( func->type->NumParameters() != 1 )
 	{
 		gameLocal.Error( "Function '%s' has the wrong number of parameters for 'callFunction'", funcname );
+		return;
 	}
 	if( !scriptObject.GetTypeDef()->Inherits( func->type->GetParmType( 0 ) ) )
 	{
 		gameLocal.Error( "Function '%s' is the wrong type for 'callFunction'", funcname );
+		return;
 	}
 
 	// function args will be invalid after this call

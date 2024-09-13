@@ -70,6 +70,18 @@ typedef struct playerPState_s
 	int						movementType;
 	int						movementFlags;
 	int						movementTime;
+
+	playerPState_s() :
+		origin( vec3_zero ),
+		velocity( vec3_zero ),
+		localOrigin( vec3_zero ),
+		pushVelocity( vec3_zero ),
+		stepUp( 0.0f ),
+		movementType( 0 ),
+		movementFlags( 0 ),
+		movementTime( 0 )
+	{
+	}
 } playerPState_t;
 
 class idPhysics_Player : public idPhysics_Actor

@@ -181,9 +181,9 @@ void idDragEntity::Update( idPlayer* player )
 	idVec3 viewPoint, origin;
 	idMat3 viewAxis, axis;
 	trace_t trace;
-	idEntity* newEnt;
+	idEntity* newEnt = NULL;
 	idAngles angles;
-	jointHandle_t newJoint;
+	jointHandle_t newJoint = INVALID_JOINT;
 	idStr newBodyName;
 
 	player->GetViewPos( viewPoint, viewAxis );
@@ -302,7 +302,7 @@ void idDragEntity::Update( idPlayer* player )
 		renderEntity_t* renderEntity = drag->GetRenderEntity();
 		idAnimator* dragAnimator = drag->GetAnimator();
 
-		if( joint != INVALID_JOINT && renderEntity && dragAnimator )
+		if( joint != INVALID_JOINT && renderEntity != NULL && dragAnimator != NULL )
 		{
 			dragAnimator->GetJointTransform( joint, gameLocal.time, cursor->draggedPosition, axis );
 			cursor->draggedPosition = renderEntity->origin + cursor->draggedPosition * renderEntity->axis;
@@ -1210,7 +1210,7 @@ int idGameEdit::MapGetUniqueMatchingKeyVals( const char* key, const char* list[]
 			if( ent )
 			{
 				const char* k = ent->epairs.GetString( key );
-				if( k && *k && count < max )
+				if( k != NULL && *k != '\0' && count < max )
 				{
 					list[count++] = k;
 				}

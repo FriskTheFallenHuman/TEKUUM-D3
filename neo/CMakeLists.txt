@@ -17,16 +17,8 @@ option(STANDALONE "Skip Doom 3 base/ folder" OFF)
 option(FORCE_COLOR_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 option(COMPILE_COMMANDS "Generate compile_commands.json" OFF)
 option(USE_PRECOMPILED_HEADERS "Use precompiled headers during build" ON)
-option(GLES2 "Only use OpenGL ES 2.0 functions" OFF)
-option(ANGLE "Only use OpenGL ES 2.0 functions through ANGLE" OFF)
-option(MESA "Only use OpenGL ES 3.0 functions and turn off GPU skeletal animation" OFF)
-option(DEBUG_MEMORY "Enables memory logging to file" OFF)
 option(ONATIVE "Optimize for the host CPU" OFF)
 option(RETAIL "Strip certain developer features and cheats from shipping builds" OFF)
-
-# if(ANGLE OR GLES2)
-	# set(USE_CMDLINE_TOOLS FALSE)
-# endif()
 
 # Define our cpu variable
 include( CPUDefine )
@@ -278,9 +270,6 @@ file(GLOB SYS_SOURCES sys/*.cpp)
 file(GLOB UI_INCLUDES ui/*.h)
 file(GLOB UI_SOURCES ui/*.cpp)
 
-file(GLOB UI_LUA_INCLUDES ui-lua/*.h)
-file(GLOB UI_LUA_SOURCES ui-lua/*.cpp)
-
 file(GLOB COMPILER_INCLUDES tools/compilers/*.h)
 
 file(GLOB COMPILER_AAS_INCLUDES tools/compilers/aas/*.h)
@@ -480,8 +469,6 @@ source_group("Sound" FILES ${SOUND_INCLUDES})
 source_group("Sound" FILES ${SOUND_SOURCES})
 source_group("UI" FILES ${UI_INCLUDES})
 source_group("UI" FILES ${UI_SOURCES})
-source_group("UI-Lua" FILES ${UI_LUA_INCLUDES})
-source_group("UI-Lua" FILES ${UI_LUA_SOURCES})
 source_group("Sys" FILES ${SYS_INCLUDES})
 source_group("Sys" FILES ${SYS_SOURCES})
 #source_group("Sys\\win32" FILES ${WIN32_INCLUDES})
@@ -532,16 +519,6 @@ source_group("tools\\script" FILES ${EDITOR_SCRIPT_SOURCES})
 source_group("tools\\sound" FILES ${EDITOR_SOUND_INCLUDES})
 source_group("tools\\sound" FILES ${EDITOR_SOUND_SOURCES})
 
-
-if(ANGLE OR GLES2)
-	if(ANGLE)
-		add_definitions(-DUSE_ANGLE)
-		include_directories(libs/angle/include)
-	endif()
-
-	add_definitions(-DUSE_GLES3)
-endif()
-
 set(TEKUUM_INCLUDES
 	${AAS_INCLUDES}
 	${CM_INCLUDES}
@@ -567,7 +544,8 @@ set(TEKUUM_INCLUDES
 	${SHADERS_BUILTIN_VIDEO}
 	${SHADERS_BUILTIN_VR}
 	${RENDERER_OPENGL_INCLUDES}
-	${SOUND_INCLUDES})
+	${SOUND_INCLUDES}
+	${UI_INCLUDES})
 
 set(TEKUUM_SOURCES
 	${AAS_SOURCES}
@@ -582,30 +560,8 @@ set(TEKUUM_SOURCES
 	${RENDERER_JOBS_PRELIGHTSHADOWVOLUME_SOURCES}
 	${RENDERER_JOBS_STATICSHADOWVOLUME_SOURCES}
 	${RENDERER_OPENGL_SOURCES}
-	${SOUND_SOURCES})
-
-if(STANDALONE)
-	list(APPEND TEKUUM_INCLUDES
-		${UI_LUA_INCLUDES}
-		${LUA_INCLUDES})
-
-	list(APPEND TEKUUM_SOURCES
-		${UI_LUA_SOURCES})
-
-	add_definitions(-DUSE_LUA)
-
-	include_directories(
-			libs/lua/src
-			libs/luawrapper)
-else()
-	list(APPEND TEKUUM_INCLUDES ${UI_INCLUDES})
-	list(APPEND TEKUUM_SOURCES ${UI_SOURCES})
-endif()
-
-if(NOT ANGLE)
-	list(APPEND TEKUUM_INCLUDES ${GLEW_INCLUDES})
-	list(APPEND TEKUUM_SOURCES ${GLEW_SOURCES})
-endif()
+	${SOUND_SOURCES}
+	${UI_SOURCES})
 
 add_definitions(-D__DOOM__
 				-D__DOOM_DLL__
@@ -632,13 +588,7 @@ include_directories(
 			libs/miniz
 			libs/minizip
 			libs/freetype/include)
-
-link_directories(
-			${CMAKE_CURRENT_SOURCE_DIR}/libs/curl/lib
-			${CMAKE_CURRENT_SOURCE_DIR}/libs/openal/lib)
-
 if(MSVC)
-
 	# if(MSVC_VERSION EQUAL 1700)
 		 set(DirectX_LIBRARIES
 			 dinput8
@@ -659,13 +609,6 @@ if(MSVC)
 		# if(MFC_FOUND)
 			# include_directories(${MFC_INCLUDE_DIR})
 			# link_directories(${MFC_LIBRARY_DIR})
-		# endif()
-
-		# find_package(ATL REQUIRED)
-		# if(ATL_FOUND)
-			# include_directories(${ATL_INCLUDE_DIR})
-			# link_directories(${ATL_LIBRARY_DIR})
-			# add_definitions(-DUSE_MFC6_WITH_ATL7)
 		# endif()
 
 		include_directories(libs/atlmfc/include)
@@ -735,8 +678,6 @@ if(MSVC)
 
 	if( USE_PRECOMPILED_HEADERS )
 		set( TEKUUM_PRECOMPILED_SOURCES ${TEKUUM_SOURCES} )
-		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/game/gamesys/TypeInfo.cpp )
-		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/ui-lua/Lua_init.cpp )
 		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTDecoder.cpp )
 		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder.cpp )
 		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder_SSE2.cpp )
@@ -782,44 +723,23 @@ if(MSVC)
 
 	add_executable( ${PROJECT_NAME} WIN32 ${TEKUUM_INCLUDES} ${TEKUUM_SOURCES} ${WIN32_RESOURCES} )
 
-	if(ANGLE)
-		add_dependencies( ${PROJECT_NAME} idlib external libANGLE )
-		target_link_libraries( ${PROJECT_NAME}
-			idlib
-			external
-			GLEW::GLEW
-			${OPENAL_LIBRARY}
-			${FREETYPE_LIBRARY}
-			libANGLE
-			${DirectX_LIBRARIES}
-			${QT_LIBRARIES}
-			#openal32
-			#opengl32
-			glu32
-			dbghelp
-			#eaxguid
-			iphlpapi
-			winmm
-			ws2_32.lib)
-	else()
-		add_dependencies(${PROJECT_NAME} idlib external)
-		target_link_libraries(${PROJECT_NAME}
-			idlib
-			external
-			GLEW::GLEW
-			${OPENAL_LIBRARY}
-			${FREETYPE_LIBRARY}
-			${DirectX_LIBRARIES}
-			${QT_LIBRARIES}
-			#openal32
-			opengl32
-			glu32
-			dbghelp
-			#eaxguid
-			iphlpapi
-			winmm
-			ws2_32)
-	endif()
+	add_dependencies(${PROJECT_NAME} idlib external)
+	target_link_libraries(${PROJECT_NAME}
+		idlib
+		external
+		GLEW::GLEW
+		${OPENAL_LIBRARY}
+		${FREETYPE_LIBRARY}
+		${DirectX_LIBRARIES}
+		${QT_LIBRARIES}
+		#openal32
+		opengl32
+		glu32
+		dbghelp
+		#eaxguid
+		iphlpapi
+		winmm
+		ws2_32)
 
 	# set MSVC default debug directory on executable
 	if( CMAKE_MAJOR_VERSION EQUAL 3 AND CMAKE_MINOR_VERSION GREATER_EQUAL 8 )
@@ -844,13 +764,6 @@ elseif( UNIX )
 	add_definitions( -DUSE_SDL )
 	add_definitions( -DUSE_SOUND_PULSE )
 	add_definitions( -DUSE_EXCEPTIONS )
-
-	if(MESA)
-		add_definitions( -DUSE_GLES3 )
-		add_definitions( -DUSE_MESA )
-	endif()
-
-	#find_package(PulseAudio REQUIRED)
 
 	list(APPEND TEKUUM_INCLUDES
 		${SYS_INCLUDES}

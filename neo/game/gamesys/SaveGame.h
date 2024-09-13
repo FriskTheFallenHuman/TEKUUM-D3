@@ -45,6 +45,8 @@ public:
 
 	void					Close();
 
+	void					WriteDecls();
+
 	void					AddObject( const idClass* obj );
 	void					WriteObjectList();
 
@@ -78,6 +80,7 @@ public:
 	void					WriteUserInterface( const idUserInterface* ui, bool unique );
 	void					WriteRenderEntity( const renderEntity_t& renderEntity );
 	void					WriteRenderLight( const renderLight_t& renderLight );
+	void					WriteRenderEnvprobe( const renderEnvironmentProbe_t& renderEnvprobe ); // RB
 	void					WriteRefSound( const refSound_t& refSound );
 	void					WriteRenderView( const renderView_t& view );
 	void					WriteUsercmd( const usercmd_t& usercmd );
@@ -102,6 +105,8 @@ class idRestoreGame
 public:
 	idRestoreGame( idFile* savefile );
 	~idRestoreGame();
+
+	void					ReadDecls();
 
 	void					CreateObjects();
 	void					RestoreObjects();
@@ -139,6 +144,7 @@ public:
 	void					ReadUserInterface( idUserInterface*& ui );
 	void					ReadRenderEntity( renderEntity_t& renderEntity );
 	void					ReadRenderLight( renderLight_t& renderLight );
+	void					ReadRenderEnvprobe( renderEnvironmentProbe_t& renderEnvprobe ); // RB
 	void					ReadRefSound( refSound_t& refSound );
 	void					ReadRenderView( renderView_t& view );
 	void					ReadUsercmd( usercmd_t& usercmd );

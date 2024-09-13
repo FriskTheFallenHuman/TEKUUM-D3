@@ -76,7 +76,9 @@ const idEventDef EV_Player_ExitTeleporter( "exitTeleporter" );
 const idEventDef EV_Player_StopAudioLog( "stopAudioLog" );
 const idEventDef EV_Player_HideTip( "hideTip" );
 const idEventDef EV_Player_LevelTrigger( "levelTrigger" );
-const idEventDef EV_SpectatorTouch( "spectatorTouch", "et" );
+// RB: changed to internal event as it was not exposed to Doom Script by default and broke the automatic export
+const idEventDef EV_SpectatorTouch( "<spectatorTouch>", "et" );
+// RB end
 const idEventDef EV_Player_GetIdealWeapon( "getIdealWeapon", NULL, 's' );
 
 CLASS_DECLARATION( idActor, idPlayer )
@@ -415,9 +417,6 @@ void idInventory::RestoreInventory( idPlayer* owner, const idDict& dict )
 	// weapons are stored as a number for persistant data, but as strings in the entityDef
 	weapons	= dict.GetInt( "weapon_bits", "0" );
 
-#ifdef ID_DEMO_BUILD
-	Give( owner, dict, "weapon", dict.GetString( "weapon" ), NULL, false );
-#else
 	if( g_skill.GetInteger() >= 3 )
 	{
 		Give( owner, dict, "weapon", dict.GetString( "weapon_nightmare" ), NULL, false );
@@ -426,7 +425,6 @@ void idInventory::RestoreInventory( idPlayer* owner, const idDict& dict )
 	{
 		Give( owner, dict, "weapon", dict.GetString( "weapon" ), NULL, false );
 	}
-#endif
 
 	num = dict.GetInt( "levelTriggers" );
 	for( i = 0; i < num; i++ )
@@ -751,7 +749,8 @@ ammo_t idInventory::AmmoIndexForWeaponClass( const char* weapon_classname, int* 
 	const idDeclEntityDef* decl = gameLocal.FindEntityDef( weapon_classname, false );
 	if( !decl )
 	{
-		gameLocal.Error( "Unknown weapon in decl '%s'", weapon_classname );
+		//gameLocal.Error( "Unknown weapon in decl '%s'", weapon_classname );
+		return 0;
 	}
 	if( ammoRequired )
 	{
@@ -895,7 +894,8 @@ bool idInventory::Give( idPlayer* owner, const idDict& spawnArgs, const char* st
 
 			if( i >= MAX_WEAPONS )
 			{
-				gameLocal.Error( "Unknown weapon '%s'", weaponName.c_str() );
+				gameLocal.Warning( "Unknown weapon '%s'", weaponName.c_str() );
+				continue;
 			}
 
 			// cache the media for this weapon
@@ -1026,6 +1026,11 @@ idInventory::UseAmmo
 */
 bool idInventory::UseAmmo( ammo_t type, int amount )
 {
+	if( g_infiniteAmmo.GetBool() )
+	{
+		return true;
+	}
+
 	if( !HasAmmo( type, amount ) )
 	{
 		return false;
@@ -1311,7 +1316,7 @@ void idPlayer::SetupWeaponEntity()
 	for( w = 0; w < MAX_WEAPONS; w++ )
 	{
 		weap = spawnArgs.GetString( va( "def_weapon%d", w ) );
-		if( weap && *weap )
+		if( weap != NULL && *weap != '\0' )
 		{
 			idWeapon::CacheWeapon( weap );
 		}
@@ -1445,7 +1450,7 @@ void idPlayer::Init()
 	viewBob.Zero();
 
 	value = spawnArgs.GetString( "model" );
-	if( value && ( *value != 0 ) )
+	if( value != NULL && ( *value != 0 ) )
 	{
 		SetModel( value );
 	}
@@ -1688,6 +1693,7 @@ void idPlayer::Spawn()
 			ent->ActivateTargets( this );
 		}
 	}
+
 	if( hud )
 	{
 		// We can spawn with a full soul cube, so we need to make sure the hud knows this
@@ -1760,13 +1766,12 @@ void idPlayer::Spawn()
 		{
 			g_damageScale.SetFloat( 1.0f );
 			g_armorProtection.SetFloat( ( g_skill.GetInteger() < 2 ) ? 0.4f : 0.2f );
-#ifndef ID_DEMO_BUILD
+
 			if( g_skill.GetInteger() == 3 )
 			{
 				healthTake = true;
 				nextHealthTake = gameLocal.time + g_healthTakeTime.GetInteger() * 1000;
 			}
-#endif
 		}
 	}
 }
@@ -3108,7 +3113,7 @@ void idPlayer::FireWeapon()
 
 	if( !hiddenWeapon && weapon.GetEntity()->IsReady() )
 	{
-		if( weapon.GetEntity()->AmmoInClip() || weapon.GetEntity()->AmmoAvailable() )
+		if( g_infiniteAmmo.GetBool() || weapon.GetEntity()->AmmoInClip() || weapon.GetEntity()->AmmoAvailable() )
 		{
 			AI_ATTACK_HELD = true;
 			weapon.GetEntity()->BeginAttack();
@@ -3585,7 +3590,7 @@ void idPlayer::UpdatePowerUps()
 		nextHealthPulse = gameLocal.time + HEALTHPULSE_TIME;
 		healthPulse = true;
 	}
-#ifndef ID_DEMO_BUILD
+
 	if( !gameLocal.inCinematic && influenceActive == 0 && g_skill.GetInteger() == 3 && gameLocal.time > nextHealthTake && !AI_DEAD && health > g_healthTakeLimit.GetInteger() )
 	{
 		assert( !gameLocal.isClient );	// healthPool never be set on client
@@ -3597,7 +3602,6 @@ void idPlayer::UpdatePowerUps()
 		nextHealthTake = gameLocal.time + g_healthTakeTime.GetInteger() * 1000;
 		healthTake = true;
 	}
-#endif
 }
 
 /*
@@ -3812,7 +3816,7 @@ void idPlayer::GivePDA( const char* pdaName, idDict* item )
 	for( int i = 0; i < pda->GetNumVideos(); i++ )
 	{
 		const idDeclVideo* video = pda->GetVideoByIndex( i );
-		if( video )
+		if( video != NULL )
 		{
 			inventory.videos.AddUnique( video->GetName() );
 		}
@@ -3861,7 +3865,7 @@ idDict* idPlayer::FindInventoryItem( const char* name )
 	for( int i = 0; i < inventory.items.Num(); i++ )
 	{
 		const char* iname = inventory.items[i]->GetString( "inv_name" );
-		if( iname && *iname )
+		if( iname != NULL && *iname != '\0' )
 		{
 			if( idStr::Icmp( name, iname ) == 0 )
 			{
@@ -4198,6 +4202,11 @@ void idPlayer::DropWeapon( bool died )
 {
 	idVec3 forward, up;
 	int inclip, ammoavailable;
+
+	if( died == false )
+	{
+		return;
+	}
 
 	assert( !gameLocal.isClient );
 
@@ -4680,7 +4689,7 @@ void idPlayer::SpectateFreeFly( bool force )
 	if( force || gameLocal.time > lastSpectateChange )
 	{
 		spectator = entityNumber;
-		if( player && player != this && !player->spectating && !player->IsInTeleport() )
+		if( player != NULL && player != this && !player->spectating && !player->IsInTeleport() )
 		{
 			newOrig = player->GetPhysics()->GetOrigin();
 			if( player->physicsObj.IsCrouching() )
@@ -5079,7 +5088,7 @@ void idPlayer::UpdateFocus()
 			if( ent->IsType( idAFAttachment::Type ) )
 			{
 				idEntity* body = static_cast<idAFAttachment*>( ent )->GetBody();
-				if( body && body->IsType( idAI::Type ) && ( static_cast<idAI*>( body )->GetTalkState() >= TALK_OK ) )
+				if( body != NULL && body->IsType( idAI::Type ) && ( static_cast<idAI*>( body )->GetTalkState() >= TALK_OK ) )
 				{
 					gameLocal.clip.TracePoint( trace, start, end, MASK_SHOT_RENDERMODEL, this );
 					if( ( trace.fraction < 1.0f ) && ( trace.c.entityNum == ent->entityNumber ) )
@@ -6829,7 +6838,7 @@ void idPlayer::InitAASLocation()
 		aasLocation[ i ].areaNum = 0;
 		aasLocation[ i ].pos = origin;
 		aas = gameLocal.GetAAS( i );
-		if( aas && aas->GetSettings() )
+		if( aas != NULL && aas->GetSettings() )
 		{
 			size = aas->GetSettings()->boundingBoxes[0][1];
 			bounds[0] = -size;
@@ -7028,7 +7037,7 @@ void idPlayer::Move()
 
 		// check if we're standing on top of a monster and give a push if we are
 		idEntity* groundEnt = physicsObj.GetGroundEntity();
-		if( groundEnt && groundEnt->IsType( idAI::Type ) )
+		if( groundEnt != NULL && groundEnt->IsType( idAI::Type ) )
 		{
 			idVec3 vel = physicsObj.GetLinearVelocity();
 			if( vel.ToVec2().LengthSqr() < 0.1f )
@@ -7572,6 +7581,7 @@ void idPlayer::Kill( bool delayRespawn, bool nodamage )
 		if( nodamage )
 		{
 			ServerSpectate( true );
+			idLib::Printf( "TOURNEY Kill :> Player %d On Deck \n", entityNumber );
 			forceRespawn = true;
 		}
 		else
@@ -7720,7 +7730,7 @@ void idPlayer::DamageFeedback( idEntity* victim, idEntity* inflictor, int& damag
 {
 	assert( !gameLocal.isClient );
 	damage *= PowerUpModifier( BERSERK );
-	if( damage && ( victim != this ) && victim->IsType( idActor::Type ) )
+	if( damage && ( victim != this ) && ( victim->IsType( idActor::Type ) || victim->IsType( idDamagable::Type ) ) )
 	{
 		SetLastHitTime( gameLocal.time );
 	}
@@ -8686,7 +8696,10 @@ void idPlayer::AddAIKill()
 		inventory.ammo[ ammo_souls ]++;
 		if( inventory.ammo[ ammo_souls ] >= max_souls )
 		{
-			hud->HandleNamedEvent( "soulCubeReady" );
+			if( hud )
+			{
+				hud->HandleNamedEvent( "soulCubeReady" );
+			}
 			StartSound( "snd_soulcube_ready", SND_CHANNEL_ANY, 0, false, NULL );
 		}
 	}
@@ -9948,6 +9961,7 @@ idPlayer::Event_Gibbed
 */
 void idPlayer::Event_Gibbed()
 {
+	// do nothing
 }
 
 /*

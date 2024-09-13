@@ -692,7 +692,10 @@ bool idPhysics_Parametric::Evaluate( int timeStepMSec, int endTimeMSec )
 		gameLocal.push.ClipPush( pushResults, self, pushFlags, oldOrigin, oldAxis, current.origin, current.axis );
 		if( pushResults.fraction < 1.0f )
 		{
-			clipModel->Link( gameLocal.clip, self, 0, oldOrigin, oldAxis );
+			if( clipModel )
+			{
+				clipModel->Link( gameLocal.clip, self, 0, oldOrigin, oldAxis );
+			}
 			current.localOrigin = oldLocalOrigin;
 			current.origin = oldOrigin;
 			current.localAngles = oldLocalAngles;

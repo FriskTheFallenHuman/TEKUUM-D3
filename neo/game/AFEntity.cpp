@@ -671,6 +671,11 @@ bool idAFEntity_Base::LoadAF()
 	{
 		gameLocal.Error( "idAFEntity_Base::LoadAF: Couldn't load af file '%s' on entity '%s'", fileName.c_str(), name.c_str() );
 	}
+	float mass = spawnArgs.GetFloat( "mass", "-1" );
+	if( mass > 0.0f )
+	{
+		af.GetPhysics()->SetMass( mass );
+	}
 
 	af.Start();
 
@@ -778,6 +783,16 @@ idAFEntity_Base::RemoveBindConstraints
 void idAFEntity_Base::RemoveBindConstraints()
 {
 	af.RemoveBindConstraints();
+}
+
+/*
+================
+idAFEntity_Base::AddDamageEffect
+================
+*/
+void idAFEntity_Base::AddDamageEffect( const trace_t& collision, const idVec3& velocity, const char* damageDefName )
+{
+	idAnimatedEntity::AddDamageEffect( collision, velocity, damageDefName );
 }
 
 /*
@@ -1252,9 +1267,10 @@ void idAFEntity_Gibbable::SpawnGibs( const idVec3& dir, const char* damageDefNam
 	assert( !gameLocal.isClient );
 
 	const idDict* damageDef = gameLocal.FindEntityDefDict( damageDefName );
-	if( !damageDef )
+	if( damageDef == NULL )
 	{
 		gameLocal.Error( "Unknown damageDef '%s'", damageDefName );
+		return;
 	}
 
 	// spawn gib articulated figures
@@ -1304,9 +1320,10 @@ void idAFEntity_Gibbable::Gib( const idVec3& dir, const char* damageDefName )
 	}
 
 	const idDict* damageDef = gameLocal.FindEntityDefDict( damageDefName );
-	if( !damageDef )
+	if( damageDef == NULL )
 	{
 		gameLocal.Error( "Unknown damageDef '%s'", damageDefName );
+		return;
 	}
 
 	if( damageDef->GetBool( "gibNonSolid" ) )
@@ -3045,25 +3062,25 @@ idGameEdit::AF_CreateMesh
 idRenderModel* idGameEdit::AF_CreateMesh( const idDict& args, idVec3& meshOrigin, idMat3& meshAxis, bool& poseIsSet )
 {
 	int i, jointNum;
-	const idDeclAF* af;
-	const idDeclAF_Body* fb;
+	const idDeclAF* af = NULL;
+	const idDeclAF_Body* fb = NULL;
 	renderEntity_t ent;
-	idVec3 origin, *bodyOrigin, *newBodyOrigin, *modifiedOrigin;
-	idMat3 axis, *bodyAxis, *newBodyAxis, *modifiedAxis;
-	declAFJointMod_t* jointMod;
+	idVec3 origin, *bodyOrigin = NULL, *newBodyOrigin = NULL, *modifiedOrigin = NULL;
+	idMat3 axis, *bodyAxis = NULL, *newBodyAxis = NULL, *modifiedAxis = NULL;
+	declAFJointMod_t* jointMod = NULL;
 	idAngles angles;
-	const idDict* defArgs;
-	const idKeyValue* arg;
+	const idDict* defArgs = NULL;
+	const idKeyValue* arg = NULL;
 	idStr name;
 	jointTransformData_t data;
-	const char* classname, *afName, *modelName;
-	idRenderModel* md5;
-	const idDeclModelDef* modelDef;
-	const idMD5Anim* MD5anim;
-	const idMD5Joint* MD5joint;
-	const idMD5Joint* MD5joints;
+	const char* classname = NULL, *afName = NULL, *modelName = NULL;
+	idRenderModel* md5 = NULL;
+	const idDeclModelDef* modelDef = NULL;
+	const idMD5Anim* MD5anim = NULL;
+	const idMD5Joint* MD5joint = NULL;
+	const idMD5Joint* MD5joints = NULL;
 	int numMD5joints;
-	idJointMat* originalJoints;
+	idJointMat* originalJoints = NULL;
 	int parentNum;
 
 	poseIsSet = false;

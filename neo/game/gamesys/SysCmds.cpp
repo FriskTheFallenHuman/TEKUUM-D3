@@ -920,6 +920,17 @@ void Cmd_Spawn_f( const idCmdArgs& args )
 	dict.Set( "angle", va( "%f", yaw + 180 ) );
 
 	org = player->GetPhysics()->GetOrigin() + idAngles( 0, yaw, 0 ).ToForward() * 80 + idVec3( 0, 0, 1 );
+
+	// RB: put env_probes a bit higher
+	if( idStr::Icmp( value, "env_probe" ) == 0 )
+	{
+		//org.z = 64;
+		org.SnapInt();
+
+		idStr name = gameEdit->GetUniqueEntityName( "env_probe_ingame_placed" );
+		dict.Set( "name", name );
+	}
+
 	dict.Set( "origin", org.ToString() );
 
 	for( i = 2; i < args.Argc() - 1; i += 2 )
@@ -1002,8 +1013,8 @@ void Cmd_TestLight_f( const idCmdArgs& args )
 {
 	int			i;
 	idStr		filename;
-	const char* key, *value, *name;
-	idPlayer* 	player;
+	const char* key = NULL, *value = NULL, *name = NULL;
+	idPlayer* 	player = NULL;
 	idDict		dict;
 
 	player = gameLocal.GetLocalPlayer();
@@ -1065,9 +1076,9 @@ Cmd_TestPointLight_f
 */
 void Cmd_TestPointLight_f( const idCmdArgs& args )
 {
-	const char* key, *value, *name;
+	const char* key = NULL, *value = NULL, *name = NULL;
 	int			i;
-	idPlayer*	player;
+	idPlayer*	player = NULL;
 	idDict		dict;
 
 	player = gameLocal.GetLocalPlayer();
@@ -2218,6 +2229,68 @@ static void Cmd_SaveLights_f( const idCmdArgs& args )
 }
 
 
+// RB begin
+/*
+==================
+Cmd_SaveEnvprobes_f
+==================
+*/
+static void Cmd_SaveEnvprobes_f( const idCmdArgs& args )
+{
+	int e;
+	idEnvProbes* envProbe = NULL;
+	idMapEntity* mapEnt = NULL;
+	idMapFile* mapFile = gameLocal.GetLevelMap();
+	idDict dict;
+	idStr mapName;
+	idMapFile mapExportFile;
+	const char* name = NULL;
+
+	if( !gameLocal.CheatsOk() )
+	{
+		return;
+	}
+
+	if( args.Argc() > 1 )
+	{
+		mapName = args.Argv( 1 );
+		mapName = "maps/" + mapName;
+	}
+	else
+	{
+		mapName = mapFile->GetName();
+	}
+
+	mapName += "_extra_ents.map";
+
+	for( e = 0; e < MAX_GENTITIES; e++ )
+	{
+		envProbe = static_cast<idEnvProbes*>( gameLocal.entities[ e ] );
+
+		if( !envProbe || !envProbe->IsType( idEnvProbes::Type ) )
+		{
+			continue;
+		}
+
+		dict.Clear();
+		envProbe->SaveState( &dict );
+
+		mapEnt = new idMapEntity();
+		mapExportFile.AddEntity( mapEnt );
+
+		envProbe->name = name;
+		mapEnt->epairs.Set( "classname", envProbe->GetEntityDefName() );
+		mapEnt->epairs.Set( "name", envProbe->name );
+
+		// save the env probes state
+		mapEnt->epairs.Copy( dict );
+	}
+
+	// write out the map file
+	mapExportFile.Write( mapName, ".map" );
+}
+// RB end
+
 /*
 ==================
 Cmd_SaveParticles_f
@@ -2303,131 +2376,6 @@ static void Cmd_TestSave_f( const idCmdArgs& args )
 	f = fileSystem->OpenFileWrite( "test.sav" );
 	gameLocal.SaveGame( f );
 	fileSystem->CloseFile( f );
-}
-
-/*
-==================
-Cmd_RecordViewNotes_f
-==================
-*/
-static void Cmd_RecordViewNotes_f( const idCmdArgs& args )
-{
-	idPlayer* player;
-	idVec3 origin;
-	idMat3 axis;
-
-	if( args.Argc() <= 3 )
-	{
-		return;
-	}
-
-	player = gameLocal.GetLocalPlayer();
-	if( !player )
-	{
-		return;
-	}
-
-	player->GetViewPos( origin, axis );
-
-	// Argv(1) = filename for map (viewnotes/mapname/person)
-	// Argv(2) = note number (person0001)
-	// Argv(3) = comments
-
-	idStr str = args.Argv( 1 );
-	str.SetFileExtension( ".txt" );
-
-	idFile* file = fileSystem->OpenFileAppend( str );
-
-	if( file )
-	{
-		file->WriteFloatString( "\"view\"\t( %s )\t( %s )\r\n", origin.ToString(), axis.ToString() );
-		file->WriteFloatString( "\"comments\"\t\"%s: %s\"\r\n\r\n", args.Argv( 2 ), args.Argv( 3 ) );
-		fileSystem->CloseFile( file );
-	}
-
-	idStr viewComments = args.Argv( 1 );
-	viewComments.StripLeading( "viewnotes/" );
-	viewComments += " -- Loc: ";
-	viewComments += origin.ToString();
-	viewComments += "\n";
-	viewComments += args.Argv( 3 );
-	player->hud->SetStateString( "viewcomments", viewComments );
-	player->hud->HandleNamedEvent( "showViewComments" );
-}
-
-/*
-==================
-Cmd_CloseViewNotes_f
-==================
-*/
-static void Cmd_CloseViewNotes_f( const idCmdArgs& args )
-{
-	idPlayer* player = gameLocal.GetLocalPlayer();
-
-	if( !player )
-	{
-		return;
-	}
-
-	player->hud->SetStateString( "viewcomments", "" );
-	player->hud->HandleNamedEvent( "hideViewComments" );
-}
-
-/*
-==================
-Cmd_ShowViewNotes_f
-==================
-*/
-static void Cmd_ShowViewNotes_f( const idCmdArgs& args )
-{
-	static idLexer parser( LEXFL_ALLOWPATHNAMES | LEXFL_NOSTRINGESCAPECHARS | LEXFL_NOSTRINGCONCAT | LEXFL_NOFATALERRORS );
-	idToken	token;
-	idPlayer* player;
-	idVec3 origin;
-	idMat3 axis;
-
-	player = gameLocal.GetLocalPlayer();
-
-	if( !player )
-	{
-		return;
-	}
-
-	if( !parser.IsLoaded() )
-	{
-		idStr str = "viewnotes/";
-		str += gameLocal.GetMapName();
-		str.StripFileExtension();
-		str += "/";
-		if( args.Argc() > 1 )
-		{
-			str += args.Argv( 1 );
-		}
-		else
-		{
-			str += "comments";
-		}
-		str.SetFileExtension( ".txt" );
-		if( !parser.LoadFile( str ) )
-		{
-			gameLocal.Printf( "No view notes for %s\n", gameLocal.GetMapName() );
-			return;
-		}
-	}
-
-	if( parser.ExpectTokenString( "view" ) && parser.Parse1DMatrix( 3, origin.ToFloatPtr() ) &&
-			parser.Parse1DMatrix( 9, axis.ToFloatPtr() ) && parser.ExpectTokenString( "comments" ) && parser.ReadToken( &token ) )
-	{
-		player->hud->SetStateString( "viewcomments", token );
-		player->hud->HandleNamedEvent( "showViewComments" );
-		player->Teleport( origin, axis.ToAngles(), NULL );
-	}
-	else
-	{
-		parser.FreeSource();
-		player->hud->HandleNamedEvent( "hideViewComments" );
-		return;
-	}
 }
 
 /*
@@ -2737,12 +2685,12 @@ void idGameLocal::InitConsoleCommands()
 	cmdSystem->AddCommand( "clearLights",			Cmd_ClearLights_f,			CMD_FL_GAME | CMD_FL_CHEAT,	"clears all lights" );
 	cmdSystem->AddCommand( "gameError",				Cmd_GameError_f,			CMD_FL_GAME | CMD_FL_CHEAT,	"causes a game error" );
 
-#ifndef	ID_DEMO_BUILD
 	cmdSystem->AddCommand( "disasmScript",			Cmd_DisasmScript_f,			CMD_FL_GAME | CMD_FL_CHEAT,	"disassembles script" );
-	cmdSystem->AddCommand( "recordViewNotes",		Cmd_RecordViewNotes_f,		CMD_FL_GAME | CMD_FL_CHEAT,	"record the current view position with notes" );
-	cmdSystem->AddCommand( "showViewNotes",			Cmd_ShowViewNotes_f,		CMD_FL_GAME | CMD_FL_CHEAT,	"show any view notes for the current map, successive calls will cycle to the next note" );
-	cmdSystem->AddCommand( "closeViewNotes",		Cmd_CloseViewNotes_f,		CMD_FL_GAME | CMD_FL_CHEAT,	"close the view showing any notes for this map" );
 	cmdSystem->AddCommand( "exportmodels",			Cmd_ExportModels_f,			CMD_FL_GAME | CMD_FL_CHEAT,	"exports models", ArgCompletion_DefFile );
+
+	// RB begin
+	cmdSystem->AddCommand( "saveEnvprobes",			Cmd_SaveEnvprobes_f,		CMD_FL_GAME | CMD_FL_CHEAT,	"saves all autogenerated env_probes to a .extras_env_probes.map file" );
+	// RB end
 
 	// multiplayer client commands ( replaces old impulses stuff )
 	cmdSystem->AddCommand( "clientDropWeapon",		idMultiplayerGame::DropWeapon_f, CMD_FL_GAME,			"drop current weapon" );
@@ -2757,7 +2705,6 @@ void idGameLocal::InitConsoleCommands()
 	cmdSystem->AddCommand( "serverMapRestart",		idGameLocal::MapRestart_f,	CMD_FL_GAME,				"restart the current game" );
 	cmdSystem->AddCommand( "serverForceReady",	idMultiplayerGame::ForceReady_f, CMD_FL_GAME,				"force all players ready" );
 	cmdSystem->AddCommand( "serverNextMap",			idGameLocal::NextMap_f,		CMD_FL_GAME,				"change to the next map" );
-#endif
 
 	// localization help commands
 	cmdSystem->AddCommand( "nextGUI",				Cmd_NextGUI_f,				CMD_FL_GAME | CMD_FL_CHEAT,	"teleport the player to the next func_static with a gui" );

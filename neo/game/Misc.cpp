@@ -201,7 +201,7 @@ void idPlayerStart::TeleportPlayer( idPlayer* player )
 	const char* viewName = spawnArgs.GetString( "visualView", "" );
 	idEntity* ent = viewName ? gameLocal.FindEntity( viewName ) : NULL;
 
-	if( f && ent )
+	if( f && ent != NULL )
 	{
 		// place in private camera view for some time
 		// the entity needs to teleport to where the camera view is to have the PVS right
@@ -429,7 +429,7 @@ idPathCorner* idPathCorner::RandomPath( const idEntity* source, const idEntity* 
 	for( i = 0; i < source->targets.Num(); i++ )
 	{
 		ent = source->targets[ i ].GetEntity();
-		if( ent && ( ent != ignore ) && ent->IsType( idPathCorner::Type ) )
+		if( ent != NULL && ( ent != ignore ) && ent->IsType( idPathCorner::Type ) )
 		{
 			path[ num++ ] = static_cast<idPathCorner*>( ent );
 			if( num >= MAX_GENTITIES )
@@ -768,9 +768,10 @@ void idSpring::Event_LinkSpring()
 	if( name1.Length() )
 	{
 		ent1 = gameLocal.FindEntity( name1 );
-		if( !ent1 )
+		if( ent1 == NULL )
 		{
 			gameLocal.Error( "idSpring '%s' at (%s): cannot find first entity '%s'", name.c_str(), GetPhysics()->GetOrigin().ToString( 0 ), name1.c_str() );
+			return;
 		}
 	}
 	else
@@ -781,15 +782,17 @@ void idSpring::Event_LinkSpring()
 	if( name2.Length() )
 	{
 		ent2 = gameLocal.FindEntity( name2 );
-		if( !ent2 )
+		if( ent2 == NULL )
 		{
 			gameLocal.Error( "idSpring '%s' at (%s): cannot find second entity '%s'", name.c_str(), GetPhysics()->GetOrigin().ToString( 0 ), name2.c_str() );
+			return;
 		}
 	}
 	else
 	{
 		ent2 = gameLocal.entities[ENTITYNUM_WORLD];
 	}
+
 	spring.SetPosition( ent1->GetPhysics(), id1, p1, ent2->GetPhysics(), id2, p2 );
 	BecomeActive( TH_THINK );
 }
@@ -1447,9 +1450,10 @@ void idAnimated::Event_LaunchMissilesUpdate( int launchjoint, int targetjoint, i
 	dir.Normalize();
 
 	gameLocal.SpawnEntityDef( *projectileDef, &ent, false );
-	if( !ent || !ent->IsType( idProjectile::Type ) )
+	if( ent == NULL || !ent->IsType( idProjectile::Type ) )
 	{
 		gameLocal.Error( "idAnimated '%s' at (%s): in 'launchMissiles' call '%s' is not an idProjectile", name.c_str(), GetPhysics()->GetOrigin().ToString( 0 ), projectilename );
+		return;
 	}
 	projectile = ( idProjectile* )ent;
 	projectile->Create( this, launchPos, dir );
@@ -1946,7 +1950,7 @@ void idFuncSplat::Event_Splat()
 	for( int i = 0; i < count; i++ )
 	{
 		splat = spawnArgs.RandomPrefix( "mtr_splat", gameLocal.random );
-		if( splat && *splat )
+		if( splat != NULL && *splat != '\0' )
 		{
 			float size = spawnArgs.GetFloat( "splatSize", "128" );
 			float dist = spawnArgs.GetFloat( "splatDistance", "128" );
@@ -2517,16 +2521,17 @@ void idBeam::Event_MatchTarget()
 	for( i = 0; i < targets.Num(); i++ )
 	{
 		targetEnt = targets[ i ].GetEntity();
-		if( targetEnt && targetEnt->IsType( idBeam::Type ) )
+		if( targetEnt != NULL && targetEnt->IsType( idBeam::Type ) )
 		{
 			targetBeam = static_cast<idBeam*>( targetEnt );
 			break;
 		}
 	}
 
-	if( !targetBeam )
+	if( targetBeam == NULL )
 	{
 		gameLocal.Error( "Could not find valid beam target for '%s'", name.c_str() );
+		return;
 	}
 
 	target = targetBeam;
@@ -3256,7 +3261,11 @@ idFuncRadioChatter::Event_ResetRadioHud
 void idFuncRadioChatter::Event_ResetRadioHud( idEntity* activator )
 {
 	idPlayer* player = ( activator->IsType( idPlayer::Type ) ) ? static_cast<idPlayer*>( activator ) : gameLocal.GetLocalPlayer();
-	player->hud->HandleNamedEvent( "radioChatterDown" );
+	if( player != NULL && player->hud )
+	{
+		player->hud->HandleNamedEvent( "radioChatterDown" );
+	}
+
 	ActivateTargets( activator );
 }
 
@@ -3308,12 +3317,12 @@ void idPhantomObjects::Save( idSaveGame* savefile ) const
 	savefile->WriteInt( min_wait );
 	savefile->WriteInt( max_wait );
 	target.Save( savefile );
+
 	savefile->WriteInt( targetTime.Num() );
 	for( i = 0; i < targetTime.Num(); i++ )
 	{
 		savefile->WriteInt( targetTime[ i ] );
 	}
-
 	for( i = 0; i < lastTargetPos.Num(); i++ )
 	{
 		savefile->WriteVec3( lastTargetPos[ i ] );
@@ -3481,9 +3490,10 @@ void idPhantomObjects::Think()
 	}
 
 	targetEnt = target.GetEntity();
-	if( !targetEnt || ( targetEnt->health <= 0 ) || ( end_time && ( gameLocal.time > end_time ) ) || gameLocal.inCinematic )
+	if( targetEnt == NULL || ( targetEnt->health <= 0 ) || ( end_time && ( gameLocal.time > end_time ) ) || gameLocal.inCinematic )
 	{
 		BecomeInactive( TH_THINK );
+		return;
 	}
 
 	const idVec3& toPos = targetEnt->GetEyePosition();

@@ -1131,10 +1131,16 @@ void idAI::DormantEnd()
 idAI::Think
 =====================
 */
+idCVar ai_think( "ai_think", "1", CVAR_BOOL, "for testing.." );
 void idAI::Think()
 {
 	// if we are completely closed off from the player, don't do anything at all
 	if( CheckDormant() )
+	{
+		return;
+	}
+
+	if( !ai_think.GetBool() )
 	{
 		return;
 	}

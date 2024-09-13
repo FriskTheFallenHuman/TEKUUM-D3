@@ -429,7 +429,7 @@ bool idItem::Pickup( idPlayer* player )
 	// hide the model
 	Hide();
 
-	// add the highlight shell
+	// remove the highlight shell
 	if( itemShellHandle != -1 )
 	{
 		gameRenderWorld->FreeEntityDef( itemShellHandle );
@@ -448,7 +448,7 @@ bool idItem::Pickup( idPlayer* player )
 	if( respawn && !dropped && !no_respawn )
 	{
 		const char* sfx = spawnArgs.GetString( "fxRespawn" );
-		if( sfx && *sfx )
+		if( sfx != NULL && *sfx != '\0' )
 		{
 			PostEventSec( &EV_RespawnFx, respawn - 0.5f );
 		}
@@ -646,7 +646,7 @@ void idItem::Event_RespawnFx()
 		ServerSendEvent( EVENT_RESPAWNFX, NULL, false, -1 );
 	}
 	const char* sfx = spawnArgs.GetString( "fxRespawn" );
-	if( sfx && *sfx )
+	if( sfx != NULL && *sfx != '\0' )
 	{
 		idEntityFx::StartFx( sfx, NULL, NULL, this, true );
 	}

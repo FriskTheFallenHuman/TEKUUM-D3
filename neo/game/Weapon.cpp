@@ -110,6 +110,9 @@ EVENT( EV_Weapon_IsInvisible,				idWeapon::Event_IsInvisible )
 EVENT( EV_Weapon_NetEndReload,				idWeapon::Event_NetEndReload )
 END_CLASS
 
+idCVar g_useWeaponDepthHack( "g_useWeaponDepthHack", "1", CVAR_BOOL, "Crunch z depth on weapons" );
+
+idCVar g_weaponShadows( "g_weaponShadows", "0", CVAR_BOOL | CVAR_ARCHIVE, "Cast shadows from weapons" );
 /***********************************************************************
 
 	init
@@ -1192,6 +1195,8 @@ void idWeapon::UpdateFlashPosition()
 	// be at least 8 units away from a solid
 	muzzleFlash.origin = tr.endpos - playerViewAxis[0] * 8;
 
+	muzzleFlash.noShadows = !g_weaponShadows.GetBool();
+
 	// put the world muzzle flash on the end of the joint, no matter what
 	GetGlobalJointTransform( false, flashJointWorld, worldMuzzleFlash.origin, worldMuzzleFlash.axis );
 }
@@ -1616,7 +1621,9 @@ idWeapon::ShowCrosshair
 */
 bool idWeapon::ShowCrosshair() const
 {
-	return !( state == idStr( WP_RISING ) || state == idStr( WP_LOWERING ) || state == idStr( WP_HOLSTERED ) );
+// JDC: this code would never function as written, I'm assuming they wanted the following behavior
+//	return !( state == idStr( WP_RISING ) || state == idStr( WP_LOWERING ) || state == idStr( WP_HOLSTERED ) );
+	return !( status == WP_RISING || status == WP_LOWERING || status == WP_HOLSTERED || status == WP_RELOAD );
 }
 
 /*
@@ -2125,7 +2132,7 @@ void idWeapon::PresentWeapon( bool showViewModel )
 	renderEntity.allowSurfaceInViewID = owner->entityNumber + 1;
 
 	// crunch the depth range so it never pokes into walls this breaks the machine gun gui
-	renderEntity.weaponDepthHack = true;
+	renderEntity.weaponDepthHack = g_useWeaponDepthHack.GetBool();
 
 	// present the model
 	if( showViewModel )
@@ -2352,9 +2359,10 @@ ammo_t idWeapon::GetAmmoNumForName( const char* ammoname )
 	assert( ammoname );
 
 	ammoDict = gameLocal.FindEntityDefDict( "ammo_types", false );
-	if( !ammoDict )
+	if( ammoDict == NULL )
 	{
 		gameLocal.Error( "Could not find entity definition for 'ammo_types'\n" );
+		return 0;
 	}
 
 	if( !ammoname[ 0 ] )
@@ -2364,12 +2372,13 @@ ammo_t idWeapon::GetAmmoNumForName( const char* ammoname )
 
 	if( !ammoDict->GetInt( ammoname, "-1", num ) )
 	{
-		gameLocal.Error( "Unknown ammo type '%s'", ammoname );
+
 	}
 
 	if( ( num < 0 ) || ( num >= AMMO_NUMTYPES ) )
 	{
-		gameLocal.Error( "Ammo type '%s' value out of range.  Maximum ammo types is %d.\n", ammoname, AMMO_NUMTYPES );
+		gameLocal.Warning( "Ammo type '%s' value out of range.  Maximum ammo types is %d.\n", ammoname, AMMO_NUMTYPES );
+		num = 0;
 	}
 
 	return ( ammo_t )num;
@@ -2389,9 +2398,10 @@ const char* idWeapon::GetAmmoNameForNum( ammo_t ammonum )
 	char text[ 32 ];
 
 	ammoDict = gameLocal.FindEntityDefDict( "ammo_types", false );
-	if( !ammoDict )
+	if( ammoDict == NULL )
 	{
 		gameLocal.Error( "Could not find entity definition for 'ammo_types'\n" );
+		return NULL;
 	}
 
 	sprintf( text, "%d", ammonum );
@@ -2429,7 +2439,7 @@ const char* idWeapon::GetAmmoPickupNameForNum( ammo_t ammonum )
 
 	const char* name = GetAmmoNameForNum( ammonum );
 
-	if( name && *name )
+	if( name != NULL && *name != '\0' )
 	{
 		num = ammoDict->GetNumKeyVals();
 		for( i = 0; i < num; i++ )
@@ -2458,7 +2468,14 @@ int idWeapon::AmmoAvailable() const
 	}
 	else
 	{
-		return 0;
+		if( g_infiniteAmmo.GetBool() )
+		{
+			return 10;	// arbitrary number, just so whatever's calling thinks there's sufficient ammo...
+		}
+		else
+		{
+			return 0;
+		}
 	}
 }
 
@@ -2685,6 +2702,7 @@ idWeapon::Event_WeaponReady
 void idWeapon::Event_WeaponReady()
 {
 	status = WP_READY;
+	idLib::PrintfIf( g_debugWeapon.GetBool(), "Weapon Status WP_READY \n" );
 	if( isLinked )
 	{
 		WEAPON_RAISEWEAPON = false;
@@ -2704,6 +2722,7 @@ idWeapon::Event_WeaponOutOfAmmo
 void idWeapon::Event_WeaponOutOfAmmo()
 {
 	status = WP_OUTOFAMMO;
+	idLib::PrintfIf( g_debugWeapon.GetBool(), "Weapon Status WP_OUTOFAMMO \n" );
 	if( isLinked )
 	{
 		WEAPON_RAISEWEAPON = false;
@@ -2718,6 +2737,7 @@ idWeapon::Event_WeaponReloading
 void idWeapon::Event_WeaponReloading()
 {
 	status = WP_RELOAD;
+	idLib::PrintfIf( g_debugWeapon.GetBool(), "Weapon Status WP_RELOAD \n" );
 }
 
 /*
@@ -2728,6 +2748,7 @@ idWeapon::Event_WeaponHolstered
 void idWeapon::Event_WeaponHolstered()
 {
 	status = WP_HOLSTERED;
+	idLib::PrintfIf( g_debugWeapon.GetBool(), "Weapon Status WP_HOLSTERED \n" );
 	if( isLinked )
 	{
 		WEAPON_LOWERWEAPON = false;
@@ -2742,6 +2763,7 @@ idWeapon::Event_WeaponRising
 void idWeapon::Event_WeaponRising()
 {
 	status = WP_RISING;
+	idLib::PrintfIf( g_debugWeapon.GetBool(), "Weapon Status WP_RISING \n" );
 	if( isLinked )
 	{
 		WEAPON_LOWERWEAPON = false;
@@ -2757,6 +2779,7 @@ idWeapon::Event_WeaponLowering
 void idWeapon::Event_WeaponLowering()
 {
 	status = WP_LOWERING;
+	idLib::PrintfIf( g_debugWeapon.GetBool(), "Weapon Status WP_LOWERING \n" );
 	if( isLinked )
 	{
 		WEAPON_RAISEWEAPON = false;
@@ -3027,8 +3050,7 @@ idWeapon::Event_SetSkin
 */
 void idWeapon::Event_SetSkin( const char* skinname )
 {
-	const idDeclSkin* skinDecl;
-
+	const idDeclSkin* skinDecl = NULL;
 	if( !skinname || !skinname[ 0 ] )
 	{
 		skinDecl = NULL;
@@ -3036,6 +3058,12 @@ void idWeapon::Event_SetSkin( const char* skinname )
 	else
 	{
 		skinDecl = declManager->FindSkin( skinname );
+	}
+
+	// Don't update if the skin hasn't changed.
+	if( renderEntity.customSkin == skinDecl && worldModel.GetEntity() != NULL && worldModel.GetEntity()->GetSkin() == skinDecl )
+	{
+		return;
 	}
 
 	renderEntity.customSkin = skinDecl;
@@ -3086,6 +3114,7 @@ void idWeapon::Event_GetLightParm( int parmnum )
 	if( ( parmnum < 0 ) || ( parmnum >= MAX_ENTITY_SHADER_PARMS ) )
 	{
 		gameLocal.Error( "shader parm index (%d) out of range", parmnum );
+		return;
 	}
 
 	idThread::ReturnFloat( muzzleFlash.shaderParms[ parmnum ] );
@@ -3101,6 +3130,7 @@ void idWeapon::Event_SetLightParm( int parmnum, float value )
 	if( ( parmnum < 0 ) || ( parmnum >= MAX_ENTITY_SHADER_PARMS ) )
 	{
 		gameLocal.Error( "shader parm index (%d) out of range", parmnum );
+		return;
 	}
 
 	muzzleFlash.shaderParms[ parmnum ]		= value;
@@ -3309,10 +3339,11 @@ void idWeapon::Event_LaunchProjectiles( int num_projectiles, float spread, float
 				gameLocal.SpawnEntityDef( projectileDict, &ent, false );
 			}
 
-			if( !ent || !ent->IsType( idProjectile::Type ) )
+			if( ent == NULL || !ent->IsType( idProjectile::Type ) )
 			{
 				const char* projectileName = weaponDef->dict.GetString( "def_projectile" );
 				gameLocal.Error( "'%s' is not an idProjectile", projectileName );
+				return;
 			}
 
 			if( projectileDict.GetBool( "net_instanthit" ) )
@@ -3377,9 +3408,16 @@ void idWeapon::Event_Melee()
 	idEntity*	ent;
 	trace_t		tr;
 
-	if( !meleeDef )
+	if( weaponDef == NULL )
+	{
+		gameLocal.Error( "No weaponDef on '%s'", this->GetName() );
+		return;
+	}
+
+	if( meleeDef == NULL )
 	{
 		gameLocal.Error( "No meleeDef on '%s'", weaponDef->dict.GetString( "classname" ) );
+		return;
 	}
 
 	if( !gameLocal.isClient )
@@ -3399,7 +3437,7 @@ void idWeapon::Event_Melee()
 		if( g_debugWeapon.GetBool() )
 		{
 			gameRenderWorld->DebugLine( colorYellow, start, end, 100 );
-			if( ent )
+			if( ent != NULL )
 			{
 				gameRenderWorld->DebugBounds( colorRed, ent->GetPhysics()->GetBounds(), ent->GetPhysics()->GetOrigin(), 100 );
 			}
@@ -3408,7 +3446,7 @@ void idWeapon::Event_Melee()
 		bool hit = false;
 		const char* hitSound = meleeDef->dict.GetString( "snd_miss" );
 
-		if( ent )
+		if( ent != NULL )
 		{
 
 			float push = meleeDef->dict.GetFloat( "push" );
@@ -3476,7 +3514,7 @@ void idWeapon::Event_Melee()
 						const char* decal;
 						// project decal
 						decal = weaponDef->dict.GetString( "mtr_strike" );
-						if( decal && *decal )
+						if( decal != NULL && *decal != '\0' )
 						{
 							gameLocal.ProjectDecal( tr.c.point, -tr.c.normal, 8.0f, true, 6.0, decal );
 						}

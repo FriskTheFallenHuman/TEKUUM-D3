@@ -1447,9 +1447,10 @@ idActor::SetState
 */
 void idActor::SetState( const function_t* newState )
 {
-	if( !newState )
+	if( newState == NULL )
 	{
 		gameLocal.Error( "idActor::SetState: Null state" );
+		return;
 	}
 
 	if( ai_debugScript.GetInteger() == entityNumber )
@@ -2425,10 +2426,11 @@ Bleeding wounds and surface overlays are applied in the collision code that
 calls Damage()
 ============
 */
+idCVar actor_noDamage(	"actor_noDamage",			"0",		CVAR_BOOL, "actors don't take damage -- for testing" );
 void idActor::Damage( idEntity* inflictor, idEntity* attacker, const idVec3& dir,
 					  const char* damageDefName, const float damageScale, const int location )
 {
-	if( !fl.takedamage )
+	if( !fl.takedamage || actor_noDamage.GetBool() )
 	{
 		return;
 	}
@@ -2448,16 +2450,20 @@ void idActor::Damage( idEntity* inflictor, idEntity* attacker, const idVec3& dir
 	}
 
 	const idDict* damageDef = gameLocal.FindEntityDefDict( damageDefName );
-	if( !damageDef )
+	if( damageDef == NULL )
 	{
 		gameLocal.Error( "Unknown damageDef '%s'", damageDefName );
+		return;
 	}
 
 	int	damage = damageDef->GetInt( "damage" ) * damageScale;
 	damage = GetDamageForLocation( damage, location );
 
 	// inform the attacker that they hit someone
-	attacker->DamageFeedback( this, inflictor, damage );
+	if( attacker )
+	{
+		attacker->DamageFeedback( this, inflictor, damage );
+	}
 	if( damage > 0 )
 	{
 		health -= damage;
@@ -2736,11 +2742,11 @@ void idActor::PlayFootStepSound()
 	{
 		sound = spawnArgs.GetString( va( "snd_footstep_%s", gameLocal.sufaceTypeNames[ material->GetSurfaceType() ] ) );
 	}
-	if( *sound == '\0' )
+	if( sound != NULL && *sound == '\0' )
 	{
 		sound = spawnArgs.GetString( "snd_footstep" );
 	}
-	if( *sound != '\0' )
+	if( sound != NULL && *sound != '\0' )
 	{
 		StartSoundShader( declManager->FindSound( sound ), SND_CHANNEL_BODY, 0, false, NULL );
 	}

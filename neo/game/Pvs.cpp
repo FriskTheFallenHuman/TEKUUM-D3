@@ -1284,6 +1284,7 @@ void idPVS::FreeCurrentPVS( pvsHandle_t handle ) const
 	if( handle.i < 0 || handle.i >= MAX_CURRENT_PVS || handle.h != currentPVS[handle.i].handle.h )
 	{
 		gameLocal.Error( "idPVS::FreeCurrentPVS: invalid handle" );
+		return;
 	}
 	currentPVS[handle.i].handle.i = -1;
 }
@@ -1300,7 +1301,8 @@ bool idPVS::InCurrentPVS( const pvsHandle_t handle, const idVec3& target ) const
 	if( handle.i < 0 || handle.i >= MAX_CURRENT_PVS ||
 			handle.h != currentPVS[handle.i].handle.h )
 	{
-		gameLocal.Error( "idPVS::InCurrentPVS: invalid handle" );
+		gameLocal.Warning( "idPVS::InCurrentPVS: invalid handle" );
+		return false;
 	}
 
 	targetArea = gameRenderWorld->PointInArea( target );
@@ -1325,7 +1327,8 @@ bool idPVS::InCurrentPVS( const pvsHandle_t handle, const idBounds& target ) con
 	if( handle.i < 0 || handle.i >= MAX_CURRENT_PVS ||
 			handle.h != currentPVS[handle.i].handle.h )
 	{
-		gameLocal.Error( "idPVS::InCurrentPVS: invalid handle" );
+		gameLocal.Warning( "idPVS::InCurrentPVS: invalid handle" );
+		return false;
 	}
 
 	numTargetAreas = gameRenderWorld->BoundsInAreas( target, targetAreas, MAX_BOUNDS_AREAS );
@@ -1351,7 +1354,8 @@ bool idPVS::InCurrentPVS( const pvsHandle_t handle, const int targetArea ) const
 	if( handle.i < 0 || handle.i >= MAX_CURRENT_PVS ||
 			handle.h != currentPVS[handle.i].handle.h )
 	{
-		gameLocal.Error( "idPVS::InCurrentPVS: invalid handle" );
+		gameLocal.Warning( "idPVS::InCurrentPVS: invalid handle" );
+		return false;
 	}
 
 	if( targetArea < 0 || targetArea >= numAreas )
@@ -1374,7 +1378,8 @@ bool idPVS::InCurrentPVS( const pvsHandle_t handle, const int* targetAreas, int 
 	if( handle.i < 0 || handle.i >= MAX_CURRENT_PVS ||
 			handle.h != currentPVS[handle.i].handle.h )
 	{
-		gameLocal.Error( "idPVS::InCurrentPVS: invalid handle" );
+		gameLocal.Warning( "idPVS::InCurrentPVS: invalid handle" );
+		return false;
 	}
 
 	for( i = 0; i < numTargetAreas; i++ )
@@ -1537,6 +1542,7 @@ void idPVS::DrawCurrentPVS( const pvsHandle_t handle, const idVec3& source ) con
 			handle.h != currentPVS[handle.i].handle.h )
 	{
 		gameLocal.Error( "idPVS::DrawCurrentPVS: invalid handle" );
+		return;
 	}
 
 	sourceArea = gameRenderWorld->PointInArea( source );

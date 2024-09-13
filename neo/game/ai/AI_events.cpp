@@ -519,7 +519,7 @@ void idAI::Event_HeardSound( int ignore_team )
 {
 	// check if we heard any sounds in the last frame
 	idActor*	actor = gameLocal.GetAlertEntity();
-	if( actor && ( !ignore_team || ( ReactionTo( actor ) & ATTACK_ON_SIGHT ) ) && gameLocal.InPlayerPVS( this ) )
+	if( actor != NULL && ( !ignore_team || ( ReactionTo( actor ) & ATTACK_ON_SIGHT ) ) && gameLocal.InPlayerPVS( this ) )
 	{
 		idVec3 pos = actor->GetPhysics()->GetOrigin();
 		idVec3 org = physicsObj.GetOrigin();
@@ -2405,7 +2405,7 @@ void idAI::Event_GetClosestHiddenTarget( const char* type )
 	if( targets.Num() == 1 )
 	{
 		ent = targets[ 0 ].GetEntity();
-		if( ent && idStr::Cmp( ent->GetEntityDefName(), type ) == 0 )
+		if( ent != NULL && idStr::Cmp( ent->GetEntityDefName(), type ) == 0 )
 		{
 			if( !EntityCanSeePos( enemyEnt, lastVisibleEnemyPos, ent->GetPhysics()->GetOrigin() ) )
 			{
@@ -2422,7 +2422,7 @@ void idAI::Event_GetClosestHiddenTarget( const char* type )
 	for( i = 0; i < targets.Num(); i++ )
 	{
 		ent = targets[ i ].GetEntity();
-		if( ent && idStr::Cmp( ent->GetEntityDefName(), type ) == 0 )
+		if( ent != NULL && idStr::Cmp( ent->GetEntityDefName(), type ) == 0 )
 		{
 			const idVec3& destOrg = ent->GetPhysics()->GetOrigin();
 			time = TravelDistance( org, destOrg );
@@ -2456,7 +2456,7 @@ void idAI::Event_GetRandomTarget( const char* type )
 	for( i = 0; i < targets.Num(); i++ )
 	{
 		ent = targets[ i ].GetEntity();
-		if( ent && idStr::Cmp( ent->GetEntityDefName(), type ) == 0 )
+		if( ent != NULL && idStr::Cmp( ent->GetEntityDefName(), type ) == 0 )
 		{
 			ents[ num++ ] = ent;
 			if( num >= MAX_GENTITIES )

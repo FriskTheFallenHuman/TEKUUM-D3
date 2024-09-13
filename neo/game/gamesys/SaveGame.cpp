@@ -116,6 +116,34 @@ void idSaveGame::Close()
 
 /*
 ================
+idSaveGame::WriteDecls
+================
+*/
+void idSaveGame::WriteDecls()
+{
+	// Write out all loaded decls
+	for( int t = 0; t < declManager->GetNumDeclTypes(); t++ )
+	{
+		for( int d = 0; d < declManager->GetNumDecls( ( declType_t )t ); d++ )
+		{
+			const idDecl* decl = declManager->DeclByIndex( ( declType_t )t, d, false );
+			if( decl == NULL || decl->GetState() == DS_UNPARSED )
+			{
+				continue;
+			}
+			const char* declName = decl->GetName();
+			if( declName[0] == 0 )
+			{
+				continue;
+			}
+			WriteString( declName );
+		}
+		WriteString( "" );
+	}
+}
+
+/*
+================
 idSaveGame::WriteObjectList
 ================
 */
@@ -663,6 +691,16 @@ void idSaveGame::WriteRenderLight( const renderLight_t& renderLight )
 	}
 }
 
+// RB begin
+void idSaveGame::WriteRenderEnvprobe( const renderEnvironmentProbe_t& renderEnvprobe )
+{
+	WriteVec3( renderEnvprobe.origin );
+
+	WriteInt( renderEnvprobe.suppressEnvprobeInViewID );
+	WriteInt( renderEnvprobe.allowEnvprobeInViewID );
+}
+// Rb end
+
 /*
 ================
 idSaveGame::WriteRefSound
@@ -887,6 +925,28 @@ idRestoreGame::~idRestoreGame()
 
 /*
 ================
+idRestoreGame::ReadDecls
+================
+*/
+void idRestoreGame::ReadDecls()
+{
+	idStr declName;
+	for( int t = 0; t < declManager->GetNumDeclTypes(); t++ )
+	{
+		while( true )
+		{
+			ReadString( declName );
+			if( declName.IsEmpty() )
+			{
+				break;
+			}
+			declManager->FindType( ( declType_t )t, declName );
+		}
+	}
+}
+
+/*
+================
 void idRestoreGame::CreateObjects
 ================
 */
@@ -906,9 +966,10 @@ void idRestoreGame::CreateObjects()
 	{
 		ReadString( classname );
 		type = idClass::GetClass( classname );
-		if( !type )
+		if( type == NULL )
 		{
 			Error( "idRestoreGame::CreateObjects: Unknown class '%s'", classname.c_str() );
+			return;
 		}
 		objects[ i ] = type->CreateInstance();
 
@@ -1536,6 +1597,16 @@ void idRestoreGame::ReadRenderLight( renderLight_t& renderLight )
 	ReadInt( index );
 	renderLight.referenceSound = gameSoundWorld->EmitterForIndex( index );
 }
+
+// RB begin
+void idRestoreGame::ReadRenderEnvprobe( renderEnvironmentProbe_t& renderEnvprobe )
+{
+	ReadVec3( renderEnvprobe.origin );
+
+	ReadInt( renderEnvprobe.suppressEnvprobeInViewID );
+	ReadInt( renderEnvprobe.allowEnvprobeInViewID );
+}
+// RB end
 
 /*
 ================

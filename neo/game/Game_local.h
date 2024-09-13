@@ -64,6 +64,7 @@ class idProgram;
 class idThread;
 class idEditEntities;
 class idLocationEntity;
+class idEnvProbes; // RB
 
 //============================================================================
 
@@ -534,6 +535,9 @@ private:
 	void					MapPopulate();
 	void					MapClear( bool clearClients );
 
+	// RB: spawn environment probes if there aren't any by default
+	void					PopulateEnvironmentProbes();
+
 	pvsHandle_t				GetClientPVS( idPlayer* player, pvsType_t type );
 	void					SetupPlayerPVS();
 	void					FreePlayerPVS();
@@ -727,6 +731,7 @@ const int	CINEMATIC_SKIP_DELAY	= SEC2MS( 2.0f );
 #include "Projectile.h"
 #include "Weapon.h"
 #include "Light.h"
+#include "EnvironmentProbe.h"
 #include "WorldSpawn.h"
 #include "Item.h"
 #include "PlayerView.h"

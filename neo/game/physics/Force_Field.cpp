@@ -236,7 +236,7 @@ void idForce_Field::Evaluate( int time )
 			default:
 			{
 				gameLocal.Error( "idForce_Field: invalid type" );
-				return;
+				break;
 			}
 		}
 
@@ -290,7 +290,7 @@ void idForce_Field::Evaluate( int time )
 			default:
 			{
 				gameLocal.Error( "idForce_Field: invalid apply type" );
-				return;
+				break;
 			}
 		}
 	}

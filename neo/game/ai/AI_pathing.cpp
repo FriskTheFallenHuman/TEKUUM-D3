@@ -702,7 +702,7 @@ pathNode_t* BuildPathTree( const obstacle_t* obstacles, int numObstacles, const 
 
 	pathNodeQueue.Add( root );
 
-	for( node = pathNodeQueue.Get(); node && pathNodeAllocator.GetAllocCount() < MAX_PATH_NODES; node = pathNodeQueue.Get() )
+	for( node = pathNodeQueue.Get(); node != NULL && pathNodeAllocator.GetAllocCount() < MAX_PATH_NODES; node = pathNodeQueue.Get() )
 	{
 
 		treeQueue.Add( node );
@@ -1681,7 +1681,10 @@ bool idAI::PredictTrajectory( const idVec3& firePos, const idVec3& target, float
 	idVec3 velocity;
 	idVec3 lastPos, pos;
 
-	assert( targetEntity );
+	if( targetEntity == NULL )
+	{
+		return false;
+	}
 
 	// check if the projectile starts inside the target
 	if( targetEntity->GetPhysics()->GetAbsBounds().IntersectsBounds( clip->GetBounds().Translate( firePos ) ) )

@@ -602,6 +602,7 @@ void idEntityFx::Run( int time )
 				{
 					useAction->renderEntity.origin = GetPhysics()->GetOrigin() + fxaction.offset;
 					useAction->renderEntity.axis = fxaction.explicitAxis ? fxaction.axis : GetPhysics()->GetAxis();
+					gameRenderWorld->UpdateEntityDef( useAction->modelDefHandle, &useAction->renderEntity );
 				}
 				ApplyFade( fxaction, *useAction, time, actualStart );
 				break;

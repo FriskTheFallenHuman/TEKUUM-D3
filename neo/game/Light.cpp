@@ -557,6 +557,7 @@ void idLight::SetLightParm( int parmnum, float value )
 	if( ( parmnum < 0 ) || ( parmnum >= MAX_ENTITY_SHADER_PARMS ) )
 	{
 		gameLocal.Error( "shader parm index (%d) out of range", parmnum );
+		return;
 	}
 
 	renderLight.shaderParms[ parmnum ] = value;
@@ -745,7 +746,7 @@ void idLight::BecomeBroken( idEntity* activator )
 
 	// if the light has a sound, either start the alternate (broken) sound, or stop the sound
 	const char* parm = spawnArgs.GetString( "snd_broken" );
-	if( refSound.shader || ( parm && *parm ) )
+	if( refSound.shader || ( parm != NULL && *parm != '\0' ) )
 	{
 		StopSound( SND_CHANNEL_ANY, false );
 		const idSoundShader* alternate = refSound.shader ? refSound.shader->GetAltSound() : declManager->FindSound( parm );
@@ -757,7 +758,7 @@ void idLight::BecomeBroken( idEntity* activator )
 	}
 
 	parm = spawnArgs.GetString( "mtr_broken" );
-	if( parm && *parm )
+	if( parm != NULL && *parm != '\0' )
 	{
 		SetShader( parm );
 	}
@@ -957,6 +958,7 @@ void idLight::Event_GetLightParm( int parmnum )
 	if( ( parmnum < 0 ) || ( parmnum >= MAX_ENTITY_SHADER_PARMS ) )
 	{
 		gameLocal.Error( "shader parm index (%d) out of range", parmnum );
+		return;
 	}
 
 	idThread::ReturnFloat( renderLight.shaderParms[ parmnum ] );

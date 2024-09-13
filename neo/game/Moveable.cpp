@@ -1131,7 +1131,7 @@ void idExplodingBarrel::Killed( idEntity* inflictor, idEntity* attacker, int dam
 	physicsObj.SetContents( 0 );
 
 	const char* splash = spawnArgs.GetString( "def_splash_damage", "damage_explosion" );
-	if( splash && *splash )
+	if( splash != NULL && *splash != '\0' )
 	{
 		gameLocal.RadiusDamage( GetPhysics()->GetOrigin(), this, attacker, this, this, splash );
 	}
@@ -1141,7 +1141,7 @@ void idExplodingBarrel::Killed( idEntity* inflictor, idEntity* attacker, int dam
 	//FIXME: need to precache all the debris stuff here and in the projectiles
 	const idKeyValue* kv = spawnArgs.MatchPrefix( "def_debris" );
 	// bool first = true;
-	while( kv )
+	while( kv != NULL )
 	{
 		const idDict* debris_args = gameLocal.FindEntityDefDict( kv->GetValue(), false );
 		if( debris_args )
@@ -1160,9 +1160,10 @@ void idExplodingBarrel::Killed( idEntity* inflictor, idEntity* attacker, int dam
 			dir.Normalize();
 
 			gameLocal.SpawnEntityDef( *debris_args, &ent, false );
-			if( !ent || !ent->IsType( idDebris::Type ) )
+			if( ent == NULL || !ent->IsType( idDebris::Type ) )
 			{
 				gameLocal.Error( "'projectile_debris' is not an idDebris" );
+				break;
 			}
 
 			debris = static_cast<idDebris*>( ent );
@@ -1205,9 +1206,10 @@ void idExplodingBarrel::Damage( idEntity* inflictor, idEntity* attacker, const i
 {
 
 	const idDict* damageDef = gameLocal.FindEntityDefDict( damageDefName );
-	if( !damageDef )
+	if( damageDef == NULL )
 	{
 		gameLocal.Error( "Unknown damageDef '%s'\n", damageDefName );
+		return;
 	}
 	if( damageDef->FindKey( "radius" ) && GetPhysics()->GetContents() != 0 && GetBindMaster() == NULL )
 	{
@@ -1275,7 +1277,7 @@ void idExplodingBarrel::Event_Respawn()
 		}
 	}
 	const char* temp = spawnArgs.GetString( "model" );
-	if( temp && *temp )
+	if( temp != NULL && *temp != '\0' )
 	{
 		SetModel( temp );
 	}

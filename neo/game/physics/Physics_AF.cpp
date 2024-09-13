@@ -3466,6 +3466,10 @@ void idAFConstraint_Contact::ApplyFriction( float invTimeStep )
 	float friction, magnitude, forceNumerator, forceDenominator;
 	idVecX impulse, dv;
 
+	if( !body1 )
+	{
+		return;
+	}
 	friction = body1->GetContactFriction();
 	if( body2 && body2->GetContactFriction() < friction )
 	{
@@ -5047,7 +5051,7 @@ void idAFTree::Factor() const
 			}
 
 			body->invI = body->I;
-			if( !body->invI.InverseFastSelf() )
+			if( !body->invI.InverseFastSelf() && child != NULL )
 			{
 				gameLocal.Warning( "idAFTree::Factor: couldn't invert %dx%d matrix for body %s",
 								   child->invI.GetNumRows(), child->invI.GetNumColumns(), body->GetName().c_str() );
@@ -7921,9 +7925,10 @@ int idPhysics_AF::AddBody( idAFBody* body )
 {
 	int id = 0;
 
-	if( !body->clipModel )
+	if( body->clipModel == NULL )
 	{
 		gameLocal.Error( "idPhysics_AF::AddBody: body '%s' has no clip model.", body->name.c_str() );
+		return 0;
 	}
 
 	if( bodies.Find( body ) )
@@ -8397,9 +8402,11 @@ void idPhysics_AF::ApplyImpulse( const int id, const idVec3& point, const idVec3
 	{
 		return;
 	}
+	const float maxImpulse =  100000.0f;
+	const float maxRotation = 100000.0f;
 	idMat3 invWorldInertiaTensor = bodies[id]->current->worldAxis.Transpose() * bodies[id]->inverseInertiaTensor * bodies[id]->current->worldAxis;
-	bodies[id]->current->spatialVelocity.SubVec3( 0 ) += bodies[id]->invMass * impulse;
-	bodies[id]->current->spatialVelocity.SubVec3( 1 ) += invWorldInertiaTensor * ( point - bodies[id]->current->worldOrigin ).Cross( impulse );
+	bodies[id]->current->spatialVelocity.SubVec3( 0 ) += bodies[id]->invMass * impulse.Truncate( maxImpulse );
+	bodies[id]->current->spatialVelocity.SubVec3( 1 ) += invWorldInertiaTensor * ( point - bodies[id]->current->worldOrigin ).Cross( impulse ).Truncate( maxRotation );
 	Activate();
 }
 

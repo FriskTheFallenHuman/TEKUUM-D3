@@ -53,7 +53,7 @@ typedef struct pvsCurrent_s
 	byte* 				pvs;		// current pvs bit string
 } pvsCurrent_t;
 
-#define MAX_CURRENT_PVS		8		// must be a power of 2
+#define MAX_CURRENT_PVS		64		// must be a power of 2
 
 typedef enum
 {

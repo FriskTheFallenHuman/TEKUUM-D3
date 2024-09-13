@@ -24,10 +24,6 @@ set(EXTERNAL_SOURCES_ALL
 	${MINIZ_SOURCES}
 	${MINIZIP_SOURCES})
 
-if(ANGLE)
-	add_subdirectory(angle)
-endif()
-
 source_group("Irrxml" FILES ${IRRXML_INCLUDES})
 source_group("Irrxml" FILES ${IRRXML_SOURCES})
 source_group("Mikktspace" FILES ${MIKKTSPACE_SOURCES})

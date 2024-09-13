@@ -31,7 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "../Game_local.h"
 
-static idCVar binaryLoadAnim( "binaryLoadAnim", "1", 0, "enable binary load/write of idMD5Anim" );
+idCVar binaryLoadAnim( "binaryLoadAnim", "1", 0, "enable binary load/write of idMD5Anim" );
 
 static const byte B_ANIM_MD5_VERSION = 101;
 static const unsigned int B_ANIM_MD5_MAGIC = ( 'B' << 24 ) | ( 'M' << 16 ) | ( 'D' << 8 ) | B_ANIM_MD5_VERSION;
@@ -182,7 +182,7 @@ bool idMD5Anim::LoadAnim( const char* filename )
 
 	idStr generatedFileName = "generated/anim/";
 	generatedFileName.AppendPath( filename );
-	generatedFileName.SetFileExtension( ".bmd5anim" );
+	generatedFileName.SetFileExtension( ".bMD5anim" );
 
 	// Get the timestamp on the original file, if it's newer than what is stored in binary model, regenerate it
 	ID_TIME_T sourceTimeStamp = fileSystem->GetTimestamp( filename );
@@ -397,7 +397,7 @@ bool idMD5Anim::LoadAnim( const char* filename )
 
 	if( binaryLoadAnim.GetBool() )
 	{
-		idLib::Printf( "writing %s\n", generatedFileName.c_str() );
+		idLib::Printf( "Writing %s\n", generatedFileName.c_str() );
 		idFileLocal outputFile( fileSystem->OpenFileWrite( generatedFileName, "fs_basepath" ) );
 		WriteBinary( outputFile, sourceTimeStamp );
 	}
@@ -429,12 +429,12 @@ bool idMD5Anim::LoadBinary( idFile* file, ID_TIME_T sourceTimeStamp )
 	ID_TIME_T loadedTimeStamp;
 	file->ReadBig( loadedTimeStamp );
 
-
 	// RB: source might be from pk4, so we ignore the time stamp and assume a release build
 	if( ( sourceTimeStamp != FILE_NOT_FOUND_TIMESTAMP ) && ( sourceTimeStamp != 0 ) && ( sourceTimeStamp != loadedTimeStamp ) /* && !fileSystem->InProductionMode()*/ )
 	{
 		return false;
 	}
+	// RB end
 
 	file->ReadBig( numFrames );
 	file->ReadBig( frameRate );

@@ -197,21 +197,13 @@ void idTarget_EndLevel::Event_Activate( idEntity* activator )
 {
 	idStr nextMap;
 
-#ifdef ID_DEMO_BUILD
-	if( spawnArgs.GetBool( "endOfGame" ) )
-	{
-		cvarSystem->SetCVarBool( "g_nightmare", true );
-		gameLocal.sessionCommand = "endofDemo";
-		return;
-	}
-#else
 	if( spawnArgs.GetBool( "endOfGame" ) )
 	{
 		cvarSystem->SetCVarBool( "g_nightmare", true );
 		gameLocal.sessionCommand = "disconnect";
 		return;
 	}
-#endif
+
 	if( !spawnArgs.GetString( "nextMap", "", nextMap ) )
 	{
 		gameLocal.Printf( "idTarget_SessionCommand::Event_Activate: no nextMap key\n" );
@@ -274,7 +266,7 @@ void idTarget_WaitForButton::Think()
 	if( thinkFlags & TH_THINK )
 	{
 		player = gameLocal.GetLocalPlayer();
-		if( player && !( player->oldButtons & BUTTON_ATTACK ) && ( player->usercmd.buttons & BUTTON_ATTACK ) )
+		if( player != NULL && ( !( player->oldButtons & BUTTON_ATTACK ) ) && ( player->usercmd.buttons & BUTTON_ATTACK ) )
 		{
 			player->usercmd.buttons &= ~BUTTON_ATTACK;
 			BecomeInactive( TH_THINK );
@@ -1134,7 +1126,7 @@ void idTarget_SetInfluence::Event_Activate( idEntity* activator )
 	}
 
 	parm = spawnArgs.GetString( "snd_influence" );
-	if( parm && *parm )
+	if( parm != NULL && *parm != '\0' )
 	{
 		PostEventSec( &EV_StartSoundShader, flashIn, parm, SND_CHANNEL_ANY );
 	}
@@ -1249,7 +1241,7 @@ void idTarget_SetInfluence::Event_Activate( idEntity* activator )
 	}
 
 	parm = spawnArgs.GetString( "mtrWorld" );
-	if( parm && *parm )
+	if( parm != NULL && *parm != '\0' )
 	{
 		gameLocal.SetGlobalMaterial( declManager->FindMaterial( parm ) );
 	}
@@ -1321,7 +1313,8 @@ void idTarget_SetInfluence::Event_RestoreInfluence()
 			continue;
 		}
 		generic = static_cast<idStaticEntity*>( ent );
-		colorTo.Set( 1.0f, 1.0f, 1.0f, 1.0f );
+		color = generic->spawnArgs.GetVector( "_color", "1 1 1" );
+		colorTo.Set( color.x, color.y, color.z, 1.0f );
 		generic->Fade( colorTo, spawnArgs.GetFloat( "fade_time", "0.25" ) );
 	}
 
@@ -1591,7 +1584,7 @@ void idTarget_LockDoor::Event_Activate( idEntity* activator )
 	for( i = 0; i < targets.Num(); i++ )
 	{
 		ent = targets[ i ].GetEntity();
-		if( ent && ent->IsType( idDoor::Type ) )
+		if( ent != NULL && ent->IsType( idDoor::Type ) )
 		{
 			if( static_cast<idDoor*>( ent )->IsLocked() )
 			{
@@ -1634,12 +1627,13 @@ void idTarget_CallObjectFunction::Event_Activate( idEntity* activator )
 	for( i = 0; i < targets.Num(); i++ )
 	{
 		ent = targets[ i ].GetEntity();
-		if( ent && ent->scriptObject.HasObject() )
+		if( ent != NULL && ent->scriptObject.HasObject() )
 		{
 			func = ent->scriptObject.GetFunction( funcName );
-			if( !func )
+			if( func == NULL )
 			{
 				gameLocal.Error( "Function '%s' not found on entity '%s' for function call from '%s'", funcName, ent->name.c_str(), name.c_str() );
+				return;
 			}
 			if( func->type->NumParameters() != 1 )
 			{
@@ -1700,7 +1694,7 @@ void idTarget_EnableLevelWeapons::Event_Activate( idEntity* activator )
 			if( gameLocal.entities[ i ] )
 			{
 				gameLocal.entities[ i ]->ProcessEvent( &EV_Player_EnableWeapon );
-				if( weap && weap[ 0 ] )
+				if( weap != NULL && weap[ 0 ] != '\0' )
 				{
 					gameLocal.entities[ i ]->PostEventSec( &EV_Player_SelectWeapon, 0.5f, weap );
 				}
