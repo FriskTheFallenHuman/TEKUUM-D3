@@ -265,7 +265,7 @@ void Sys_Quit()
 	// RB begin
 	Sys_DestroyConsole();
 
-#if defined(USE_MFC_TOOLS)
+#ifdef ID_ALLOW_TOOLS
 	if( com_editors )
 	{
 		if( com_editors & EDITOR_RADIANT )
@@ -969,9 +969,7 @@ void Sys_PumpEvents()
 			win32.sysMsgTime = msg.time;
 		}
 
-// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
-// RB end
+#ifdef ID_ALLOW_TOOLS
 		if( GUIEditorHandleMessage( &msg ) )
 		{
 			continue;

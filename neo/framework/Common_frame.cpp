@@ -227,7 +227,7 @@ idSessionLocal::UpdateScreen
 void idSessionLocal::UpdateScreen( bool captureToImage, bool outOfSequence, bool swapBuffers )
 {
 
-#if defined(USE_MFC_TOOLS)
+#ifdef ID_ALLOW_TOOLS
 	if( com_editors )
 	{
 		if( !Sys_IsWindowVisible() )

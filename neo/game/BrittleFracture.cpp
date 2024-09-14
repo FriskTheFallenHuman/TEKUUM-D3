@@ -773,7 +773,11 @@ void idBrittleFracture::ProjectDecal( const idVec3& point, const idVec3& dir, co
 			damageDef = gameLocal.FindEntityDef( damageDefName, false );
 			if( damageDef )
 			{
-				sndShader = declManager->FindSound( damageDef->dict.GetString( "snd_shatter", "" ) );
+				const char* sndName = damageDef->dict.GetString( "snd_shatter", "" );
+				if( sndName[0] != 0 )
+				{
+					sndShader = declManager->FindSound( sndName );
+				}
 			}
 		}
 

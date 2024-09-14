@@ -65,7 +65,7 @@ If you have questions concerning this license or the applicable additional terms
 				#endif
 
 				// RB begin
-			#elif defined(USE_MFC_TOOLS)
+			#elif defined(ID_ALLOW_TOOLS)
 				// RB end
 
 				#include "../tools/comafx/StdAfx.h"

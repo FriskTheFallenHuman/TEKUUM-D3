@@ -38,7 +38,7 @@ If you have questions concerning this license or the applicable additional terms
 #include <conio.h>
 
 #include "win_local.h"
-#if defined(USE_MFC_TOOLS)
+#ifdef ID_ALLOW_TOOLS
 	#include "rc/AFEditor_resource.h"
 #endif
 #include "rc/doom_resource.h"

@@ -389,6 +389,8 @@ private:
 	void					InitDefaultPhysics( const idVec3& origin, const idMat3& axis );
 	// update visual position from the physics
 	void					UpdateFromPhysics( bool moveBack );
+	// get physics timestep
+	virtual int				GetPhysicsTimeStep() const;
 
 	// entity binding
 	bool					InitBind( idEntity* master );		// initialize an entity binding

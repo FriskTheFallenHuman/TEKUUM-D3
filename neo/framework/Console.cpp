@@ -1059,13 +1059,13 @@ void idConsoleLocal::Print( const char* txt )
 	}
 
 // RB begin
-#if defined(USE_MFC_TOOLS)
+#ifdef ID_ALLOW_TOOLS
 	RadiantPrint( txt );
 
-	//if( com_editors & EDITOR_MATERIAL )
-	//{
-	//	MaterialEditorPrintConsole( txt );
-	//}
+	if( com_editors & EDITOR_MATERIAL )
+	{
+		MaterialEditorPrintConsole( txt );
+	}
 #endif
 
 // RB end

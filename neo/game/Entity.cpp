@@ -582,7 +582,7 @@ void idEntity::Spawn()
 	SetAxis( axis );
 
 	temp = spawnArgs.GetString( "model" );
-	if( temp && *temp )
+	if( temp != NULL && *temp != '\0' )
 	{
 		SetModel( temp );
 	}
@@ -2912,7 +2912,7 @@ bool idEntity::RunPhysics()
 		{
 
 			// run physics
-			moved = part->physics->Evaluate( endTime - startTime, endTime );
+			moved = part->physics->Evaluate( GetPhysicsTimeStep(), endTime );
 
 			// check if the object is blocked
 			blockingEntity = part->physics->GetBlockingEntity();
@@ -3064,6 +3064,16 @@ void idEntity::UpdateFromPhysics( bool moveBack )
 	}
 
 	UpdateVisuals();
+}
+
+/*
+================
+idEntity::GetPhysicsTimeStep
+================
+*/
+int idEntity::GetPhysicsTimeStep() const
+{
+	return gameLocal.GetFrameTime();
 }
 
 /*

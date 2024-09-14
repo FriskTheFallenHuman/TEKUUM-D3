@@ -152,12 +152,12 @@ const uint32_t NUM_FRAME_DATA = 2;
 
 		// The editor entry points are always declared, but may just be
 		// stubbed out on non-windows platforms.
-		#if defined(USE_MFC_TOOLS)
+		#ifdef ID_ALLOW_TOOLS
 			#include "../tools/edit_public.h"
 		#endif
 
 		// Compilers for map, model, video etc. processing.
-		#if defined(USE_CMDLINE_TOOLS)
+		#ifdef ID_ALLOW_CMD_TOOLS
 			#include "../tools/compilers/compiler_public.h"
 		#endif
 

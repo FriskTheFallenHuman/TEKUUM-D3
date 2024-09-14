@@ -50,7 +50,7 @@ public:
 	void					Restore( idRestoreGame* savefile );
 
 	void					Spawn();
-	void					GetAttributes( idDict& attributes );
+	void					GetAttributes( idDict& attributes ) const;
 	virtual bool			GiveToPlayer( idPlayer* player );
 	virtual bool			Pickup( idPlayer* player );
 	virtual void			Think();

@@ -1906,7 +1906,7 @@ void idActor::RemoveAttachments()
 	for( i = 0; i < attachments.Num(); i++ )
 	{
 		ent = attachments[ i ].ent.GetEntity();
-		if( ent && ent->spawnArgs.GetBool( "remove" ) )
+		if( ent != NULL && ent->spawnArgs.GetBool( "remove" ) )
 		{
 			ent->PostEventMS( &EV_Remove, 0 );
 		}

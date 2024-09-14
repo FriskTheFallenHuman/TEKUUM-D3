@@ -37,7 +37,6 @@ If you have questions concerning this license or the applicable additional terms
 ===============================================================================
 */
 
-// RB: 64 bit fixes, changed int to size_t
 void* 		Mem_Alloc16( const size_t size );
 void		Mem_Free16( void* ptr );
 
@@ -53,8 +52,8 @@ ID_INLINE void		Mem_Free( void* ptr )
 
 void* 		Mem_ClearedAlloc( const size_t size );
 char* 		Mem_CopyString( const char* in );
-// RB end
 
+#ifdef ID_REDIRECT_NEWDELETE
 ID_INLINE void* operator new( size_t s )
 {
 	return Mem_Alloc( s );
@@ -75,6 +74,7 @@ ID_INLINE void operator delete[]( void* p ) noexcept
 {
 	Mem_Free( p );
 }
+#endif
 
 // Define replacements for the PS3 library's aligned new operator.
 // Without these, allocations of objects with 32 byte or greater alignment

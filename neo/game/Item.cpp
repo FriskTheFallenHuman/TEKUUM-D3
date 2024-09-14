@@ -364,7 +364,7 @@ void idItem::Spawn()
 idItem::GetAttributes
 ================
 */
-void idItem::GetAttributes( idDict& attributes )
+void idItem::GetAttributes( idDict& attributes ) const
 {
 	int					i;
 	const idKeyValue*	arg;

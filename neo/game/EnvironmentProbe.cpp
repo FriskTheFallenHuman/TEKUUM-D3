@@ -154,8 +154,6 @@ idEnvProbes::Spawn
 */
 void idEnvProbes::Spawn()
 {
-	bool start_off;
-
 	// do the parsing the same way dmap and the editor do
 	gameEdit->ParseSpawnArgsToRenderEnvprobe( &spawnArgs, &renderEnvprobe );
 
