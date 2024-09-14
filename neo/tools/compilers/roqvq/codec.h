@@ -78,14 +78,14 @@ private:
 
 	NSBitmapImageRep*	image;
 	NSBitmapImageRep*	newImage;
-	NSBitmapImageRep*	 previousImage[2];		// the ones in video ram and offscreen ram
+	NSBitmapImageRep*	previousImage[2];		// the ones in video ram and offscreen ram
 	int					numQuadCels;
 	int					whichFrame;
 	int					slop;
-	bool 				detail;
-	int 				onQuad;
+	bool				detail;
+	int					onQuad;
 	int					initRGBtab;
-	quadcel*			 qStatus;
+	quadcel*				qStatus;
 	int					dxMean;
 	int					dyMean;
 	int					codebooksize;

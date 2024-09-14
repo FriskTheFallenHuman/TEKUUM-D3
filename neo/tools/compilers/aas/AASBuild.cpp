@@ -151,9 +151,7 @@ bool idAASBuild::LoadProcBSP( const char* name, ID_TIME_T minFileTime )
 		return false;
 	}
 
-	// RB: added PROC_FILE_ID2
-	if( !src->ReadToken( &token ) || ( token.Icmp( PROC_FILE_ID ) && token.Icmp( PROC_FILE_ID2 ) ) )
-		// RB end
+	if( !src->ReadToken( &token ) || token.Icmp( PROC_FILE_ID ) )
 	{
 		common->Warning( "idAASBuild::LoadProcBSP: bad id '%s' instead of '%s'", token.c_str(), PROC_FILE_ID );
 		delete src;
@@ -185,14 +183,6 @@ bool idAASBuild::LoadProcBSP( const char* name, ID_TIME_T minFileTime )
 			src->SkipBracedSection();
 			continue;
 		}
-
-		// RB begin
-		if( token == "lightGridPoints" )
-		{
-			src->SkipBracedSection();
-			continue;
-		}
-		// RB end
 
 		if( token == "nodes" )
 		{
@@ -891,10 +881,6 @@ bool idAASBuild::Build( const idStr& fileName, const idAASSettings* settings )
 	}
 
 	// write the file
-
-// RB: added generated/
-	name = "generated/" + name;
-// RB end
 	name.SetFileExtension( aasSettings->fileExtension );
 	file->Write( name, mapFile->GetGeometryCRC() );
 

@@ -33,7 +33,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "dmap.h"
 
 
-idList<interAreaPortal_t> interAreaPortals;
+interAreaPortal_t interAreaPortals[MAX_INTER_AREA_PORTALS];
+int					numInterAreaPortals;
 
 
 int		c_active_portals;
@@ -90,7 +91,7 @@ static bool Portal_Passable( uPortal_t*  p )
 	if( p->nodes[0]->planenum != PLANENUM_LEAF
 			|| p->nodes[1]->planenum != PLANENUM_LEAF )
 	{
-		common->Error( "Portal_EntityFlood: not a leaf" );
+		idLib::Error( "Portal_EntityFlood: not a leaf" );
 	}
 
 	if( !p->nodes[0]->opaque && !p->nodes[1]->opaque )
@@ -115,7 +116,7 @@ void AddPortalToNodes( uPortal_t*  p, node_t* front, node_t* back )
 {
 	if( p->nodes[0] || p->nodes[1] )
 	{
-		common->Error( "AddPortalToNode: allready included" );
+		idLib::Error( "AddPortalToNode: already included" );
 	}
 
 	p->nodes[0] = front;
@@ -144,7 +145,7 @@ void RemovePortalFromNode( uPortal_t*  portal, node_t* l )
 		t = *pp;
 		if( !t )
 		{
-			common->Error( "RemovePortalFromNode: portal not in leaf" );
+			idLib::Error( "RemovePortalFromNode: portal not in leaf" );
 		}
 
 		if( t == portal )
@@ -162,7 +163,7 @@ void RemovePortalFromNode( uPortal_t*  portal, node_t* l )
 		}
 		else
 		{
-			common->Error( "RemovePortalFromNode: portal not bounding leaf" );
+			idLib::Error( "RemovePortalFromNode: portal not bounding leaf" );
 		}
 	}
 
@@ -178,7 +179,7 @@ void RemovePortalFromNode( uPortal_t*  portal, node_t* l )
 	}
 	else
 	{
-		common->Error( "RemovePortalFromNode: mislinked" );
+		idLib::Error( "RemovePortalFromNode: mislinked" );
 	}
 }
 
@@ -192,7 +193,7 @@ void PrintPortal( uPortal_t* p )
 	w = p->winding;
 	for( i = 0; i < w->GetNumPoints(); i++ )
 	{
-		common->Printf( "(%5.0f,%5.0f,%5.0f)\n", ( *w )[i][0], ( *w )[i][1], ( *w )[i][2] );
+		idLib::Printf( "(%5.0f,%5.0f,%5.0f)\n", ( *w )[i][0], ( *w )[i][1], ( *w )[i][2] );
 	}
 }
 
@@ -232,7 +233,7 @@ static void MakeHeadnodePortals( tree_t* tree )
 		bounds[1][i] = tree->bounds[1][i] + SIDESPACE;
 		if( bounds[0][i] >= bounds[1][i] )
 		{
-			common->Error( "Backwards tree volume" );
+			idLib::Error( "Backwards tree volume" );
 		}
 	}
 
@@ -354,7 +355,7 @@ static void MakeNodePortal( node_t* node )
 		}
 		else
 		{
-			common->Error( "CutNodePortals_r: mislinked portal" );
+			idLib::Error( "CutNodePortals_r: mislinked portal" );
 			side = 0;	// quiet a compiler warning
 		}
 
@@ -414,7 +415,7 @@ static void SplitNodePortals( node_t* node )
 		}
 		else
 		{
-			common->Error( "SplitNodePortals: mislinked portal" );
+			idLib::Error( "SplitNodePortals: mislinked portal" );
 			side = 0;	// quiet a compiler warning
 		}
 		next_portal = p->next[side];
@@ -535,14 +536,14 @@ void MakeTreePortals_r( node_t* node )
 
 	if( node->bounds[0][0] >= node->bounds[1][0] )
 	{
-		common->Warning( "node without a volume" );
+		VerbosePrintf( "Warning: node without a volume" );
 	}
 
 	for( i = 0; i < 3; i++ )
 	{
 		if( node->bounds[0][i] < MIN_WORLD_COORD || node->bounds[1][i] > MAX_WORLD_COORD )
 		{
-			common->Warning( "node with unbounded volume" );
+			idLib::Warning( "node with unbounded volume" );
 			break;
 		}
 	}
@@ -565,7 +566,7 @@ MakeTreePortals
 */
 void MakeTreePortals( tree_t* tree )
 {
-	common->Printf( "----- MakeTreePortals -----\n" );
+	VerbosePrintf( "----- MakeTreePortals -----\n" );
 	MakeHeadnodePortals( tree );
 	MakeTreePortals_r( tree->headnode );
 }
@@ -664,7 +665,7 @@ bool FloodEntities( tree_t* tree )
 	node_t* headnode;
 
 	headnode = tree->headnode;
-	common->Printf( "--- FloodEntities ---\n" );
+	idLib::Printf( "--- FloodEntities ---\n" );
 	inside = false;
 	tree->outside_node.occupied = 0;
 
@@ -721,30 +722,30 @@ bool FloodEntities( tree_t* tree )
 		if( tree->outside_node.occupied && !errorShown )
 		{
 			errorShown = true;
-			common->Printf( "Leak on entity # %d\n", i );
+			idLib::Printf( "Leak on entity # %d\n", i );
 			const char* p;
 
 			mapEnt->epairs.GetString( "classname", "", &p );
-			common->Printf( "Entity classname was: %s\n", p );
+			idLib::Printf( "Entity classname was: %s\n", p );
 			mapEnt->epairs.GetString( "name", "", &p );
-			common->Printf( "Entity name was: %s\n", p );
+			idLib::Printf( "Entity name was: %s\n", p );
 			idVec3 origin;
 			if( mapEnt->epairs.GetVector( "origin", "", origin ) )
 			{
-				common->Printf( "Entity origin is: %f %f %f\n\n\n", origin.x, origin.y, origin.z );
+				idLib::Printf( "Entity origin is: %f %f %f\n\n\n", origin.x, origin.y, origin.z );
 			}
 		}
 	}
 
-	common->Printf( "%5i flooded leafs\n", c_floodedleafs );
+	idLib::Printf( "%5i flooded leafs\n", c_floodedleafs );
 
 	if( !inside )
 	{
-		common->Printf( "no entities in open -- no filling\n" );
+		idLib::Printf( "no entities in open -- no filling\n" );
 	}
 	else if( tree->outside_node.occupied )
 	{
-		common->Printf( "entity reached from outside -- no filling\n" );
+		idLib::Printf( "entity reached from outside -- no filling\n" );
 	}
 
 	return ( bool )( inside && !tree->outside_node.occupied );
@@ -816,7 +817,7 @@ static side_t*	FindSideForPortal( uPortal_t* p )
 					{
 						continue;
 					}
-					common->Warning( "brush has multiple area portal sides at %s", s2->visibleHull->GetCenter().ToString() );
+					idLib::Warning( "brush has multiple area portal sides at %s", s2->visibleHull->GetCenter().ToString() );
 					delete s2->visibleHull;
 					s2->visibleHull = NULL;
 				}
@@ -826,68 +827,6 @@ static side_t*	FindSideForPortal( uPortal_t* p )
 	}
 	return NULL;
 }
-
-// RB: extra function to avoid many allocations
-static bool	CheckTrianglesForPortal( uPortal_t* p )
-{
-	int			i;
-	node_t*		node;
-	mapTri_t*	tri;
-
-	// scan both bordering nodes triangle lists for portal triangles that share the plane
-	for( i = 0 ; i < 2 ; i++ )
-	{
-		node = p->nodes[i];
-		for( tri = node->areaPortalTris; tri; tri = tri->next )
-		{
-			if( !( tri->material->GetContentFlags() & CONTENTS_AREAPORTAL ) )
-			{
-				continue;
-			}
-
-			if( ( tri->planeNum & ~1 ) != ( p->onnode->planenum & ~1 ) )
-			{
-				continue;
-			}
-
-			return true;
-		}
-	}
-
-	return false;
-}
-
-static bool	FindTrianglesForPortal( uPortal_t* p, idList<mapTri_t*>& tris )
-{
-	int			i;
-	node_t*		node;
-	mapTri_t*	tri;
-
-	tris.Clear();
-
-	// scan both bordering nodes triangle lists for portal triangles that share the plane
-	for( i = 0 ; i < 2 ; i++ )
-	{
-		node = p->nodes[i];
-		for( tri = node->areaPortalTris; tri; tri = tri->next )
-		{
-			if( !( tri->material->GetContentFlags() & CONTENTS_AREAPORTAL ) )
-			{
-				continue;
-			}
-
-			if( ( tri->planeNum & ~1 ) != ( p->onnode->planenum & ~1 ) )
-			{
-				continue;
-			}
-
-			tris.Append( tri );
-		}
-	}
-
-	return tris.Num() > 0;
-}
-// RB end
 
 /*
 =============
@@ -929,12 +868,6 @@ void FloodAreas_r( node_t* node )
 			continue;
 		}
 
-		// RB: check area portal triangles as well
-		if( CheckTrianglesForPortal( p ) )
-		{
-			continue;
-		}
-
 		FloodAreas_r( other );
 	}
 }
@@ -963,12 +896,12 @@ void FindAreas_r( node_t* node )
 
 	if( node->area != -1 )
 	{
-		return;		// allready got it
+		return;		// already got it
 	}
 
 	c_areaFloods = 0;
 	FloodAreas_r( node );
-	common->Printf( "area %i has %i leafs\n", c_areas, c_areaFloods );
+	VerbosePrintf( "area %i has %i leafs\n", c_areas, c_areaFloods );
 	c_areas++;
 }
 
@@ -987,7 +920,7 @@ void CheckAreas_r( node_t* node )
 	}
 	if( !node->opaque && node->area < 0 )
 	{
-		common->Error( "CheckAreas_r: area = %i", node->area );
+		idLib::Error( "CheckAreas_r: area = %i", node->area );
 	}
 }
 
@@ -1061,7 +994,7 @@ static void FindInterAreaPortals_r( node_t* node )
 //		w = p->winding;
 		if( !side )
 		{
-			common->Warning( "FindSideForPortal failed at %s", p->winding->GetCenter().ToString() );
+			idLib::Warning( "FindSideForPortal failed at %s", p->winding->GetCenter().ToString() );
 			continue;
 		}
 		w = side->visibleHull;
@@ -1071,7 +1004,7 @@ static void FindInterAreaPortals_r( node_t* node )
 		}
 
 		// see if we have created this portal before
-		for( i = 0; i < interAreaPortals.Num(); i++ )
+		for( i = 0 ; i < numInterAreaPortals ; i++ )
 		{
 			iap = &interAreaPortals[i];
 
@@ -1083,13 +1016,13 @@ static void FindInterAreaPortals_r( node_t* node )
 			}
 		}
 
-		if( i != interAreaPortals.Num() )
+		if( i != numInterAreaPortals )
 		{
 			continue;	// already emited
 		}
 
-		iap = &interAreaPortals.Alloc();
-
+		iap = &interAreaPortals[numInterAreaPortals];
+		numInterAreaPortals++;
 		if( side->planenum == p->onnode->planenum )
 		{
 			iap->area0 = p->nodes[0]->area;
@@ -1101,84 +1034,8 @@ static void FindInterAreaPortals_r( node_t* node )
 			iap->area1 = p->nodes[0]->area;
 		}
 		iap->side = side;
-	}
-
-	// RB: check area portal triangles
-	idList<mapTri_t*> apTriangles;
-	for( p = node->portals ; p ; p = p->next[s] )
-	{
-		node_t*	other;
-
-		s = ( p->nodes[1] == node );
-		other = p->nodes[!s];
-
-		if( other->opaque )
-		{
-			continue;
-		}
-
-		// only report areas going from lower number to higher number
-		// so we don't report the portal twice
-		if( other->area <= node->area )
-		{
-			continue;
-		}
-
-		FindTrianglesForPortal( p, apTriangles );
-		if( apTriangles.Num() < 2 )
-		{
-			//common->Warning( "FindTrianglesForPortal failed at %s", p->winding->GetCenter().ToString() );
-			continue;
-		}
-
-		// see if we have created this portal before
-		for( i = 0; i < interAreaPortals.Num(); i++ )
-		{
-			iap = &interAreaPortals[i];
-
-			if( apTriangles[0]->polygonId == iap->polygonId &&
-					( ( p->nodes[0]->area == iap->area0 && p->nodes[1]->area == iap->area1 )
-					  || ( p->nodes[1]->area == iap->area0 && p->nodes[0]->area == iap->area1 ) ) )
-			{
-				break;
-			}
-		}
-
-		if( i != interAreaPortals.Num() )
-		{
-			continue;	// already emited
-		}
-
-		iap = &interAreaPortals.Alloc();
-
-		if( apTriangles[0]->planeNum == p->onnode->planenum )
-		{
-			iap->area0 = p->nodes[0]->area;
-			iap->area1 = p->nodes[1]->area;
-		}
-		else
-		{
-			iap->area0 = p->nodes[1]->area;
-			iap->area1 = p->nodes[0]->area;
-		}
-
-		iap->polygonId = apTriangles[0]->polygonId;
-
-		// merge triangles to a new winding
-		for( int j = 0; j < apTriangles.Num(); j++ )
-		{
-			mapTri_t* tri = apTriangles[j];
-			idVec3 planeNormal = dmapGlobals.mapPlanes[ tri->planeNum].Normal();
-
-			for( int k = 0; k < 3; k++ )
-			{
-				iap->w.AddToConvexHull( tri->v[k].xyz, planeNormal );
-			}
-		}
-
 
 	}
-	// RB end
 }
 
 
@@ -1195,7 +1052,10 @@ Sets e->areas.numAreas
 */
 void FloodAreas( uEntity_t* e )
 {
-	common->Printf( "--- FloodAreas ---\n" );
+	if( e == &dmapGlobals.uEntities[0] )
+	{
+		idLib::Printf( "--- FloodAreas ---\n" );
+	}
 
 	// set all areas to -1
 	ClearAreas_r( e->tree->headnode );
@@ -1204,7 +1064,10 @@ void FloodAreas( uEntity_t* e )
 	c_areas = 0;
 	FindAreas_r( e->tree->headnode );
 
-	common->Printf( "%5i areas\n", c_areas );
+	if( e == &dmapGlobals.uEntities[0] )
+	{
+		idLib::Printf( "%5i areas\n", c_areas );
+	}
 	e->numAreas = c_areas;
 
 	// make sure we got all of them
@@ -1213,7 +1076,7 @@ void FloodAreas( uEntity_t* e )
 	// identify all portals between areas if this is the world
 	if( e == &dmapGlobals.uEntities[0] )
 	{
-		interAreaPortals.Clear();
+		numInterAreaPortals = 0;
 		FindInterAreaPortals_r( e->tree->headnode );
 	}
 }
@@ -1272,9 +1135,9 @@ void FillOutside( uEntity_t* e )
 	c_outside = 0;
 	c_inside = 0;
 	c_solid = 0;
-	common->Printf( "--- FillOutside ---\n" );
+	idLib::Printf( "--- FillOutside ---\n" );
 	FillOutside_r( e->tree->headnode );
-	common->Printf( "%5i solid leafs\n", c_solid );
-	common->Printf( "%5i leafs filled\n", c_outside );
-	common->Printf( "%5i inside leafs\n", c_inside );
+	idLib::Printf( "%5i solid leafs\n", c_solid );
+	idLib::Printf( "%5i leafs filled\n", c_outside );
+	idLib::Printf( "%5i inside leafs\n", c_inside );
 }

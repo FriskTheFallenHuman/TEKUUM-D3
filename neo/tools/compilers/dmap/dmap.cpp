@@ -45,38 +45,24 @@ bool ProcessModel( uEntity_t* e, bool floodFill )
 
 	// build a bsp tree using all of the sides
 	// of all of the structural brushes
+	dmapGlobals.timingMakeStructural.Start();
 	faces = MakeStructuralBspFaceList( e->primitives );
-
-	// RB: dump BSP for debugging
-	if( dmapGlobals.glview )
-	{
-		WriteGLView( faces, "facelist" );
-	}
-	// RB end
-
 	e->tree = FaceBSP( faces );
+	dmapGlobals.timingMakeStructural.Stop();
 
 	// create portals at every leaf intersection
 	// to allow flood filling
+	dmapGlobals.timingMakeTreePortals.Start();
 	MakeTreePortals( e->tree );
-
-	// RB: calculate node numbers for split plane analysis
-	NumberNodes_r( e->tree->headnode, 0 );
+	dmapGlobals.timingMakeTreePortals.Stop();
 
 	// classify the leafs as opaque or areaportal
+	dmapGlobals.timingFilterBrushesIntoTree.Start();
 	FilterBrushesIntoTree( e );
-
-	// RB: use mapTri_t by MapPolygonMesh primitives in case we don't use brushes
-	FilterMeshesIntoTree( e );
-
-	// RB: dump BSP for debugging
-	//if( dmapGlobals.glview )
-	//{
-	//WriteGLView( e->tree, "unclipped", dmapGlobals.entityNum );
-	//}
-	// RB end
+	dmapGlobals.timingFilterBrushesIntoTree.Stop();
 
 	// see if the bsp is completely enclosed
+	dmapGlobals.timingFloodAndFill.Start();
 	if( floodFill && !dmapGlobals.noFlood )
 	{
 		if( FloodEntities( e->tree ) )
@@ -86,9 +72,11 @@ bool ProcessModel( uEntity_t* e, bool floodFill )
 		}
 		else
 		{
-			common->Printf( "**********************\n" );
-			common->Warning( "******* leaked *******" );
-			common->Printf( "**********************\n" );
+			idLib::Printf( "**********************\n" );
+			idLib::Printf( "**********************\n" );
+			idLib::Warning( "**** L E A K E D *****" );
+			idLib::Printf( "**********************\n" );
+			idLib::Printf( "**********************\n" );
 			LeakFile( e->tree );
 			// bail out here.  If someone really wants to
 			// process a map that leaks, they should use
@@ -96,35 +84,37 @@ bool ProcessModel( uEntity_t* e, bool floodFill )
 			return false;
 		}
 	}
+	dmapGlobals.timingFloodAndFill.Stop();
 
 	// get minimum convex hulls for each visible side
 	// this must be done before creating area portals,
 	// because the visible hull is used as the portal
+	dmapGlobals.timingClipSidesByTree.Start();
 	ClipSidesByTree( e );
+	dmapGlobals.timingClipSidesByTree.Stop();
 
 	// determine areas before clipping tris into the
 	// tree, so tris will never cross area boundaries
+	dmapGlobals.timingFloodAreas.Start();
 	FloodAreas( e );
+	dmapGlobals.timingFloodAreas.Stop();
 
-	// RB: dump BSP for debugging
-	if( dmapGlobals.glview )
-	{
-		WriteGLView( e->tree, "areas", dmapGlobals.entityNum );
-	}
-	// RB end
-
-	// we now have a BSP tree with solid and non-solid leafs marked with areas
 	// all primitives will now be clipped into this, throwing away
 	// fragments in the solid areas
+	dmapGlobals.timingPutPrimitivesInAreas.Start();
 	PutPrimitivesInAreas( e );
+	dmapGlobals.timingPutPrimitivesInAreas.Stop();
 
 	// now build shadow volumes for the lights and split
 	// the optimize lists by the light beam trees
 	// so there won't be unneeded overdraw in the static
 	// case
+	dmapGlobals.timingPreLight.Start();
 	Prelight( e );
+	dmapGlobals.timingPreLight.Stop();
 
 	// optimizing is a superset of fixing tjunctions
+	dmapGlobals.timingOptimize.Start();
 	if( !dmapGlobals.noOptimize )
 	{
 		OptimizeEntity( e );
@@ -133,9 +123,12 @@ bool ProcessModel( uEntity_t* e, bool floodFill )
 	{
 		FixEntityTjunctions( e );
 	}
+	dmapGlobals.timingOptimize.Stop();
 
 	// now fix t junctions across areas
+	dmapGlobals.timingFixTJunctions.Start();
 	FixGlobalTjunctions( e );
+	dmapGlobals.timingFixTJunctions.Stop();
 
 	return true;
 }
@@ -147,21 +140,27 @@ ProcessModels
 */
 bool ProcessModels()
 {
-	bool	oldVerbose;
-	uEntity_t*	entity;
-
-	oldVerbose = dmapGlobals.verbose;
+	bool	oldVerbose = dmapGlobals.verbose;
 
 	for( dmapGlobals.entityNum = 0 ; dmapGlobals.entityNum < dmapGlobals.num_entities ; dmapGlobals.entityNum++ )
 	{
 
-		entity = &dmapGlobals.uEntities[dmapGlobals.entityNum];
+		uEntity_t* entity = &dmapGlobals.uEntities[dmapGlobals.entityNum];
 		if( !entity->primitives )
 		{
 			continue;
 		}
 
-		common->Printf( "############### entity %i ###############\n", dmapGlobals.entityNum );
+		if( dmapGlobals.entityNum == 0 )
+		{
+			idLib::Printf( "Current entity : worldspawn\n" );
+		}
+		else
+		{
+			idLib::Printf( "Current entity : %s\n", entity->mapEntity->epairs.GetString( "name" ) );
+		}
+
+		VerbosePrintf( "############### entity %i ###############\n", dmapGlobals.entityNum );
 
 		// if we leaked, stop without any more processing
 		if( !ProcessModel( entity, ( bool )( dmapGlobals.entityNum == 0 ) ) )
@@ -189,7 +188,7 @@ DmapHelp
 */
 void DmapHelp()
 {
-	common->Printf(
+	idLib::Printf(
 
 		"Usage: dmap [options] mapfile\n"
 		"Options:\n"
@@ -214,12 +213,7 @@ void ResetDmapGlobals()
 	dmapGlobals.uEntities = NULL;
 	dmapGlobals.entityNum = 0;
 	dmapGlobals.mapLights.Clear();
-	// RB begin
-	dmapGlobals.lightGridSize.Set( 64, 64, 128 );
-	dmapGlobals.lightGridPoints.Clear();
-	// RB end
 	dmapGlobals.verbose = false;
-	dmapGlobals.glview = false;
 	dmapGlobals.noOptimize = false;
 	dmapGlobals.verboseentities = false;
 	dmapGlobals.noCurves = false;
@@ -231,6 +225,9 @@ void ResetDmapGlobals()
 	dmapGlobals.noClipSides = false;
 	dmapGlobals.noLightCarve = false;
 	dmapGlobals.noShadow = false;
+	dmapGlobals.noStats = false;
+	dmapGlobals.noCM = false;
+	dmapGlobals.noAAS = false;
 	dmapGlobals.shadowOptLevel = SO_NONE;
 	dmapGlobals.drawBounds.Clear();
 	dmapGlobals.drawflag = false;
@@ -250,8 +247,6 @@ void Dmap( const idCmdArgs& args )
 	char		path[1024];
 	idStr		passedName;
 	bool		leaked = false;
-	bool		noCM = false;
-	bool		noAAS = false;
 
 	ResetDmapGlobals();
 
@@ -261,7 +256,7 @@ void Dmap( const idCmdArgs& args )
 		return;
 	}
 
-	common->Printf( "---- dmap ----\n" );
+	idLib::Printf( "---- dmap ----\n" );
 
 	dmapGlobals.fullCarve = true;
 	dmapGlobals.shadowOptLevel = SO_MERGE_SURFACES;		// create shadows by merging all surfaces, but no super optimization
@@ -285,88 +280,89 @@ void Dmap( const idCmdArgs& args )
 			}
 		}
 
-		if( !idStr::Icmp( s, "glview" ) )
+		if( !idStr::Icmp( s, "v" ) || !idStr::Icmp( s, "verbose" ) )
 		{
-			dmapGlobals.glview = true;
-		}
-		else if( !idStr::Icmp( s, "v" ) )
-		{
-			common->Printf( "verbose = true\n" );
+			idLib::Printf( "verbose = true\n" );
 			dmapGlobals.verbose = true;
 		}
 		else if( !idStr::Icmp( s, "draw" ) )
 		{
-			common->Printf( "drawflag = true\n" );
+			idLib::Printf( "drawflag = true\n" );
 			dmapGlobals.drawflag = true;
 		}
 		else if( !idStr::Icmp( s, "noFlood" ) )
 		{
-			common->Printf( "noFlood = true\n" );
+			idLib::Printf( "noFlood = true\n" );
 			dmapGlobals.noFlood = true;
 		}
 		else if( !idStr::Icmp( s, "noLightCarve" ) )
 		{
-			common->Printf( "noLightCarve = true\n" );
+			idLib::Printf( "noLightCarve = true\n" );
 			dmapGlobals.noLightCarve = true;
 		}
 		else if( !idStr::Icmp( s, "lightCarve" ) )
 		{
-			common->Printf( "noLightCarve = false\n" );
+			idLib::Printf( "noLightCarve = false\n" );
 			dmapGlobals.noLightCarve = false;
 		}
 		else if( !idStr::Icmp( s, "noOpt" ) )
 		{
-			common->Printf( "noOptimize = true\n" );
+			idLib::Printf( "noOptimize = true\n" );
 			dmapGlobals.noOptimize = true;
 		}
 		else if( !idStr::Icmp( s, "verboseentities" ) )
 		{
-			common->Printf( "verboseentities = true\n" );
+			idLib::Printf( "verboseentities = true\n" );
 			dmapGlobals.verboseentities = true;
 		}
 		else if( !idStr::Icmp( s, "noCurves" ) )
 		{
-			common->Printf( "noCurves = true\n" );
+			idLib::Printf( "noCurves = true\n" );
 			dmapGlobals.noCurves = true;
 		}
 		else if( !idStr::Icmp( s, "noModels" ) )
 		{
-			common->Printf( "noModels = true\n" );
+			idLib::Printf( "noModels = true\n" );
 			dmapGlobals.noModelBrushes = true;
 		}
 		else if( !idStr::Icmp( s, "noClipSides" ) )
 		{
-			common->Printf( "noClipSides = true\n" );
+			idLib::Printf( "noClipSides = true\n" );
 			dmapGlobals.noClipSides = true;
 		}
 		else if( !idStr::Icmp( s, "noCarve" ) )
 		{
-			common->Printf( "noCarve = true\n" );
+			idLib::Printf( "noCarve = true\n" );
 			dmapGlobals.fullCarve = false;
 		}
 		else if( !idStr::Icmp( s, "shadowOpt" ) )
 		{
 			dmapGlobals.shadowOptLevel = ( shadowOptLevel_t )atoi( args.Argv( i + 1 ) );
-			common->Printf( "shadowOpt = %i\n", dmapGlobals.shadowOptLevel );
+			idLib::Printf( "shadowOpt = %i\n", dmapGlobals.shadowOptLevel );
 			i += 1;
 		}
 		else if( !idStr::Icmp( s, "noTjunc" ) )
 		{
 			// triangle optimization won't work properly without tjunction fixing
-			common->Printf( "noTJunc = true\n" );
+			idLib::Printf( "noTJunc = true\n" );
 			dmapGlobals.noTJunc = true;
 			dmapGlobals.noOptimize = true;
-			common->Printf( "forcing noOptimize = true\n" );
+			idLib::Printf( "forcing noOptimize = true\n" );
 		}
 		else if( !idStr::Icmp( s, "noCM" ) )
 		{
-			noCM = true;
-			common->Printf( "noCM = true\n" );
+			dmapGlobals.noCM = true;
+			idLib::Printf( "noCM = true\n" );
 		}
 		else if( !idStr::Icmp( s, "noAAS" ) )
 		{
-			noAAS = true;
-			common->Printf( "noAAS = true\n" );
+			dmapGlobals.noAAS = true;
+			idLib::Printf( "noAAS = true\n" );
+		}
+		else if( !idStr::Icmp( s, "noStats" ) )
+		{
+			dmapGlobals.noStats = true;
+			idLib::Printf( "noStats = true\n" );
 		}
 		else if( !idStr::Icmp( s, "editorOutput" ) )
 		{
@@ -382,7 +378,7 @@ void Dmap( const idCmdArgs& args )
 
 	if( i >= args.Argc() )
 	{
-		common->Error( "usage: dmap [options] mapfile" );
+		idLib::Error( "usage: dmap [options] mapfile" );
 	}
 
 	passedName = args.Argv( i );		// may have an extension
@@ -400,7 +396,7 @@ void Dmap( const idCmdArgs& args )
 	// if this isn't a regioned map, delete the last saved region map
 	if( passedName.Right( 4 ) != ".reg" )
 	{
-		sprintf( path, "%s.reg", dmapGlobals.mapFileBase );
+		idStr::snPrintf( path, sizeof( path ), "%s.reg", dmapGlobals.mapFileBase );
 		fileSystem->RemoveFile( path );
 	}
 	else
@@ -412,7 +408,7 @@ void Dmap( const idCmdArgs& args )
 	passedName = stripped;
 
 	// delete any old line leak files
-	sprintf( path, "%s.lin", dmapGlobals.mapFileBase );
+	idStr::snPrintf( path, sizeof( path ), "%s.lin", dmapGlobals.mapFileBase );
 	fileSystem->RemoveFile( path );
 
 	// delete any old generated binary proc files
@@ -431,20 +427,7 @@ void Dmap( const idCmdArgs& args )
 
 	if( ProcessModels() )
 	{
-		// RB begin
-		LightWorld();
-		// RB end
-
 		WriteOutputFile();
-
-		// RB: dump BSP after nodes being pruned and optimized
-		if( dmapGlobals.glview )
-		{
-			uEntity_t* world = &dmapGlobals.uEntities[0];
-
-			WriteGLView( world->tree, "pruned", 0, true );
-		}
-		// RB end
 	}
 	else
 	{
@@ -453,17 +436,17 @@ void Dmap( const idCmdArgs& args )
 
 	FreeDMapFile();
 
-	common->Printf( "%i total shadow triangles\n", dmapGlobals.totalShadowTriangles );
-	common->Printf( "%i total shadow verts\n", dmapGlobals.totalShadowVerts );
+	idLib::Printf( "%i total shadow triangles\n", dmapGlobals.totalShadowTriangles );
+	idLib::Printf( "%i total shadow verts\n", dmapGlobals.totalShadowVerts );
 
 	end = Sys_Milliseconds();
-	common->Printf( "-----------------------\n" );
-	common->Printf( "%5.0f seconds for dmap\n", ( end - start ) * 0.001f );
+	idLib::Printf( "-----------------------\n" );
+	idLib::Printf( "%5.0f seconds for dmap\n", ( end - start ) * 0.001f );
 
 	if( !leaked )
 	{
 
-		if( !noCM )
+		if( !dmapGlobals.noCM )
 		{
 
 			// make sure the collision model manager is not used by the game
@@ -476,11 +459,11 @@ void Dmap( const idCmdArgs& args )
 			collisionModelManager->FreeMap();
 
 			end = Sys_Milliseconds();
-			common->Printf( "-------------------------------------\n" );
-			common->Printf( "%5.0f seconds to create collision map\n", ( end - start ) * 0.001f );
+			idLib::Printf( "-------------------------------------\n" );
+			idLib::Printf( "%5.0f seconds to create collision map\n", ( end - start ) * 0.001f );
 		}
 
-		if( !noAAS && !region )
+		if( !dmapGlobals.noAAS && !region )
 		{
 			// create AAS files
 			RunAAS_f( args );
@@ -492,14 +475,16 @@ void Dmap( const idCmdArgs& args )
 
 	// clear the map plane list
 	dmapGlobals.mapPlanes.Clear();
+}
 
-#ifdef _WIN32
-	if( com_outputMsg && com_hwndMsg != NULL )
-	{
-		unsigned int msg = ::RegisterWindowMessage( DMAP_DONE );
-		::PostMessage( com_hwndMsg, msg, 0, 0 );
-	}
-#endif
+/*
+============
+printTimingsStats
+============
+*/
+static void printTimingsStats( const dmapTimingStats& stats, const char* name )
+{
+	idLib::Printf( "%s: %i %i %f %i %i\n", name, stats.Sum(), stats.Min(), stats.Avg(), stats.Max(), stats.Num() );
 }
 
 /*
@@ -510,13 +495,43 @@ Dmap_f
 void Dmap_f( const idCmdArgs& args )
 {
 
-	common->ClearWarnings( "running dmap" );
+	if( !dmapGlobals.noStats )
+	{
+		// Reset the timers
+		dmapGlobals.timingMakeStructural.Reset();
+		dmapGlobals.timingMakeTreePortals.Reset();
+		dmapGlobals.timingFilterBrushesIntoTree.Reset();
+		dmapGlobals.timingFloodAndFill.Reset();
+		dmapGlobals.timingClipSidesByTree.Reset();
+		dmapGlobals.timingFloodAreas.Reset();
+		dmapGlobals.timingPutPrimitivesInAreas.Reset();
+		dmapGlobals.timingPreLight.Reset();
+		dmapGlobals.timingOptimize.Reset();
+		dmapGlobals.timingFixTJunctions.Reset();
+	}
+
+	idLib::common->ClearWarnings( "running dmap" );
 
 	// refresh the screen each time we print so it doesn't look
 	// like it is hung
-	common->SetRefreshOnPrint( true );
+	idLib::common->SetRefreshOnPrint( true );
 	Dmap( args );
-	common->SetRefreshOnPrint( false );
+	idLib::common->SetRefreshOnPrint( false );
 
-	common->PrintWarnings();
+	idLib::common->PrintWarnings();
+
+	if( !dmapGlobals.noStats )
+	{
+		// Print the timing stats
+		printTimingsStats( dmapGlobals.timingMakeStructural,        "Make Structural  " );
+		printTimingsStats( dmapGlobals.timingMakeTreePortals,       "Make Tree Portals" );
+		printTimingsStats( dmapGlobals.timingFilterBrushesIntoTree, "Filter Brushes   " );
+		printTimingsStats( dmapGlobals.timingFloodAndFill,          "Flood and Fill   " );
+		printTimingsStats( dmapGlobals.timingClipSidesByTree,       "Clip Sides       " );
+		printTimingsStats( dmapGlobals.timingFloodAreas,            "Flood Areas      " );
+		printTimingsStats( dmapGlobals.timingPutPrimitivesInAreas,  "Put Primitives   " );
+		printTimingsStats( dmapGlobals.timingPreLight,              "Prelight         " );
+		printTimingsStats( dmapGlobals.timingOptimize,              "Optimize         " );
+		printTimingsStats( dmapGlobals.timingFixTJunctions,         "Fix T Junctions  " );
+	}
 }

@@ -43,7 +43,6 @@ If you have questions concerning this license or the applicable additional terms
 
 //#define OUPUT_BSP_STATS_PER_GRID_CELL
 
-
 //===============================================================
 //
 //	idBrushBSPPortal
@@ -87,7 +86,7 @@ void idBrushBSPPortal::AddToNodes( idBrushBSPNode* front, idBrushBSPNode* back )
 {
 	if( nodes[0] || nodes[1] )
 	{
-		common->Error( "AddToNode: allready included" );
+		common->Error( "AddToNode: already included" );
 	}
 
 	assert( front && back );
@@ -1011,7 +1010,7 @@ idBrushBSPNode* idBrushBSP::ProcessGridCell( idBrushBSPNode* node, int skipConte
 
 	BuildBrushBSP_r( node, planeList, testedPlanes, skipContents );
 
-	delete testedPlanes;
+	delete[] testedPlanes;
 
 #ifdef OUPUT_BSP_STATS_PER_GRID_CELL
 	common->Printf( "\r%6d splits\n", numGridCellSplits );
@@ -1320,7 +1319,7 @@ idBrushBSP::SplitNodePortals
 
 void idBrushBSP::SplitNodePortals( idBrushBSPNode* node )
 {
-	int side = 0;
+	int side;
 	idBrushBSPPortal* p, *nextPortal, *newPortal;
 	idBrushBSPNode* f, *b, *otherNode;
 	idPlane* plane;
@@ -1343,6 +1342,7 @@ void idBrushBSP::SplitNodePortals( idBrushBSPNode* node )
 		else
 		{
 			common->Error( "idBrushBSP::SplitNodePortals: mislinked portal" );
+			return;
 		}
 		nextPortal = p->next[side];
 
@@ -1474,7 +1474,6 @@ void idBrushBSP::MakeOutsidePortals()
 	idBounds bounds;
 	idBrushBSPPortal* p, *portals[6];
 	idVec3 normal;
-	idPlane planes[6];
 
 	// pad with some space so there will never be null volume leaves
 	bounds = treeBounds.Expand( 32 );
@@ -1614,15 +1613,15 @@ void idBrushBSP::FloodThroughPortals_r( idBrushBSPNode* node, int contents, int 
 	idBrushBSPPortal* p;
 	int s;
 
-	if( node->occupied )
-	{
-		common->Error( "FloodThroughPortals_r: node already occupied\n" );
-	}
 	if( !node )
 	{
 		common->Error( "FloodThroughPortals_r: NULL node\n" );
 	}
 
+	if( node->occupied )
+	{
+		common->Error( "FloodThroughPortals_r: node already occupied\n" );
+	}
 	node->occupied = depth;
 
 	for( p = node->portals; p; p = p->next[s] )

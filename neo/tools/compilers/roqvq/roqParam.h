@@ -29,7 +29,6 @@ If you have questions concerning this license or the applicable additional terms
 #define __roqParam_h__
 
 #include "gdefs.h"
-#pragma once
 
 class roqParam
 {

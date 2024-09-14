@@ -226,6 +226,7 @@ int roq::SizeFile( idFile* ftosize )
 	return ftosize->Length();
 }
 
+#if 0
 /* Expanded data destination object for stdio output */
 
 typedef struct
@@ -495,10 +496,10 @@ void roq::WriteLossless()
 	/* First we supply a description of the input image.
 	* Four fields of the cinfo struct must be filled in:
 	*/
-	cinfo.image_width = image->pixelsWide(); 	/* image width and height, in pixels */
+	cinfo.image_width = image->pixelsWide();	/* image width and height, in pixels */
 	cinfo.image_height = image->pixelsHigh();
 	cinfo.input_components = 4;		/* # of color components per pixel */
-	cinfo.in_color_space = JCS_RGB; 	/* colorspace of input image */
+	cinfo.in_color_space = JCS_RGB;	/* colorspace of input image */
 	/* Now use the library's routine to set default compression parameters.
 	* (You must set at least cinfo.in_color_space before calling this,
 	* since the defaults depend on the source color space.)
@@ -534,7 +535,7 @@ void roq::WriteLossless()
 		 * more than one scanline at a time if that's more convenient.
 		 */
 		row_pointer[0] = &pixbuf[( ( cinfo.image_height - 1 ) * row_stride ) - cinfo.next_scanline * row_stride];
-		JPEGWriteScanlines( &cinfo, row_pointer, 1 );
+		() JPEGWriteScanlines( &cinfo, row_pointer, 1 );
 	}
 
 	/* Step 6: Finish compression */
@@ -559,6 +560,7 @@ void roq::WriteLossless()
 	/* And we're done! */
 	encoder->SetPreviousImage( "first frame", image );
 }
+#endif
 
 void roq::InitRoQFile( const char* RoQFilename )
 {

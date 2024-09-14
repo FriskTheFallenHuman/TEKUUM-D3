@@ -104,7 +104,7 @@ codec::~codec()
 
 void codec::Sort( float* list, int* intIndex, int numElements )
 {
-#define STRIDE_FACTOR 3 	// good value for stride factor is not well-understood
+#define STRIDE_FACTOR 3	// good value for stride factor is not well-understood
 	// 3 is a fairly good choice (Sedgewick)
 	int c, d, stride;
 	bool found;
@@ -148,7 +148,7 @@ void codec::Sort( float* list, int* intIndex, int numElements )
 
 void codec::Segment( int* alist, float* flist, int numElements, float rmse )
 {
-	int x, y, yy, xx, numc, onf, index, temp, best, a0, a1, a2, a3, bpp, i, len;
+	int x, y, yy, xx, numc, onf, index, temp, best, bpp, i, len;
 	byte	find[16], *lineout, *cbook, *src, *dst;
 	float	fy, fcr, fcb;
 	idFile* fpcb;
@@ -157,7 +157,6 @@ void codec::Segment( int* alist, float* flist, int numElements, float rmse )
 	float y0, y1, y2, y3, cr, cb;
 
 	doopen = false;
-	a0 = a1 = a2 = a3 = 0;
 
 	sprintf( tempcb, "%s.cb", theRoQ->CurrentFilename() );
 	sprintf( temptb, "%s.tb", theRoQ->CurrentFilename() );
@@ -434,7 +433,7 @@ void codec::Segment( int* alist, float* flist, int numElements, float rmse )
 int	codec::BestCodeword( unsigned char* tempvector, int dimension, VQDATA** codebook )
 {
 	VQDATA dist;
-	VQDATA bestDist = HUGE;
+	VQDATA bestDist = idMath::INFINITUM;
 	VQDATA tempvq[64];
 	int bestIndex = -1;
 
@@ -841,7 +840,7 @@ void codec::QuadX( int startX, int startY, int quadSize )
 
 	if( ( startX >= lowx ) && ( startX + quadSize ) <= ( bigx ) && ( startY + quadSize ) <= ( bigy ) && ( startY >= lowy ) && quadSize <= MAXSIZE )
 	{
-		qStatus[onQuad].size 	= quadSize;
+		qStatus[onQuad].size	= quadSize;
 		qStatus[onQuad].xat		= startX;
 		qStatus[onQuad].yat		= startY;
 		qStatus[onQuad].rsnr	= 999999;
@@ -972,16 +971,8 @@ void codec::VqData4( byte* cel, quadcel* pquad )
 void codec::VqData2( byte* cel, quadcel* pquad )
 {
 	byte	tempImage[16], tempOut[64];
-	int		i, j, best, x, y, xx, yy, bpp;
+	int		i, j, best, x, y, xx, yy;
 
-	if( dimension4 == 64 )
-	{
-		bpp = 4;
-	}
-	else
-	{
-		bpp = 3;
-	}
 	j = 1;
 	for( yy = 0; yy < 4; yy += 2 )
 	{
@@ -1035,7 +1026,7 @@ float codec::Snr( byte* old, byte* bnew, int size )
 {
 	int i, j;
 	float fsnr;
-	register int ind;
+	int ind;
 
 	ind = 0;
 
@@ -1085,7 +1076,7 @@ int codec::ComputeMotionBlock( byte* old, byte* bnew, int size )
 void codec::FvqData( byte* bitmap, int size, int realx, int realy,  quadcel* pquad, bool clamp )
 {
 	int x, y, xLen, yLen, mblur0, ripl, bpp, fabort, temp1;
-	int lowX, lowY, onx, ony, sX, sY, depthx, depthy, breakHigh;
+	int lowX, lowY, sX, sY, depthx, depthy, breakHigh;
 	float lowestSNR, fmblur0;
 	byte* scale1;
 	byte* bitma2;
@@ -1107,9 +1098,6 @@ void codec::FvqData( byte* bitmap, int size, int realx, int realy,  quadcel* pqu
 		pquad->snr[FCC] = 9999;
 		return;
 	}
-
-	ony = realy - ( realy & 0xfff0 );
-	onx = realx - ( realx & 0xfff0 );
 
 	xLen = previousImage[0]->pixelsWide();
 	yLen = previousImage[0]->pixelsHigh();
@@ -1140,7 +1128,6 @@ void codec::FvqData( byte* bitmap, int size, int realx, int realy,  quadcel* pqu
 		return;
 	}
 
-	int sPsQ = -1;
 	for( sX = ( ( ( realx - xxMean ) - searchX ) + depthx ); sX <= ( ( realx - xxMean ) + searchX ) && !fabort; sX += depthx )
 	{
 		for( sY = ( ( ( realy - yyMean ) - searchY ) + depthy ); sY <= ( ( realy - yyMean ) + searchY ) && breakHigh; sY += depthy )
@@ -1308,8 +1295,8 @@ void codec::LowestQuad( quadcel* qtemp, int* status, float* snr, int bweigh )
 		if( qtemp->snr[i]*quickadd[i] < wtemp )
 		{
 			*status = i;
-			*snr 	= qtemp->snr[i];
-			wtemp 	= qtemp->snr[i] * quickadd[i];
+			*snr	= qtemp->snr[i];
+			wtemp	= qtemp->snr[i] * quickadd[i];
 		}
 	}
 
@@ -1376,7 +1363,7 @@ float codec::GetCurrentRMSE( quadcel* pquad )
 int codec::AddQuad( quadcel* pquad, int lownum )
 {
 	int i, nx, nsize;
-	float newsnr, cmul;
+	float newsnr;
 	byte* idataA, *idataB;
 
 	if( lownum != -1 )
@@ -1386,13 +1373,11 @@ int codec::AddQuad( quadcel* pquad, int lownum )
 		{
 			nx = 1;
 			nsize = 4;
-			cmul = 1;
 		}
 		else
 		{
 			nx = 5;
 			nsize = 8;
-			cmul = 4;
 		}
 		newsnr = 0;
 		idataA = ( byte* )Mem_Alloc( 8 * 8 * 4 );
@@ -1471,7 +1456,7 @@ int codec::MotMeanY()
 void codec::SparseEncode()
 {
 	int i, j, osize, fsize, num[DEAD + 1], *ilist, onf, ong, wtype, temp;
-	float* flist, sRMSE, numredo;
+	float* flist, sRMSE;
 	byte* idataA, *idataB;
 
 	osize = 8;
@@ -1620,7 +1605,6 @@ void codec::SparseEncode()
 	*/
 	common->Printf( "sparseEncode: dx/dy mean is %d,%d\n", dxMean, dyMean );
 
-	numredo = 0;
 	detail = false;
 	if( codebookmade && whichFrame > 4 )
 	{
@@ -2064,7 +2048,7 @@ void codec::VQ( const int numEntries, const int dimension, const unsigned char* 
 		//
 		// find the closest two and eliminate one
 		//
-		double bestDist = HUGE;
+		double bestDist = idMath::INFINITUM;
 		double dist, simport;
 		int bestIndex = -1;
 		int bestOtherIndex = 0;
@@ -2148,7 +2132,7 @@ void codec::VQ( const int numEntries, const int dimension, const unsigned char* 
 		//
 		do
 		{
-			bestDist = HUGE;
+			bestDist = idMath::INFINITUM;
 			bestIndex = -1;
 			bestOtherIndex = -1;
 			if( optimize )
@@ -2168,7 +2152,7 @@ void codec::VQ( const int numEntries, const int dimension, const unsigned char* 
 			}
 			if( bestIndex == -1 || !optimize )
 			{
-				bestDist = HUGE;
+				bestDist = idMath::INFINITUM;
 				bestIndex = -1;
 				bestOtherIndex = 0;
 				aentries = 0;
@@ -2295,4 +2279,3 @@ void codec::VQ( const int numEntries, const int dimension, const unsigned char* 
 	int		endMsec = Sys_Milliseconds();
 	common->Printf( "VQ took %i msec\n", endMsec - startMsec );
 }
-

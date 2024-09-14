@@ -33,15 +33,9 @@ If you have questions concerning this license or the applicable additional terms
 
 int		c_active_brushes;
 
-int		c_nodes;
-
 // if a brush just barely pokes onto the other side,
 // let it slide by without chopping
 #define	PLANESIDE_EPSILON	0.001
-//0.1
-
-
-
 
 /*
 ================
@@ -161,34 +155,6 @@ uBrush_t* CopyBrush( uBrush_t* brush )
 	return newbrush;
 }
 
-
-/*
-================
-DrawBrushList
-================
-*/
-void DrawBrushList( uBrush_t* brush )
-{
-	int		i;
-	side_t*	s;
-
-	GLS_BeginScene();
-	for( ; brush ; brush = brush->next )
-	{
-		for( i = 0 ; i < brush->numsides ; i++ )
-		{
-			s = &brush->sides[i];
-			if( !s->winding )
-			{
-				continue;
-			}
-			GLS_Winding( s->winding, 0 );
-		}
-	}
-	GLS_EndScene();
-}
-
-
 /*
 =============
 PrintBrush
@@ -198,11 +164,11 @@ void PrintBrush( uBrush_t* brush )
 {
 	int		i;
 
-	common->Printf( "brush: %p\n", brush );
+	idLib::Printf( "brush: %p\n", brush );
 	for( i = 0; i < brush->numsides ; i++ )
 	{
 		brush->sides[i].winding->Print();
-		common->Printf( "\n" );
+		idLib::Printf( "\n" );
 	}
 }
 
@@ -391,12 +357,12 @@ void WriteBspBrushMap( const char* name, uBrush_t* list )
 	int			i;
 	idWinding* 	w;
 
-	common->Printf( "writing %s\n", name );
+	idLib::Printf( "writing %s\n", name );
 	f = fileSystem->OpenFileWrite( name );
 
 	if( !f )
 	{
-		common->Error( "Can't write %s\b", name );
+		idLib::Error( "Can't write %s\b", name );
 	}
 
 	f->Printf( "{\n\"classname\" \"worldspawn\"\n" );
@@ -483,12 +449,12 @@ to materials
 */
 void FilterBrushesIntoTree( uEntity_t* e )
 {
-	primitive_t*		prim;
+	primitive_t*			prim;
 	uBrush_t*			b, *newb;
 	int					r;
 	int					c_unique, c_clusters;
 
-	common->Printf( "----- FilterBrushesIntoTree -----\n" );
+	VerbosePrintf( "----- FilterBrushesIntoTree -----\n" );
 
 	c_unique = 0;
 	c_clusters = 0;
@@ -505,8 +471,8 @@ void FilterBrushesIntoTree( uEntity_t* e )
 		c_clusters += r;
 	}
 
-	common->Printf( "%5i total brushes\n", c_unique );
-	common->Printf( "%5i cluster references\n", c_clusters );
+	VerbosePrintf( "%5i total brushes\n", c_unique );
+	VerbosePrintf( "%5i cluster references\n", c_clusters );
 }
 
 
@@ -666,7 +632,7 @@ void SplitBrush( uBrush_t* brush, int planenum, uBrush_t** front, uBrush_t** bac
 
 	if( w->IsHuge() )
 	{
-		common->Printf( "WARNING: huge winding\n" );
+		idLib::Printf( "WARNING: huge winding\n" );
 	}
 
 	midwinding = w;
@@ -734,11 +700,11 @@ void SplitBrush( uBrush_t* brush, int planenum, uBrush_t** front, uBrush_t** bac
 	{
 		if( !b[0] && !b[1] )
 		{
-			common->Printf( "split removed brush\n" );
+			idLib::Printf( "split removed brush\n" );
 		}
 		else
 		{
-			common->Printf( "split not on both sides\n" );
+			idLib::Printf( "split not on both sides\n" );
 		}
 		if( b[0] )
 		{
@@ -782,7 +748,7 @@ void SplitBrush( uBrush_t* brush, int planenum, uBrush_t** front, uBrush_t** bac
 			{
 				FreeBrush( b[i] );
 				b[i] = NULL;
-//			common->Printf ("tiny volume after clip\n");
+//			idLib::Printf ("tiny volume after clip\n");
 			}
 		}
 	}

@@ -11,7 +11,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 project(RBDOOM3 C CXX)
 
-option(USE_CMDLINE_TOOLS "Compile the built-in command line based tools" OFF)
+option(USE_CMDLINE_TOOLS "Compile the built-in command line based tools" ON)
 option(USE_MFC_TOOLS "Compile the built-in MFC based tools" OFF)
 option(STANDALONE "Skip Doom 3 base/ folder" OFF)
 option(FORCE_COLOR_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
@@ -50,7 +50,7 @@ elseif( CMAKE_C_COMPILER_ID MATCHES "Clang" )
 	add_compile_options( -fcolor-diagnostics )
 endif ()
 
-if(NOT MSVC)
+if( NOT MSVC )
 	message( STATUS CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE} )
 endif()
 
@@ -83,10 +83,6 @@ if( CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang" )
 		#include_directories( ${DirectX_INCLUDE_DIR} )
 		#add_definitions( -DUSE_XINPUT )
 	endif()
-
-	#if(NOT ANDROID)
-		add_definitions( -DUSE_EXCEPTIONS )
-	#endif()
 
 	add_compile_options( -Wno-pragmas -Wno-unused-variable -Wno-switch -Wno-unused-value -Winvalid-pch -Wno-multichar )
 	if( CMAKE_C_COMPILER_ID MATCHES "Clang" )
@@ -160,8 +156,7 @@ elseif( MSVC )
 					-D_CRT_SECURE_NO_DEPRECATE
 					-D_CRT_NONSTDC_NO_DEPRECATE
 					-D_CRT_SECURE_NO_WARNINGS
-					-D_MBCS
-					-DUSE_EXCEPTIONS )
+					-D_MBCS )
 
 	#if( WINDOWS10 ) # Windows RT
 	#	add_definitions( -DUSE_WINRT )
@@ -172,24 +167,30 @@ elseif( MSVC )
 	endif()
 
 	if( USE_MFC_TOOLS )
-		add_definitions( -D_AFXDLL )
+		# This is required for tools on windows.
+		find_package( MFC )
+		if( NOT MFC_FOUND )
+			message( WARNING "MFC ('Microsoft Foundation Classes for C++') couldn't be found, but is needed for TOOLS!" )
+			message( WARNING "If you're using VS2013, you'll also need the 'Multibyte MFC Library for Visual Studio 2013': https://www.microsoft.com/en-us/download/details.aspx?id=40770 (VS2015 and 2017 include that in the default MFC package)" )
+		else()
+			set( ALLOWRESOURCES ON )
 
-		# 0: Use Standard Windows Libraries
-		# 1: Use MFC in a Static Library
-		# 2: Use MFC in a Shared DLL
-		set( CMAKE_MFC_FLAG 2 )
+			add_definitions( -D_AFXDLL )
+			add_definitions( -DID_ALLOW_TOOLS )
+
+			# 0: Use Standard Windows Libraries
+			# 1: Use MFC in a Static Library
+			# 2: Use MFC in a Shared DLL
+			set( CMAKE_MFC_FLAG 2 )
+		endif()
 	endif()
 endif()
 
 # CMake only used for desktop builds
-add_definitions(-DID_PC)
+add_definitions(-DID_PC )
 
 if ( USE_INTRINSICS_SSE )
 	add_definitions( -DUSE_INTRINSICS_SSE )
-endif()
-
-if( STANDALONE )
-	add_definitions( -DSTANDALONE )
 endif()
 
 if( RETAIL )
@@ -213,6 +214,9 @@ set( FREETYPE_LIBRARY Freetype::Freetype )
 add_subdirectory(game)
 add_subdirectory(idlib)
 add_subdirectory(libs)
+if( USE_CMDLINE_TOOLS )
+	add_subdirectory(tools/compilers)
+endif()
 
 file(GLOB AAS_INCLUDES aas/*.h)
 file(GLOB AAS_SOURCES aas/*.cpp)
@@ -270,43 +274,13 @@ file(GLOB SYS_SOURCES sys/*.cpp)
 file(GLOB UI_INCLUDES ui/*.h)
 file(GLOB UI_SOURCES ui/*.cpp)
 
-file(GLOB COMPILER_INCLUDES tools/compilers/*.h)
-
-file(GLOB COMPILER_AAS_INCLUDES tools/compilers/aas/*.h)
-file(GLOB COMPILER_AAS_SOURCES tools/compilers/aas/*.cpp)
-
-file(GLOB COMPILER_DMAP_INCLUDES tools/compilers/dmap/*.h)
-file(GLOB COMPILER_DMAP_SOURCES tools/compilers/dmap/*.cpp)
-
-file(GLOB COMPILER_ROQVQ_INCLUDES tools/compilers/roqvq/*.h)
-file(GLOB COMPILER_ROQVQ_SOURCES tools/compilers/roqvq/*.cpp)
-
 set(TOOLS_INCLUDES tools/edit_public.h)
 
 file(GLOB TOOLS_COMAFX_INCLUDES tools/comafx/*.h)
 file(GLOB TOOLS_COMAFX_SOURCES tools/comafx/*.cpp)
 
-set(TOOLS_COMMON_INCLUDES
-	tools/common/ColorButton.h
-	tools/common/DialogHelpers.h
-	tools/common/MaskEdit.h
-	tools/common/OpenFileDialog.h
-	tools/common/PropertyGrid.h
-	tools/common/RegistryOptions.h
-	#tools/common/RenderBumpFlatDialog.h
-	tools/common/RollupPanel.h
-	tools/common/SpinButton.h)
-
-set(TOOLS_COMMON_SOURCES
-	tools/common/AlphaPopup.cpp
-	tools/common/ColorButton.cpp
-	tools/common/MaskEdit.cpp
-	tools/common/OpenFileDialog.cpp
-	tools/common/PropertyGrid.cpp
-	tools/common/RegistryOptions.cpp
-	#tools/common/RenderBumpFlatDialog.cpp
-	tools/common/RollupPanel.cpp
-	tools/common/SpinButton.cpp)
+file(GLOB TOOLS_COMMON_INCLUDES tools/common/*.h)
+file(GLOB TOOLS_COMMON_SOURCES tools/common/*.cpp)
 
 file(GLOB TOOLS_COMMON_PROPTREE_INCLUDES tools/common/PropTree/*.h)
 file(GLOB TOOLS_COMMON_PROPTREE_SOURCES tools/common/PropTree/*.cpp)
@@ -314,50 +288,14 @@ file(GLOB TOOLS_COMMON_PROPTREE_SOURCES tools/common/PropTree/*.cpp)
 file(GLOB EDITOR_AF_INCLUDES tools/af/*.h)
 file(GLOB EDITOR_AF_SOURCES tools/af/*.cpp)
 
-set(EDITOR_DECL_INCLUDES
-	tools/decl/DialogDeclBrowser.h
-	tools/decl/DialogDeclEditor.h
-	tools/decl/DialogDeclNew.h)
-
-set(EDITOR_DECL_SOURCES
-	tools/decl/DialogDeclBrowser.cpp
-	tools/decl/DialogDeclEditor.cpp
-	tools/decl/DialogDeclNew.cpp)
+file(GLOB EDITOR_DECL_INCLUDES tools/decl/*.h)
+file(GLOB EDITOR_DECL_SOURCES tools/decl/*.cpp)
 
 file(GLOB EDITOR_DEBUGGER_INCLUDES tools/debugger/*.h)
 file(GLOB EDITOR_DEBUGGER_SOURCES tools/debugger/*.cpp)
 
 file(GLOB EDITOR_GUIED_INCLUDES tools/guied/*.h)
-set(EDITOR_GUIED_SOURCES
-	tools/guied/GEApp.cpp
-	tools/guied/GECheckInDlg.cpp
-	tools/guied/GEDeleteModifier.cpp
-	tools/guied/GEHideModifier.cpp
-	tools/guied/GEInsertModifier.cpp
-	tools/guied/GEItemPropsDlg.cpp
-	tools/guied/GEItemScriptsDlg.cpp
-	tools/guied/GEKeyValueModifier.cpp
-	tools/guied/GEModifier.cpp
-	tools/guied/GEModifierGroup.cpp
-	tools/guied/GEModifierStack.cpp
-	tools/guied/GEMoveModifier.cpp
-	tools/guied/GENavigator.cpp
-	tools/guied/GEOptions.cpp
-	tools/guied/GEOptionsDlg.cpp
-	tools/guied/GEProperties.cpp
-	tools/guied/GEPropertyPage.cpp
-	tools/guied/GESelectionMgr.cpp
-	tools/guied/GESizeModifier.cpp
-	tools/guied/GEStateModifier.cpp
-	tools/guied/GEStatusBar.cpp
-	tools/guied/GETransformer.cpp
-	tools/guied/GEViewer.cpp
-	tools/guied/GEWindowWrapper.cpp
-	#tools/guied/GEWindowWrapper_stub.cpp
-	tools/guied/GEWorkspace.cpp
-	tools/guied/GEWorkspaceFile.cpp
-	tools/guied/GEZOrderModifier.cpp
-	tools/guied/guied.cpp)
+file(GLOB EDITOR_GUIED_SOURCES tools/guied/*.cpp)
 
 file(GLOB EDITOR_MATERIALEDITOR_INCLUDES tools/materialeditor/*.h)
 file(GLOB EDITOR_MATERIALEDITOR_SOURCES tools/materialeditor/*.cpp)
@@ -393,37 +331,30 @@ else()
 	list(APPEND WIN32_RESOURCES sys/win32/rc/doom_nomfc.rc)
 endif()
 
-
 set(POSIX_INCLUDES
-	sys/posix/posix_public.h
-	)
+	sys/posix/posix_public.h)
 
 set(POSIX_SOURCES
 	sys/posix/posix_net.cpp
 	sys/posix/posix_main.cpp
 	sys/posix/posix_signal.cpp
-	sys/posix/posix_threads.cpp
-	)
+	sys/posix/posix_threads.cpp)
 
 set(LINUX_INCLUDES
-	sys/linux/sound.h
-	)
+	sys/linux/sound.h)
 
 set(LINUX_SOURCES
 	sys/linux/linux_main.cpp
 	sys/linux/sound.cpp
 	sys/linux/sound_pulse.cpp
-	sys/linux/stack.cpp
-	)
+	sys/linux/stack.cpp)
 
 set(SDL_INCLUDES
-	sys/sdl/sdl_local.h
-	)
+	sys/sdl/sdl_local.h)
 
 set(SDL_SOURCES
 	sys/sdl/sdl_events.cpp
-	sys/sdl/sdl_glimp.cpp
-	)
+	sys/sdl/sdl_glimp.cpp)
 
 source_group("AAS" FILES ${AAS_INCLUDES})
 source_group("AAS" FILES ${AAS_SOURCES})
@@ -449,21 +380,21 @@ source_group("Renderer\\Jobs\\StaticShadowVolume" FILES ${RENDERER_JOBS_STATICSH
 source_group("Renderer\\Jobs\\StaticShadowVolume" FILES ${RENDERER_JOBS_STATICSHADOWVOLUME_SOURCES})
 source_group("Renderer\\OpenGL" FILES ${RENDERER_OPENGL_INCLUDES})
 source_group("Renderer\\OpenGL" FILES ${RENDERER_OPENGL_SOURCES})
-source_group("renderer\\Vulkan" FILES ${RENDERER_VULKAN_INCLUDES})
-source_group("renderer\\Vulkan" FILES ${RENDERER_VULKAN_SOURCES})
-source_group("renderer\\SMAA" FILES ${RENDERER_SMAA_INCLUDES})
+source_group("Renderer\\Vulkan" FILES ${RENDERER_VULKAN_INCLUDES})
+source_group("Renderer\\Vulkan" FILES ${RENDERER_VULKAN_SOURCES})
+source_group("Renderer\\SMAA" FILES ${RENDERER_SMAA_INCLUDES})
 
-source_group("renderer\\Shaders" FILES ${SHADERS})
-source_group("renderer\\Shaders\\builtin" FILES ${SHADERS_BUILTIN})
-source_group("renderer\\Shaders\\builtin\\debug" FILES ${SHADERS_BUILTIN_DEBUG})
-source_group("renderer\\Shaders\\builtin\\fog" FILES ${SHADERS_BUILTIN_FOG})
-source_group("renderer\\Shaders\\builtin\\legacy" FILES ${SHADERS_BUILTIN_LEGACY})
-source_group("renderer\\Shaders\\builtin\\lighting" FILES ${SHADERS_BUILTIN_LIGHTING})
-source_group("renderer\\Shaders\\builtin\\post" FILES ${SHADERS_BUILTIN_POST})
-source_group("renderer\\Shaders\\builtin\\SSAO" FILES ${SHADERS_BUILTIN_SSAO})
-source_group("renderer\\Shaders\\builtin\\SSGI" FILES ${SHADERS_BUILTIN_SSGI})
-source_group("renderer\\Shaders\\builtin\\video" FILES ${SHADERS_BUILTIN_VIDEO})
-source_group("renderer\\Shaders\\builtin\\VR" FILES ${SHADERS_BUILTIN_VR})
+source_group("Renderer\\Shaders" FILES ${SHADERS})
+source_group("Renderer\\Shaders\\builtin" FILES ${SHADERS_BUILTIN})
+source_group("Renderer\\Shaders\\builtin\\debug" FILES ${SHADERS_BUILTIN_DEBUG})
+source_group("Renderer\\Shaders\\builtin\\fog" FILES ${SHADERS_BUILTIN_FOG})
+source_group("Renderer\\Shaders\\builtin\\legacy" FILES ${SHADERS_BUILTIN_LEGACY})
+source_group("Renderer\\Shaders\\builtin\\lighting" FILES ${SHADERS_BUILTIN_LIGHTING})
+source_group("Renderer\\Shaders\\builtin\\post" FILES ${SHADERS_BUILTIN_POST})
+source_group("Renderer\\Shaders\\builtin\\SSAO" FILES ${SHADERS_BUILTIN_SSAO})
+source_group("Renderer\\Shaders\\builtin\\SSGI" FILES ${SHADERS_BUILTIN_SSGI})
+source_group("Renderer\\Shaders\\builtin\\video" FILES ${SHADERS_BUILTIN_VIDEO})
+source_group("Renderer\\Shaders\\builtin\\VR" FILES ${SHADERS_BUILTIN_VR})
 
 source_group("Sound" FILES ${SOUND_INCLUDES})
 source_group("Sound" FILES ${SOUND_SOURCES})
@@ -484,13 +415,6 @@ source_group("Sys\\Win32" FILES ${WIN32_INCLUDES})
 source_group("Sys\\Win32" FILES ${WIN32_SOURCES})
 source_group("Sys\\Win32\\Resources" FILES ${WIN32_RESOURCES})
 
-source_group("tools\\compilers" FILES ${COMPILER_INCLUDES})
-source_group("tools\\compilers\\aas" FILES ${COMPILER_AAS_INCLUDES})
-source_group("tools\\compilers\\aas" FILES ${COMPILER_AAS_SOURCES})
-source_group("tools\\compilers\\dmap" FILES ${COMPILER_DMAP_INCLUDES})
-source_group("tools\\compilers\\dmap" FILES ${COMPILER_DMAP_SOURCES})
-source_group("tools\\compilers\\roqvq" FILES ${COMPILER_ROQVQ_INCLUDES})
-source_group("tools\\compilers\\roqvq" FILES ${COMPILER_ROQVQ_SOURCES})
 source_group("tools" FILES ${TOOLS_INCLUDES})
 source_group("tools\\comafx" FILES ${TOOLS_COMAFX_INCLUDES})
 source_group("tools\\comafx" FILES ${TOOLS_COMAFX_SOURCES})
@@ -565,22 +489,10 @@ set(TEKUUM_SOURCES
 
 add_definitions(-D__DOOM__
 				-D__DOOM_DLL__
-				-DBUILD_FREETYPE
-				-DFT2_BUILD_LIBRARY)
+				-DBUILD_FREETYPE)
 
-if(USE_CMDLINE_TOOLS)
-	add_definitions(-DUSE_CMDLINE_TOOLS)
-
-	list(APPEND TEKUUM_INCLUDES
-		${COMPILER_INCLUDES}
-		${COMPILER_AAS_INCLUDES}
-		${COMPILER_DMAP_INCLUDES}
-		${COMPILER_ROQVQ_INCLUDES})
-
-	list(APPEND TEKUUM_SOURCES
-		${COMPILER_AAS_SOURCES}
-		${COMPILER_DMAP_SOURCES}
-		${COMPILER_ROQVQ_SOURCES})
+if( USE_CMDLINE_TOOLS )
+	add_definitions( -DID_ALLOW_CMD_TOOLS )
 endif()
 
 include_directories(
@@ -862,6 +774,11 @@ elseif( UNIX )
 		pulse
 		pulse-simple
 		${SDLx_LIBRARY})
+endif()
+
+if( USE_CMDLINE_TOOLS )
+	target_link_libraries(${PROJECT_NAME}
+		cmdtools)
 endif()
 
 set_target_properties( ${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:>${CMAKE_SOURCE_DIR}/.. LIBRARY_OUTPUT_DIRECTORY $<1:>${CMAKE_SOURCE_DIR}/.. )

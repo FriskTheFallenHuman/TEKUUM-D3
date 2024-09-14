@@ -27,7 +27,7 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
-#include "../../../renderer/tr_local.h"
+#include "../../../renderer/RenderCommon.h"
 
 
 typedef struct primitive_s
@@ -37,7 +37,6 @@ typedef struct primitive_s
 	// only one of these will be non-NULL
 	struct bspbrush_s* 	brush;
 	struct mapTri_s* 	tris;
-	struct mapTri_s*	bsptris;
 } primitive_t;
 
 
@@ -67,15 +66,6 @@ typedef struct mapTri_s
 
 	const idMaterial* 	material;
 	void* 				mergeGroup;		// we want to avoid merging triangles
-
-	// RB begin
-	int					polygonId;		// n-gon number from original face used for area portal construction
-
-	const MapPolygonMesh*	originalMapMesh;
-//	idWinding* 			visibleHull;	// also clipped to the solid parts of the world
-
-	// RB end
-
 	// from different fixed groups, like guiSurfs and mirrors
 	int					planeNum;			// not set universally, just in some areas
 
@@ -170,10 +160,8 @@ typedef struct node_s
 	// leafs only
 	bool				opaque;		// view can never be inside
 
-	// RB: needed for areaportal construction
 	uBrush_t* 			brushlist;	// fragments of all brushes in this leaf
-	mapTri_t*			areaPortalTris;
-	// --
+	// needed for FindSideForPortal
 
 	int					area;		// determined by flood filling up to areaportals
 	int					occupied;	// 1 or greater can reach entity
@@ -205,26 +193,9 @@ typedef struct tree_s
 typedef struct
 {
 	idRenderLightLocal	def;
-	char				name[MAX_QPATH];		// for naming the shadow volume surface and interactions
-	srfTriangles_t*		shadowTris;
 
 	idPlane				frustumPlanes[6];		// RB: should be calculated after R_DeriveLightData()
-
-	// RB: extra info for vertex lighting
-	int					photons;
-	// RB end
 } mapLight_t;
-
-// RB begin
-/*
-struct lightGridPoint_t
-{
-	idVec3          ambient;
-	idVec3          directed;
-	idVec3          dir;
-};
-*/
-// RB end
 
 #define	MAX_GROUP_LIGHTS	16
 
@@ -275,6 +246,84 @@ typedef enum
 	SO_SIL_OPTIMIZE		// 5
 } shadowOptLevel_t;
 
+class dmapTimingStats
+{
+public:
+	dmapTimingStats()
+	{
+		Reset();
+	}
+
+	void Reset()
+	{
+		num = 0;
+		sum = 0;
+		min = 0;
+		max = 0;
+	}
+
+	void Start()
+	{
+		start_ms = Sys_Milliseconds();
+	}
+
+	void Stop()
+	{
+		int ms = Sys_Milliseconds() - start_ms;
+
+		sum += ms;
+
+		if( ms < min )
+		{
+			min = ms;
+		}
+
+		if( ms > max )
+		{
+			max = ms;
+		}
+
+		++num;
+	}
+
+	int Min() const
+	{
+		return min;
+	}
+
+	int Max() const
+	{
+		return max;
+	}
+
+	int Num() const
+	{
+		return num;
+	}
+
+	int Sum() const
+	{
+		return sum;
+	}
+
+	float Avg() const
+	{
+		if( num <= 0 )
+		{
+			return 0.0f;
+		}
+
+		return static_cast<float>( sum ) / num;
+	}
+
+private:
+	int start_ms;
+	int sum;
+	int min;
+	int max;
+	int num;
+};
+
 typedef struct
 {
 	// mapFileBase will contain the qpath without any extension: "maps/test_box"
@@ -291,16 +340,8 @@ typedef struct
 
 	idList<mapLight_t*>	mapLights;
 
-	// RB begin
-	idVec3		lightGridMins;
-	idVec3		lightGridSize;
-	int			lightGridBounds[3];
-	idList<lightGridPoint_t> lightGridPoints;
-	// RB end
-
 	bool	verbose;
 
-	bool	glview;
 	bool	noOptimize;
 	bool	verboseentities;
 	bool	noCurves;
@@ -313,15 +354,32 @@ typedef struct
 	bool	noLightCarve;		// extra triangle subdivision by light frustums
 	shadowOptLevel_t	shadowOptLevel;
 	bool	noShadow;			// don't create optimized shadow volumes
+	bool	noStats;			// don't print timing stats
+	bool	noCM;				// don't create collision map
+	bool	noAAS;				// don't create AAS files
 
 	idBounds	drawBounds;
 	bool	drawflag;
 
 	int		totalShadowTriangles;
 	int		totalShadowVerts;
+
+	// Time stats
+	dmapTimingStats timingMakeStructural;
+	dmapTimingStats timingMakeTreePortals;
+	dmapTimingStats timingFilterBrushesIntoTree;
+	dmapTimingStats timingFloodAndFill;
+	dmapTimingStats timingClipSidesByTree;
+	dmapTimingStats timingFloodAreas;
+	dmapTimingStats timingPutPrimitivesInAreas;
+	dmapTimingStats timingPreLight;
+	dmapTimingStats timingOptimize;
+	dmapTimingStats timingFixTJunctions;
 } dmapGlobals_t;
 
 extern dmapGlobals_t dmapGlobals;
+
+#define VerbosePrintf( x, ... ) idLib::PrintfIf( !dmapGlobals.verbose, x, ##__VA_ARGS__ )
 
 int FindFloatPlane( const idPlane& plane, bool* fixedDegeneracies = NULL );
 
@@ -344,7 +402,6 @@ uBrush_t* AllocBrush( int numsides );
 void FreeBrush( uBrush_t* brushes );
 void FreeBrushList( uBrush_t* brushes );
 uBrush_t* CopyBrush( uBrush_t* brush );
-void DrawBrushList( uBrush_t* brush );
 void PrintBrush( uBrush_t* brush );
 bool BoundBrush( uBrush_t* brush );
 bool CreateBrushWindings( uBrush_t* brush );
@@ -368,54 +425,24 @@ void		FreeDMapFile();
 
 //=============================================================================
 
-// draw.cpp -- draw debug views either directly, or through glserv.exe
-
-void Draw_ClearWindow();
-void DrawWinding( const idWinding* w );
-void DrawAuxWinding( const idWinding* w );
-
-void DrawLine( idVec3 v1, idVec3 v2, int color );
-
-void GLS_BeginScene();
-void GLS_Winding( const idWinding* w, int code );
-void GLS_Triangle( const mapTri_t* tri, int code );
-void GLS_EndScene();
-
-
-
-//=============================================================================
-
 // portals.cpp
 
 #define	MAX_INTER_AREA_PORTALS	1024
 
-struct interAreaPortal_t
+typedef struct
 {
-	int				area0, area1;
-	side_t*			side = NULL;
+	int		area0, area1;
+	side_t*	side;
+} interAreaPortal_t;
 
-	// RB begin
-	int				polygonId;
-	idFixedWinding	w;
-	// RB end
-};
-
-extern idList<interAreaPortal_t> interAreaPortals;
+extern	interAreaPortal_t interAreaPortals[MAX_INTER_AREA_PORTALS];
+extern	int					numInterAreaPortals;
 
 bool FloodEntities( tree_t* tree );
 void FillOutside( uEntity_t* e );
 void FloodAreas( uEntity_t* e );
 void MakeTreePortals( tree_t* tree );
 void FreePortal( uPortal_t* p );
-
-//=============================================================================
-
-// glfile.cpp -- write a debug file to be viewd with glview.exe
-
-void OutputWinding( idWinding* w, idFile* glview );
-
-void WriteGLView( tree_t* tree, const char* source, int entityNum, bool force = false );
-void WriteGLView( bspface_t* list, const char* source );
 
 //=============================================================================
 
@@ -436,24 +463,15 @@ void FreeTreePortals_r( node_t* node );
 
 
 bspface_t*	MakeStructuralBspFaceList( primitive_t* list );
-//bspface_t*	MakeVisibleBspFaceList( primitive_t* list );
 tree_t*		FaceBSP( bspface_t* list );
-
-node_t*		NodeForPoint( node_t* node, const idVec3& origin );
 
 //=============================================================================
 
 // surface.cpp
 
-mapTri_t* CullTrisInOpaqueLeafs( mapTri_t* triList, tree_t* tree );
 void	ClipSidesByTree( uEntity_t* e );
-void	SplitTrisToSurfaces( mapTri_t* triList, tree_t* tree );
 void	PutPrimitivesInAreas( uEntity_t* e );
 void	Prelight( uEntity_t* e );
-
-// RB begin
-void	FilterMeshesIntoTree( uEntity_t* e );
-// RB end
 
 //=============================================================================
 
@@ -530,7 +548,6 @@ mapTri_t*	CopyMapTri( const mapTri_t* tri );
 float		MapTriArea( const mapTri_t* tri );
 mapTri_t*	RemoveBadTris( const mapTri_t* tri );
 void		BoundTriList( const mapTri_t* list, idBounds& b );
-void		DrawTri( const mapTri_t* tri );
 void		FlipTriList( mapTri_t* tris );
 void		TriVertsFromOriginal( mapTri_t* tri, const mapTri_t* original );
 void		PlaneForTri( const mapTri_t* tri, idPlane& plane );
@@ -542,17 +559,8 @@ void		ClipTriList( const mapTri_t* list, const idPlane& plane, float epsilon, ma
 
 // output.cpp
 
-int			NumberNodes_r( node_t* node, int nextNumber );
-
 srfTriangles_t*	ShareMapTriVerts( const mapTri_t* tris );
 void WriteOutputFile();
 
 //=============================================================================
 
-// RB begin
-
-// light.cpp --	Q3A style vertex lighting and lightgrid calculation
-
-void		LightWorld();
-
-// RB end

@@ -53,9 +53,9 @@ If you have questions concerning this license or the applicable additional terms
 
   A case that causes recursive overflow with point to triangle fixing:
 
-               A
+			   A
 	C            D
-	           B
+			   B
 
   Triangle ABC tests against point D and splits into triangles ADC and DBC
   Triangle DBC then tests against point A again and splits into ABC and ADB
@@ -135,13 +135,6 @@ struct hashVert_s*	GetHashVert( idVec3& v )
 	// this could still fail to find a near neighbor right at the hash block boundary
 	for( hv = hashVerts[block[0]][block[1]][block[2]] ; hv ; hv = hv->next )
 	{
-#if 0
-		if( hv->iv[0] == iv[0] && hv->iv[1] == iv[1] && hv->iv[2] == iv[2] )
-		{
-			VectorCopy( hv->v, v );
-			return hv;
-		}
-#else
 		for( i = 0 ; i < 3 ; i++ )
 		{
 			int	d;
@@ -156,7 +149,6 @@ struct hashVert_s*	GetHashVert( idVec3& v )
 			v = hv->v;
 			return hv;
 		}
-#endif
 	}
 
 	// create a new one
@@ -352,6 +344,8 @@ static mapTri_t* FixTriangleAgainstHashVert( const mapTri_t* a, const hashVert_t
 		return NULL;
 	}
 
+	split.Clear();
+
 	// we probably should find the edge that the vertex is closest to.
 	// it is possible to be < 1 unit away from multiple
 	// edges, but we only want to split by one of them
@@ -386,7 +380,6 @@ static mapTri_t* FixTriangleAgainstHashVert( const mapTri_t* a, const hashVert_t
 		split.xyz = *v;
 		frac = d / len;
 
-		// RB begin
 		const idVec2 v1ST = v1->GetTexCoord();
 		const idVec2 v2ST = v2->GetTexCoord();
 
@@ -403,7 +396,6 @@ static mapTri_t* FixTriangleAgainstHashVert( const mapTri_t* a, const hashVert_t
 		splitNormal.Normalize();
 
 		split.SetNormal( splitNormal );
-		// RB end
 
 		// split the tri
 		new1 = CopyMapTri( a );
@@ -419,7 +411,7 @@ static mapTri_t* FixTriangleAgainstHashVert( const mapTri_t* a, const hashVert_t
 		plane1.FromPoints( new1->hashVert[0]->v, new1->hashVert[1]->v, new1->hashVert[2]->v );
 		plane2.FromPoints( new2->hashVert[0]->v, new2->hashVert[1]->v, new2->hashVert[2]->v );
 
-		d = DotProduct( plane1, plane2 );
+		d = plane1.Normal() * plane2.Normal();
 
 		// if the two split triangle's normals don't face the same way,
 		// it should not be split
@@ -548,11 +540,8 @@ void	FixAreaGroupsTjunctions( optimizeGroup_t* groupList )
 
 	startCount = CountGroupListTris( groupList );
 
-	if( dmapGlobals.verbose )
-	{
-		common->Printf( "----- FixAreaGroupsTjunctions -----\n" );
-		common->Printf( "%6i triangles in\n", startCount );
-	}
+	VerbosePrintf( "----- FixAreaGroupsTjunctions -----\n" );
+	VerbosePrintf( "%6i triangles in\n", startCount );
 
 	HashTriangles( groupList );
 
@@ -575,10 +564,7 @@ void	FixAreaGroupsTjunctions( optimizeGroup_t* groupList )
 	}
 
 	endCount = CountGroupListTris( groupList );
-	if( dmapGlobals.verbose )
-	{
-		common->Printf( "%6i triangles out\n", endCount );
-	}
+	VerbosePrintf( "%6i triangles out\n", endCount );
 }
 
 
@@ -611,7 +597,7 @@ void	FixGlobalTjunctions( uEntity_t* e )
 	optimizeGroup_t*	group;
 	int			areaNum;
 
-	common->Printf( "----- FixGlobalTjunctions -----\n" );
+	VerbosePrintf( "----- FixGlobalTjunctions -----\n" );
 
 	// clear the hash tables
 	memset( hashVerts, 0, sizeof( hashVerts ) );
@@ -687,14 +673,16 @@ void	FixGlobalTjunctions( uEntity_t* e )
 			{
 				continue;
 			}
-			if( !strstr( modelName, ".lwo" ) && !strstr( modelName, ".ase" ) && !strstr( modelName, ".ma" ) )
+
+			// RB: DAE and OBJ support
+			if( !strstr( modelName, ".lwo" ) && !strstr( modelName, ".ase" ) && !strstr( modelName, ".ma" ) && !strstr( modelName, ".dae" ) && !strstr( modelName, ".obj" ) )
 			{
 				continue;
 			}
 
 			idRenderModel*	model = renderModelManager->FindModel( modelName );
 
-//			common->Printf( "adding T junction verts for %s.\n", entity->mapEntity->epairs.GetString( "name" ) );
+//			idLib::Printf( "adding T junction verts for %s.\n", entity->mapEntity->epairs.GetString( "name" ) );
 
 			idMat3	axis;
 			// get the rotation matrix in either full form, or single angle form

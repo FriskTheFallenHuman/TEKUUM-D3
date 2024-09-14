@@ -28,8 +28,6 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __quaddefs_h__
 #define __quaddefs_h__
 
-#pragma once
-
 #define DEP 0
 #define FCC 1
 #define CCC 2
@@ -58,7 +56,7 @@ If you have questions concerning this license or the applicable additional terms
 #define MAXSIZE		16
 #define MINSIZE		4
 
-#define RoQ_ID 			0x1084
+#define RoQ_ID			0x1084
 #define	RoQ_QUAD		0x1000
 #define	RoQ_PUZZLE_QUAD	0x1003
 #define RoQ_QUAD_HANG	0x1013

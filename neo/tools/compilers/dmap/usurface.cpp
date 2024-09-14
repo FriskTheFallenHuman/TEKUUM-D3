@@ -244,7 +244,7 @@ mapTri_t* TriListForSide( const side_t* s, const idWinding* w )
 				dv->SetNormal( dmapGlobals.mapPlanes[s->planenum].Normal() );
 				if( dv->GetNormal().Length() < 0.9 || dv->GetNormal().Length() > 1.1 )
 				{
-					common->Error( "Bad normal in TriListForSide" );
+					idLib::Error( "Bad normal in TriListForSide" );
 				}
 			}
 		}
@@ -291,7 +291,7 @@ mapTri_t* TriListForSide( const side_t* s, const idWinding* w )
 				dv->SetNormal( dmapGlobals.mapPlanes[s->planenum].Normal() );
 				if( dv->GetNormal().Length() < 0.9f || dv->GetNormal().Length() > 1.1f )
 				{
-					common->Error( "Bad normal in TriListForSide" );
+					idLib::Error( "Bad normal in TriListForSide" );
 				}
 			}
 		}
@@ -367,58 +367,6 @@ static void ClipSideByTree_r( idWinding* w, side_t* side, node_t* node )
 	return;
 }
 
-// RB begin
-/*
-static void ClipTriByTree_r( idWinding* w, mapTri_t* originalTri, node_t* node )
-{
-	idWinding*		front, *back;
-
-	if( !w )
-	{
-		return;
-	}
-
-	if( node->planenum != PLANENUM_LEAF )
-	{
-		if( originalTri->planeNum == node->planenum )
-		{
-			ClipTriByTree_r( w, originalTri, node->children[0] );
-			return;
-		}
-		if( originalTri->planeNum == ( node->planenum ^ 1 ) )
-		{
-			ClipTriByTree_r( w, originalTri, node->children[1] );
-			return;
-		}
-
-		w->Split( dmapGlobals.mapPlanes[ node->planenum ], ON_EPSILON, &front, &back );
-		delete w;
-
-		ClipTriByTree_r( front, originalTri, node->children[0] );
-		ClipTriByTree_r( back, originalTri, node->children[1] );
-
-		return;
-	}
-
-	// if opaque leaf, don't add
-	if( !node->opaque )
-	{
-		if( !originalTri->visibleHull )
-		{
-			originalTri->visibleHull = w->Copy();
-		}
-		else
-		{
-			originalTri->visibleHull->AddToConvexHull( w, dmapGlobals.mapPlanes[ originalTri->planeNum ].Normal() );
-		}
-	}
-
-	delete w;
-	return;
-}
-*/
-// RB end
-
 /*
 =====================
 ClipSidesByTree
@@ -436,12 +384,9 @@ void ClipSidesByTree( uEntity_t* e )
 	int				i;
 	idWinding*		w;
 	side_t*			side;
-	primitive_t*	prim;
-//	mapTri_t*		tri;
+	primitive_t*		prim;
 
-	common->Printf( "----- ClipSidesByTree -----\n" );
-
-	int c_tris = 0;
+	VerbosePrintf( "----- ClipSidesByTree -----\n" );
 
 	for( prim = e->primitives ; prim ; prim = prim->next )
 	{
@@ -449,52 +394,8 @@ void ClipSidesByTree( uEntity_t* e )
 		if( !b )
 		{
 			// FIXME: other primitives!
-
-			// RB: add new polygon mesh
-#if 0
-			for( tri = prim->bsptris ; tri ; tri = tri->next, c_tris++ )
-			{
-#if 0
-				for( int i = 0; i < 3; i++ )
-				{
-					const idVec3& testPos = tri->v[i].xyz;
-
-					node_t* node = NodeForPoint( e->tree->headnode, testPos );
-
-					if( node->opaque )
-					{
-						common->Printf( "ClipSidesByTree: triangle %i vertex %i in the void at %s\n", c_tris, i, testPos.ToString() );
-					}
-					else
-					{
-						common->Printf( "ClipSidesByTree: triangle %i vertex %i valid at %s\n", c_tris, i, testPos.ToString() );
-					}
-				}
-#endif
-
-				idWinding* w = WindingForTri( tri );
-
-				// evil HACK
-				//w->BaseForPlane( dmapGlobals.mapPlanes[ tri->planeNum] );
-				//w->ReverseSelf();
-
-				tri->visibleHull = NULL;
-				ClipTriByTree_r( w, tri, e->tree->headnode );
-
-				// for debugging, we can choose to use the entire original side
-				// but we skip this if the side was completely clipped away
-				if( tri->visibleHull && dmapGlobals.noClipSides )
-				{
-					delete tri->visibleHull;
-					tri->visibleHull = WindingForTri( tri );
-				}
-			}
-#endif
-			// RB end
-
 			continue;
 		}
-
 		for( i = 0 ; i < b->numsides ; i++ )
 		{
 			side = &b->sides[i];
@@ -502,34 +403,9 @@ void ClipSidesByTree( uEntity_t* e )
 			{
 				continue;
 			}
-
 			w = side->winding->Copy();
 			side->visibleHull = NULL;
 			ClipSideByTree_r( w, side, e->tree->headnode );
-
-
-#if 0
-			if( side->visibleHull )
-			{
-				for( int j = 0; j < side->winding->GetNumPoints(); j++ )
-				{
-					idWinding* w = side->winding;
-					const idVec5& testPos = ( *w )[j];
-
-					node_t* node = NodeForPoint( e->tree->headnode, testPos.ToVec3() );
-
-					if( node->opaque )
-					{
-						common->Printf( "ClipSidesByTree: winding %i vertex %i in the void at %s\n", i, j, testPos.ToString() );
-					}
-					else
-					{
-						common->Printf( "ClipSidesByTree: winding %i vertex %i valid at %s\n", i, j, testPos.ToString() );
-					}
-				}
-			}
-#endif
-
 			// for debugging, we can choose to use the entire original side
 			// but we skip this if the side was completely clipped away
 			if( side->visibleHull && dmapGlobals.noClipSides )
@@ -564,8 +440,6 @@ void ClipTriIntoTree_r( idWinding* w, mapTri_t* originalTri, uEntity_t* e, node_
 
 	if( node->planenum != PLANENUM_LEAF )
 	{
-		//common->Printf( "ClipTriIntoTree_r: splitting triangle with splitplane %i\n", node->nodeNumber );
-
 		w->Split( dmapGlobals.mapPlanes[ node->planenum ], ON_EPSILON, &front, &back );
 		delete w;
 
@@ -574,8 +448,6 @@ void ClipTriIntoTree_r( idWinding* w, mapTri_t* originalTri, uEntity_t* e, node_
 
 		return;
 	}
-
-	//common->Printf( "ClipTriIntoTree_r: leaf area = %i, opaque = %i, occupied = %i\n", node->area, node->occupied );
 
 	// if opaque leaf, don't add
 	if( !node->opaque && node->area >= 0 )
@@ -598,8 +470,6 @@ void ClipTriIntoTree_r( idWinding* w, mapTri_t* originalTri, uEntity_t* e, node_
 	delete w;
 	return;
 }
-
-
 
 
 
@@ -734,8 +604,6 @@ static void PutWindingIntoAreas_r( uEntity_t* e, const idWinding* w, side_t* sid
 		return;
 	}
 
-	//common->Printf( "PutWindingIntoAreas_r: leaf area = %i, opaque = %i\n", node->area, (int) node->opaque );
-
 	// if opaque leaf, don't add
 	if( node->area >= 0 && !node->opaque )
 	{
@@ -745,97 +613,6 @@ static void PutWindingIntoAreas_r( uEntity_t* e, const idWinding* w, side_t* sid
 		AddTriListToArea( e, tri, side->planenum, node->area, &side->texVec );
 	}
 }
-
-// RB begin
-static void PutTriIntoAreas_r( uEntity_t* e, const idWinding* w, mapTri_t* originalTri, node_t* node )
-{
-	idWinding*		front, *back;
-	int				area;
-
-	if( !w )
-	{
-		return;
-	}
-
-	if( node->planenum != PLANENUM_LEAF )
-	{
-		if( originalTri->planeNum == node->planenum )
-		{
-			PutTriIntoAreas_r( e, w, originalTri, node->children[0] );
-			return;
-		}
-
-		if( originalTri->planeNum == ( node->planenum ^ 1 ) )
-		{
-			PutTriIntoAreas_r( e, w, originalTri, node->children[1] );
-			return;
-		}
-
-		// see if we need to split it
-		// adding the "noFragment" flag to big surfaces like sky boxes
-		// will avoid potentially dicing them up into tons of triangles
-		// that take forever to optimize back together
-		if( !dmapGlobals.fullCarve || originalTri->material->NoFragment() )
-		{
-			area = CheckWindingInAreas_r( w, node );
-			if( area >= 0 )
-			{
-				mapTri_t*	list;
-				int			planeNum;
-				idPlane		plane;
-				textureVectors_t	texVec;
-
-				list = WindingToTriList( w, originalTri );
-
-				PlaneForTri( originalTri, plane );
-				planeNum = FindFloatPlane( plane );
-
-				TexVecForTri( &texVec, originalTri );
-
-				// put in single area
-				AddTriListToArea( e, list, planeNum, area, &texVec );
-				return;
-			}
-		}
-
-		w->Split( dmapGlobals.mapPlanes[ node->planenum ], ON_EPSILON, &front, &back );
-
-		PutTriIntoAreas_r( e, front, originalTri, node->children[0] );
-		if( front )
-		{
-			delete front;
-		}
-
-		PutTriIntoAreas_r( e, back, originalTri, node->children[1] );
-		if( back )
-		{
-			delete back;
-		}
-
-		return;
-	}
-
-	common->Printf( "PutTriIntoAreas_r: leaf area = %i, opaque = %i\n", node->area, ( int ) node->opaque );
-
-	// if opaque leaf, don't add
-	if( node->area >= 0 && !node->opaque )
-	{
-		mapTri_t*	list;
-		int			planeNum;
-		idPlane		plane;
-		textureVectors_t	texVec;
-
-		list = WindingToTriList( w, originalTri );
-
-		PlaneForTri( originalTri, plane );
-		planeNum = FindFloatPlane( plane );
-
-		TexVecForTri( &texVec, originalTri );
-
-		AddTriListToArea( e, list, planeNum, node->area, &texVec );
-	}
-}
-// RB end
 
 /*
 ==================
@@ -909,7 +686,7 @@ void PutPrimitivesInAreas( uEntity_t* e )
 	primitive_t*		prim;
 	mapTri_t*		tri;
 
-	common->Printf( "----- PutPrimitivesInAreas -----\n" );
+	VerbosePrintf( "----- PutPrimitivesInAreas -----\n" );
 
 	// allocate space for surface chains for each area
 	e->areas = ( uArea_t* )Mem_Alloc( e->numAreas * sizeof( e->areas[0] ) );
@@ -928,53 +705,6 @@ void PutPrimitivesInAreas( uEntity_t* e )
 			{
 				AddMapTriToAreas( tri, e );
 			}
-
-			// RB: add new polygon mesh
-			for( tri = prim->bsptris ; tri ; tri = tri->next )
-			{
-
-#if 1
-				// FIXME reverse vertex order for drawing
-				idDrawVert tmp = tri->v[0];
-				tri->v[0] = tri->v[2];
-				tri->v[2] = tmp;
-#endif
-
-#if 0
-				// move tri inwards along face normal
-				//idPlane& plane = dmapGlobals.mapPlanes[ tri->planeNum ];
-
-				idPlane plane;
-				plane.FromPoints( tri->v[0].xyz, tri->v[1].xyz, tri->v[2].xyz );
-
-				for( i = 0; i < 3; i++ )
-				{
-					tri->v[i].xyz += ( plane.Normal() * 1 );
-				}
-#endif
-
-#if 1
-				AddMapTriToAreas( tri, e );
-#elif 0
-				idWinding* w = WindingForTri( tri );
-
-				PutTriIntoAreas_r( e,  w, tri, e->tree->headnode );
-
-				delete w;
-#else
-				if( !tri->visibleHull )
-				{
-					continue;
-				}
-
-				//
-				PutTriIntoAreas_r( e,  tri->visibleHull, tri, e->tree->headnode );
-
-				delete tri->visibleHull;
-				tri->visibleHull = NULL;
-#endif
-			}
-			// RB end
 			continue;
 		}
 
@@ -1015,7 +745,7 @@ void PutPrimitivesInAreas( uEntity_t* e )
 			}
 			idRenderModel*	model = renderModelManager->FindModel( modelName );
 
-			common->Printf( "inlining %s.\n", entity->mapEntity->epairs.GetString( "name" ) );
+			idLib::Printf( "inlining %s.\n", entity->mapEntity->epairs.GetString( "name" ) );
 
 			idMat3	axis;
 			// get the rotation matrix in either full form, or single angle form
@@ -1067,100 +797,6 @@ void PutPrimitivesInAreas( uEntity_t* e )
 
 //============================================================================
 
-
-// RB begin
-int FilterMeshesIntoTree_r( idWinding* w, mapTri_t* originalTri, node_t* node )
-{
-	idWinding*		front, *back;
-	int				c;
-
-	if( !w )
-	{
-		return 0;
-	}
-
-	if( node->planenum == PLANENUM_LEAF )
-	{
-		// add it to the leaf list
-		if( originalTri->material->GetContentFlags() & CONTENTS_AREAPORTAL )
-		{
-			mapTri_t* list = CopyMapTri( originalTri );
-			list->next = NULL;
-
-			node->areaPortalTris = MergeTriLists( node->areaPortalTris, list );
-		}
-
-		const MapPolygonMesh* mapMesh = originalTri->originalMapMesh;
-
-		// classify the leaf by the structural brush
-		if( mapMesh->IsOpaque() )
-		{
-			node->opaque = true;
-		}
-
-		delete w;
-		return 1;
-	}
-
-	// split it by the node plane
-	w->Split( dmapGlobals.mapPlanes[ node->planenum ], ON_EPSILON, &front, &back );
-	delete w;
-
-	c = 0;
-	c += FilterMeshesIntoTree_r( front, originalTri, node->children[0] );
-	c += FilterMeshesIntoTree_r( back, originalTri, node->children[1] );
-
-	return c;
-}
-
-
-/*
-=====================
-FilterMeshesIntoTree
-
-Mark the leafs as opaque and areaportals and put mesh
-fragments in each leaf so portal surfaces can be matched
-to materials
-=====================
-*/
-void FilterMeshesIntoTree( uEntity_t* e )
-{
-	uBrush_t*		b;
-	primitive_t*	prim;
-	mapTri_t*		tri;
-	int				r;
-	int				c_unique, c_clusters;
-
-	common->Printf( "----- FilterMeshesIntoTree -----\n" );
-
-	c_unique = 0;
-	c_clusters = 0;
-	for( prim = e->primitives ; prim ; prim = prim->next )
-	{
-		b = prim->brush;
-
-		if( !b )
-		{
-			// add BSP triangles
-			for( tri = prim->bsptris ; tri ; tri = tri->next )
-			{
-				idWinding* w = WindingForTri( tri );
-
-				c_unique++;
-				r = FilterMeshesIntoTree_r( w, tri, e->tree->headnode );
-				c_clusters += r;
-			}
-			continue;
-		}
-	}
-
-	common->Printf( "%5i total BSP triangles\n", c_unique );
-	common->Printf( "%5i cluster references\n", c_clusters );
-}
-// RB end
-
-//============================================================================
-
 /*
 =================
 ClipTriByLight
@@ -1195,10 +831,8 @@ static void ClipTriByLight( const mapLight_t* light, const mapTri_t* tri,
 		oldInside = inside;
 		if( oldInside )
 		{
-			// RB begin
 			oldInside->Split( light->frustumPlanes[i], 0, &outside[i], &inside );
 			delete oldInside;
-			// RB end
 		}
 		else
 		{
@@ -1314,8 +948,8 @@ static void CarveGroupsByLight( uEntity_t* e, mapLight_t* light )
 
 			if( group->numGroupLights == MAX_GROUP_LIGHTS )
 			{
-				common->Error( "MAX_GROUP_LIGHTS around %f %f %f",
-							   group->triList->v[0].xyz[0], group->triList->v[0].xyz[1], group->triList->v[0].xyz[2] );
+				idLib::Error( "MAX_GROUP_LIGHTS around %f %f %f",
+							  group->triList->v[0].xyz[0], group->triList->v[0].xyz[1], group->triList->v[0].xyz[2] );
 			}
 
 			// if the group doesn't face the light,
@@ -1395,7 +1029,7 @@ void Prelight( uEntity_t* e )
 
 	if( dmapGlobals.shadowOptLevel > 0 )
 	{
-		common->Printf( "----- BuildLightShadows -----\n" );
+		VerbosePrintf( "----- BuildLightShadows -----\n" );
 		start = Sys_Milliseconds();
 
 		// calc bounds for all the groups to speed things up
@@ -1410,13 +1044,13 @@ void Prelight( uEntity_t* e )
 		}
 
 		end = Sys_Milliseconds();
-		common->Printf( "%5.1f seconds for BuildLightShadows\n", ( end - start ) / 1000.0 );
+		VerbosePrintf( "%5.1f seconds for BuildLightShadows\n", ( end - start ) / 1000.0 );
 	}
 
 
 	if( !dmapGlobals.noLightCarve )
 	{
-		common->Printf( "----- CarveGroupsByLight -----\n" );
+		VerbosePrintf( "----- CarveGroupsByLight -----\n" );
 		start = Sys_Milliseconds();
 		// now subdivide the optimize groups into additional groups for
 		// each light that illuminates them
@@ -1427,10 +1061,7 @@ void Prelight( uEntity_t* e )
 		}
 
 		end = Sys_Milliseconds();
-		common->Printf( "%5.1f seconds for CarveGroupsByLight\n", ( end - start ) / 1000.0 );
+		VerbosePrintf( "%5.1f seconds for CarveGroupsByLight\n", ( end - start ) / 1000.0 );
 	}
 
 }
-
-
-

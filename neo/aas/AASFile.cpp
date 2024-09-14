@@ -768,7 +768,7 @@ bool idAASFileLocal::Write( const idStr& fileName, unsigned int mapFileCRC )
 	name = fileName;
 	crc = mapFileCRC;
 
-	aasFile = fileSystem->OpenFileWrite( fileName, "fs_basepath" );
+	aasFile = fileSystem->OpenFileWrite( fileName, "fs_devpath" );
 	if( !aasFile )
 	{
 		common->Error( "Error opening %s", fileName.c_str() );
@@ -1153,6 +1153,11 @@ bool idAASFileLocal::ParseAreas( idLexer& src )
 		area.numFaces = src.ParseInt();
 		area.cluster = src.ParseInt();
 		area.clusterAreaNum = src.ParseInt();
+		area.reach = NULL;
+		area.rev_reach = NULL;
+		area.bounds.Zero();
+		area.center.Zero();
+		area.travelFlags = 0;
 		src.ExpectTokenString( ")" );
 		areas.Append( area );
 		ParseReachabilities( src, i );

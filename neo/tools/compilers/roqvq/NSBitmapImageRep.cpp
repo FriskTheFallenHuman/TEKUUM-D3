@@ -29,8 +29,9 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 #include "roq.h"
+#include "../renderer/Image.h"
 
-void R_LoadImage( const char* name, byte** pic, int* width, int* height, ID_TIME_T* timestamp, bool makePowerOf2 );
+void R_LoadImage( const char* cname, byte** pic, int* width, int* height, ID_TIME_T* timestamp, bool makePowerOf2, textureUsage_t* usage );
 
 NSBitmapImageRep::NSBitmapImageRep()
 {
@@ -43,7 +44,7 @@ NSBitmapImageRep::NSBitmapImageRep()
 NSBitmapImageRep::NSBitmapImageRep( const char* filename )
 {
 
-	R_LoadImage( filename, &bmap, &width, &height, &timestamp, false );
+	R_LoadImage( filename, &bmap, &width, &height, &timestamp, false, NULL );
 	if( !width || !height )
 	{
 		common->FatalError( "roqvq: unable to load image %s\n", filename );
@@ -116,4 +117,3 @@ NSBitmapImageRep& NSBitmapImageRep::operator=( const NSBitmapImageRep& a )
 
 	return *this;
 }
-

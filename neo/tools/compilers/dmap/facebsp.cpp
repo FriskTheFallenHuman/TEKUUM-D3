@@ -32,34 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "dmap.h"
 
-int			c_faceLeafs;
-
-
-extern	int	c_nodes;
-
 void RemovePortalFromNode( uPortal_t* portal, node_t* l );
-
-node_t* NodeForPoint( node_t* node, const idVec3& origin )
-{
-	while( node->planenum != PLANENUM_LEAF )
-	{
-		idPlane& plane = dmapGlobals.mapPlanes[node->planenum];
-
-		int side = plane.Side( origin, 0.1F );
-		if( side == SIDE_FRONT || side == SIDE_ON )
-		{
-			node = node->children[0];
-		}
-		else
-		{
-			node = node->children[1];
-		}
-	}
-
-	return node;
-}
-
-
 
 /*
 =============
@@ -108,7 +81,6 @@ void FreeTree_r( node_t* node )
 	FreeBrushList( node->brushlist );
 
 	// free the node
-	c_nodes--;
 	Mem_Free( node );
 }
 
@@ -131,35 +103,35 @@ void FreeTree( tree_t* tree )
 
 //===============================================================
 
-void PrintTree_r( node_t* node, int depth )
+static void PrintTree_r( node_t* node, int depth )
 {
 	int			i;
 	uBrush_t*	bb;
 
 	for( i = 0 ; i < depth ; i++ )
 	{
-		common->Printf( "  " );
+		idLib::Printf( "  " );
 	}
 	if( node->planenum == PLANENUM_LEAF )
 	{
 		if( !node->brushlist )
 		{
-			common->Printf( "NULL\n" );
+			idLib::Printf( "NULL\n" );
 		}
 		else
 		{
 			for( bb = node->brushlist ; bb ; bb = bb->next )
 			{
-				common->Printf( "%i ", bb->original->brushnum );
+				idLib::Printf( "%i ", bb->original->brushnum );
 			}
-			common->Printf( "\n" );
+			idLib::Printf( "\n" );
 		}
 		return;
 	}
 
 	idPlane& plane = dmapGlobals.mapPlanes[node->planenum];
-	common->Printf( "#%i (%5.2f %5.2f %5.2f %5.2f)\n", node->planenum,
-					plane[0], plane[1], plane[2], plane[3] );
+	idLib::Printf( "#%i (%5.2f %5.2f %5.2f %5.2f)\n", node->planenum,
+				   plane[0], plane[1], plane[2], plane[3] );
 	PrintTree_r( node->children[0], depth + 1 );
 	PrintTree_r( node->children[1], depth + 1 );
 }
@@ -169,7 +141,7 @@ void PrintTree_r( node_t* node, int depth )
 AllocBspFace
 ================
 */
-bspface_t*	AllocBspFace()
+static bspface_t*	AllocBspFace()
 {
 	bspface_t*	f;
 
@@ -184,7 +156,7 @@ bspface_t*	AllocBspFace()
 FreeBspFace
 ================
 */
-void	FreeBspFace( bspface_t* f )
+static void	FreeBspFace( bspface_t* f )
 {
 	if( f->w )
 	{
@@ -320,7 +292,7 @@ int SelectSplitPlaneNum( node_t* node, bspface_t* list )
 BuildFaceTree_r
 ================
 */
-void	BuildFaceTree_r( node_t* node, bspface_t* list )
+static void	BuildFaceTree_r( node_t* node, bspface_t* list, int& faceLeafs )
 {
 	bspface_t*	split;
 	bspface_t*	next;
@@ -336,7 +308,7 @@ void	BuildFaceTree_r( node_t* node, bspface_t* list )
 	if( splitPlaneNum == -1 )
 	{
 		node->planenum = PLANENUM_LEAF;
-		c_faceLeafs++;
+		faceLeafs++;
 		return;
 	}
 
@@ -412,7 +384,7 @@ void	BuildFaceTree_r( node_t* node, bspface_t* list )
 
 	for( i = 0 ; i < 2 ; i++ )
 	{
-		BuildFaceTree_r( node->children[i], childLists[i] );
+		BuildFaceTree_r( node->children[i], childLists[i], faceLeafs );
 	}
 }
 
@@ -434,7 +406,7 @@ tree_t* FaceBSP( bspface_t* list )
 
 	start = Sys_Milliseconds();
 
-	common->Printf( "--- FaceBSP ---\n" );
+	VerbosePrintf( "--- FaceBSP ---\n" );
 
 	tree = AllocTree();
 
@@ -448,19 +420,19 @@ tree_t* FaceBSP( bspface_t* list )
 			tree->bounds.AddPoint( ( *face->w )[i].ToVec3() );
 		}
 	}
-	common->Printf( "%5i faces\n", count );
+	VerbosePrintf( "%5i faces\n", count );
 
 	tree->headnode = AllocNode();
 	tree->headnode->bounds = tree->bounds;
-	c_faceLeafs = 0;
+	int faceLeafs = 0;
 
-	BuildFaceTree_r( tree->headnode, list );
+	BuildFaceTree_r( tree->headnode, list, faceLeafs );
 
-	common->Printf( "%5i leafs\n", c_faceLeafs );
+	VerbosePrintf( "%5i leafs\n", faceLeafs );
 
 	end = Sys_Milliseconds();
 
-	common->Printf( "%5.1f seconds faceBsp\n", ( end - start ) / 1000.0 );
+	VerbosePrintf( "%5.1f seconds faceBsp\n", ( end - start ) / 1000.0 );
 
 	return tree;
 }
@@ -479,53 +451,10 @@ bspface_t*	MakeStructuralBspFaceList( primitive_t* list )
 	side_t*		s;
 	idWinding*	w;
 	bspface_t*	f, *flist;
-	mapTri_t*	tri;
 
 	flist = NULL;
 	for( ; list ; list = list->next )
 	{
-		// RB: support polygons instead of brushes
-		tri = list->bsptris;
-		if( tri )
-		{
-			for( ; tri ; tri = tri->next )
-			{
-				// HACK
-				MapPolygonMesh* mapMesh = ( MapPolygonMesh* ) tri->originalMapMesh;
-
-				// don't create BSP faces for the nodraw helpers touching the area portals
-				if( mapMesh->IsAreaportal() && !( tri->material->GetContentFlags() & CONTENTS_AREAPORTAL ) )
-				{
-					continue;
-				}
-
-				// FIXME: triangles as portals, should be merged back to quad
-				f = AllocBspFace();
-				if( tri->material->GetContentFlags() & CONTENTS_AREAPORTAL )
-				{
-					f->portal = true;
-				}
-
-				//w = new idWinding( 3 );
-				//w->SetNumPoints( 3 );
-				//( *w )[0] = idVec5( tri->v[0].xyz, tri->v[0].GetTexCoord() );
-				//( *w )[1] = idVec5( tri->v[1].xyz, tri->v[1].GetTexCoord() );
-				//( *w )[2] = idVec5( tri->v[2].xyz, tri->v[2].GetTexCoord() );
-
-				w = WindingForTri( tri );
-				//w->ReverseSelf();
-				f->w = w;
-
-				f->planenum = tri->planeNum & ~1;
-				//f->planenum = ( tri->planeNum ^ 1 ) & ~1;
-				f->next = flist;
-				flist = f;
-			}
-
-			continue;
-		}
-		// RB end
-
 		b = list->brush;
 		if( !b )
 		{
@@ -563,54 +492,3 @@ bspface_t*	MakeStructuralBspFaceList( primitive_t* list )
 
 	return flist;
 }
-
-/*
-=================
-MakeVisibleBspFaceList
-=================
-*/
-/*
-bspface_t*	MakeVisibleBspFaceList( primitive_t* list )
-{
-	uBrush_t*	b;
-	int			i;
-	side_t*		s;
-	idWinding*	w;
-	bspface_t*	f, *flist;
-
-	flist = NULL;
-	for( ; list ; list = list->next )
-	{
-		b = list->brush;
-		if( !b )
-		{
-			continue;
-		}
-		if( !b->opaque && !( b->contents & CONTENTS_AREAPORTAL ) )
-		{
-			continue;
-		}
-		for( i = 0 ; i < b->numsides ; i++ )
-		{
-			s = &b->sides[i];
-			w = s->visibleHull;
-			if( !w )
-			{
-				continue;
-			}
-			f = AllocBspFace();
-			if( s->material->GetContentFlags() & CONTENTS_AREAPORTAL )
-			{
-				f->portal = true;
-			}
-			f->w = w->Copy();
-			f->planenum = s->planenum & ~1;
-			f->next = flist;
-			flist = f;
-		}
-	}
-
-	return flist;
-}
-*/
-

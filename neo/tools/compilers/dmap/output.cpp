@@ -181,13 +181,11 @@ static bool MatchVert( const idDrawVert* a, const idDrawVert* b )
 		return false;
 	}
 
-	const idVec2& aST = a->GetTexCoord();
-	const idVec2& bST = a->GetTexCoord();
-	if( idMath::Fabs( aST[0] - bST[0] ) > ST_EPSILON )
+	if( idMath::Fabs( a->GetTexCoordS() - b->GetTexCoordS() ) > ST_EPSILON )
 	{
 		return false;
 	}
-	if( idMath::Fabs( aST[1] - bST[1] ) > ST_EPSILON )
+	if( idMath::Fabs( a->GetTexCoordT() - b->GetTexCoordT() ) > ST_EPSILON )
 	{
 		return false;
 	}
@@ -255,17 +253,11 @@ srfTriangles_t*	ShareMapTriVerts( const mapTri_t* tris )
 			if( j == numVerts )
 			{
 				numVerts++;
-
-				// RB begin
 				uTri->verts[j].xyz = dv->xyz;
+				//uTri->verts[j].SetNormal( dv->normal[0], dv->normal[1], dv->normal[2] );
 				uTri->verts[j].SetNormal( dv->GetNormal() );
-				uTri->verts[j].SetTexCoord( dv->GetTexCoord() );
-
-				uTri->verts[j].color[0] = dv->color[0];
-				uTri->verts[j].color[1] = dv->color[1];
-				uTri->verts[j].color[2] = dv->color[2];
-				uTri->verts[j].color[3] = dv->color[3];
-				// RB end
+				uTri->verts[j].SetTexCoordS( dv->GetTexCoordS() );
+				uTri->verts[j].SetTexCoordT( dv->GetTexCoordT() );
 			}
 
 			uTri->indexes[numIndexes++] = j;
@@ -316,8 +308,7 @@ static void WriteUTriangles( const srfTriangles_t* uTris )
 	col = 0;
 	for( i = 0 ; i < uTris->numVerts ; i++ )
 	{
-		// RB: extended to write drawVert colors
-		float	vec[12];
+		float	vec[8];
 		const idDrawVert* dv;
 
 		dv = &uTris->verts[i];
@@ -326,22 +317,16 @@ static void WriteUTriangles( const srfTriangles_t* uTris )
 		vec[1] = dv->xyz[1];
 		vec[2] = dv->xyz[2];
 
-		const idVec2 st = dv->GetTexCoord();
+		idVec2 st = dv->GetTexCoord();
 		vec[3] = st.x;
 		vec[4] = st.y;
 
-		const idVec3 normal = dv->GetNormal();
-		vec[5] = normal[0];
-		vec[6] = normal[1];
-		vec[7] = normal[2];
+		idVec3 normal = dv->GetNormal();
+		vec[5] = normal.x;
+		vec[6] = normal.y;
+		vec[7] = normal.z;
 
-		vec[8] = dv->color[0] * ( 1.0f / 255.0f );
-		vec[9] = dv->color[1] * ( 1.0f / 255.0f );
-		vec[10] = dv->color[2] * ( 1.0f / 255.0f );
-		vec[11] = dv->color[3] * ( 1.0f / 255.0f );
-
-		Write1DMatrix( procFile, 12, vec );
-		// RB end
+		Write1DMatrix( procFile, 8, vec );
 
 		if( ++col == 3 )
 		{
@@ -359,58 +344,6 @@ static void WriteUTriangles( const srfTriangles_t* uTris )
 	for( i = 0 ; i < uTris->numIndexes ; i++ )
 	{
 		procFile->WriteFloatString( "%i ", uTris->indexes[i] );
-
-		if( ++col == 18 )
-		{
-			col = 0;
-			procFile->WriteFloatString( "\n" );
-		}
-	}
-	if( col != 0 )
-	{
-		procFile->WriteFloatString( "\n" );
-	}
-}
-
-
-/*
-====================
-WriteShadowTriangles
-
-Writes text verts and indexes to procfile
-====================
-*/
-static void WriteShadowTriangles( const srfTriangles_t* tri )
-{
-	int			col;
-	int			i;
-
-	// emit this chain
-	procFile->WriteFloatString( "/* numVerts = */ %i /* noCaps = */ %i /* noFrontCaps = */ %i /* numIndexes = */ %i /* planeBits = */ %i\n",
-								tri->numVerts, tri->numShadowIndexesNoCaps, tri->numShadowIndexesNoFrontCaps, tri->numIndexes, tri->shadowCapPlaneBits );
-
-	// verts
-	col = 0;
-	for( i = 0 ; i < tri->numVerts ; i++ )
-	{
-		Write1DMatrix( procFile, 3, &tri->preLightShadowVertexes[i].xyzw[0] );
-
-		if( ++col == 5 )
-		{
-			col = 0;
-			procFile->WriteFloatString( "\n" );
-		}
-	}
-	if( col != 0 )
-	{
-		procFile->WriteFloatString( "\n" );
-	}
-
-	// indexes
-	col = 0;
-	for( i = 0 ; i < tri->numIndexes ; i++ )
-	{
-		procFile->WriteFloatString( "%i ", tri->indexes[i] );
 
 		if( ++col == 18 )
 		{
@@ -491,7 +424,7 @@ static void WriteOutputSurfaces( int entityNum, int areaNum )
 		entity->epairs.GetString( "name", "", &name );
 		if( !name[0] )
 		{
-			common->Error( "Entity %i has surfaces, but no name key", entityNum );
+			idLib::Error( "Entity %i has surfaces, but no name key", entityNum );
 		}
 		procFile->WriteFloatString( "model { /* name = */ \"%s\" /* numSurfaces = */ %i\n\n",
 									name, numSurfaces );
@@ -562,7 +495,7 @@ static void WriteOutputSurfaces( int entityNum, int areaNum )
 
 		if( surfaceNum >= numSurfaces )
 		{
-			common->Error( "WriteOutputSurfaces: surfaceNum >= numSurfaces" );
+			idLib::Error( "WriteOutputSurfaces: surfaceNum >= numSurfaces" );
 		}
 
 		procFile->WriteFloatString( "/* surface %i */ { ", surfaceNum );
@@ -630,7 +563,7 @@ static void WriteNode_r( node_t* node )
 	}
 }
 
-int NumberNodes_r( node_t* node, int nextNumber )
+static int NumberNodes_r( node_t* node, int nextNumber )
 {
 	if( node->planenum == PLANENUM_LEAF )
 	{
@@ -680,23 +613,12 @@ static void WriteOutputPortals( uEntity_t* e )
 	idWinding*			w;
 
 	procFile->WriteFloatString( "interAreaPortals { /* numAreas = */ %i /* numIAP = */ %i\n\n",
-								e->numAreas, interAreaPortals.Num() );
+								e->numAreas, numInterAreaPortals );
 	procFile->WriteFloatString( "/* interAreaPortal format is: numPoints positiveSideArea negativeSideArea ( point) ... */\n" );
-	for( i = 0 ; i < interAreaPortals.Num() ; i++ )
+	for( i = 0 ; i < numInterAreaPortals ; i++ )
 	{
 		iap = &interAreaPortals[i];
-
-		// RB: support new area portals
-		if( iap->side )
-		{
-			w = iap->side->winding;
-		}
-		else
-		{
-			w = & iap->w;
-		}
-		// RB end
-
+		w = iap->side->winding;
 		procFile->WriteFloatString( "/* iap %i */ %i %i %i ", i, w->GetNumPoints(), iap->area0, iap->area1 );
 		for( j = 0 ; j < w->GetNumPoints() ; j++ )
 		{
@@ -746,49 +668,6 @@ static void WriteOutputEntity( int entityNum )
 	}
 }
 
-static void WriteLightGrid()
-{
-	procFile->WriteFloatString( "lightGridPoints { /* numLightGridPoints = */ %i ", dmapGlobals.lightGridPoints.Num() );
-
-	procFile->WriteFloatString( "/* gridMins */ " );
-	Write1DMatrix( procFile, 3, dmapGlobals.lightGridMins.ToFloatPtr() );
-
-	procFile->WriteFloatString( "/* gridSize */ " );
-	Write1DMatrix( procFile, 3, dmapGlobals.lightGridSize.ToFloatPtr() );
-
-	procFile->WriteFloatString( "/* gridBounds */ " );
-	procFile->WriteFloatString( "%i %i %i\n\n", dmapGlobals.lightGridBounds[0], dmapGlobals.lightGridBounds[1], dmapGlobals.lightGridBounds[2] );
-
-	for( int i = 0 ; i < dmapGlobals.lightGridPoints.Num() ; i++ )
-	{
-		lightGridPoint_t* gridPoint = &dmapGlobals.lightGridPoints[i];
-
-#if 1
-		procFile->WriteFloatString( "/* lgp %i */ %i %i %i %i %i %i %i %i\n",
-									i,
-									gridPoint->ambient[0],
-									gridPoint->ambient[1],
-									gridPoint->ambient[2],
-									gridPoint->directed[0],
-									gridPoint->directed[1],
-									gridPoint->directed[2],
-									gridPoint->latLong[0],
-									gridPoint->latLong[1]
-								  );
-#else
-		procFile->WriteFloatString( "/* lgp %i */ ", i );
-
-		Write1DMatrix( procFile, 3, gridPoint->ambient.ToFloatPtr() );
-		Write1DMatrix( procFile, 3, gridPoint->directed.ToFloatPtr() );
-		Write1DMatrix( procFile, 3, gridPoint->dir.ToFloatPtr() );
-
-		procFile->WriteFloatString( "\n" );
-#endif
-	}
-
-	procFile->WriteFloatString( "}\n\n" );
-}
-
 
 /*
 ====================
@@ -802,22 +681,19 @@ void WriteOutputFile()
 	idStr			qpath;
 
 	// write the file
-	common->Printf( "----- WriteOutputFile -----\n" );
+	idLib::Printf( "----- WriteOutputFile -----\n" );
 
-	// RB: added generated/
-	sprintf( qpath, "generated/%s." PROC_FILE_EXT, dmapGlobals.mapFileBase );
-	// RB end
+	sprintf( qpath, "%s." PROC_FILE_EXT, dmapGlobals.mapFileBase );
 
-	common->Printf( "writing %s\n", qpath.c_str() );
+	idLib::Printf( "writing %s\n", qpath.c_str() );
 	// _D3XP used fs_cdpath
 	procFile = fileSystem->OpenFileWrite( qpath, "fs_devpath" );
 	if( !procFile )
 	{
-		common->Error( "Error opening %s", qpath.c_str() );
+		idLib::Error( "Error opening %s", qpath.c_str() );
 	}
 
-	// RB: write new PROC_FILE_ID2 format
-	procFile->WriteFloatString( "%s\n\n", PROC_FILE_ID2 );
+	procFile->WriteFloatString( "%s\n\n", PROC_FILE_ID );
 
 	// write the entity models and information, writing entities first
 	for( i = dmapGlobals.num_entities - 1 ; i >= 0 ; i-- )
@@ -831,27 +707,6 @@ void WriteOutputFile()
 
 		WriteOutputEntity( i );
 	}
-
-	// write the shadow volumes
-	for( i = 0 ; i < dmapGlobals.mapLights.Num() ; i++ )
-	{
-		mapLight_t*	light = dmapGlobals.mapLights[i];
-		if( !light->shadowTris )
-		{
-			continue;
-		}
-
-		procFile->WriteFloatString( "shadowModel { /* name = */ \"_prelight_%s\"\n\n", light->name );
-		WriteShadowTriangles( light->shadowTris );
-		procFile->WriteFloatString( "}\n\n" );
-
-		R_FreeStaticTriSurf( light->shadowTris );
-		light->shadowTris = NULL;
-	}
-
-	// RB begin
-	WriteLightGrid();
-	// RB end
 
 	fileSystem->CloseFile( procFile );
 }
