@@ -63,6 +63,8 @@ void	IN_Frame();
 
 void	DisableTaskKeys( BOOL bDisable, BOOL bBeep, BOOL bTaskMgr );
 
+const unsigned char* Win_GetScanTable( void );
+
 void Conbuf_AppendText( const char* msg );
 
 // window procedure

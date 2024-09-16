@@ -49,14 +49,15 @@ If you have questions concerning this license or the applicable additional terms
 
 // These were changed to static by ID so to make it easy we just throw them
 // in this header
-const int MAX_MSGLEN = 1400;
+// we need a lot to be able to list all threads in mars_city1
+const int MAX_MSGLEN = 8600;
 
 class rvDebuggerApp
 {
 public:
 
 	rvDebuggerApp( );
-	~rvDebuggerApp( );
+	~rvDebuggerApp();
 
 	bool				Initialize( HINSTANCE hInstance );
 	int					Run();
@@ -104,6 +105,6 @@ ID_INLINE rvDebuggerWindow& rvDebuggerApp::GetWindow()
 	return *mDebuggerWindow;
 }
 
-extern rvDebuggerApp* gDebuggerApp;
+extern rvDebuggerApp gDebuggerApp;
 
 #endif // DEBUGGERAPP_H_

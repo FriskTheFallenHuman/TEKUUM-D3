@@ -412,6 +412,13 @@ public:
 
 	void		SetTexParameters();	// update aniso and trilinear
 
+#if !defined( USE_VULKAN )
+	GLuint		GetTextureNum()
+	{
+		return texnum;
+	}
+#endif
+
 	// DG: added for imgui integration (to be used with ImGui::Image() etc)
 	void*		GetImGuiTextureID()
 	{

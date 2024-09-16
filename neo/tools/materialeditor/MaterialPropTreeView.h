@@ -71,5 +71,3 @@ protected:
 	rvRegistryOptions	registry;
 	bool				internalChange;
 };
-
-

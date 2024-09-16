@@ -29,8 +29,6 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef __WINDOW_H__
 #define __WINDOW_H__
 
-#include "Rectangle.h"
-#include "DeviceContext.h"
 #include "RegExp.h"
 #include "Winvar.h"
 #include "GuiScript.h"
@@ -207,6 +205,16 @@ public:
 		ADJUST_BOTTOMLEFT
 	};
 
+	static void SetDebugDraw( void )
+	{
+		gui_edit.SetBool( true );
+	}
+
+	static void DisableDebugDraw( void )
+	{
+		gui_edit.SetBool( false );
+	}
+
 	static const char* ScriptNames[SCRIPT_COUNT];
 
 	static const idRegEntry RegisterVars[];
@@ -229,7 +237,7 @@ public:
 	void Size( float x, float y, float w, float h );
 	void SetupFromState();
 	void SetupBackground();
-	drawWin_t* FindChildByName( const char* name );
+	virtual drawWin_t* FindChildByName( const char* name );
 	idSimpleWindow* FindSimpleWinByName( const char* _name );
 	idWindow* GetParent()
 	{
@@ -266,6 +274,7 @@ public:
 	};
 
 	virtual bool Parse( idTokenParser* src, bool rebuild = true );
+	virtual bool Parse( idParser* src, bool rebuild = true );
 	virtual const char* HandleEvent( const sysEvent_t* event, bool* updateVisuals );
 	void	CalcRects( float x, float y );
 	virtual void Redraw( float x, float y, bool hud );
@@ -320,17 +329,19 @@ public:
 	int NumTransitions();
 
 	bool ParseScript( idTokenParser* src, idGuiScriptList& list, int* timeParm = NULL, bool allowIf = false );
+	bool ParseScript( idParser* src, idGuiScriptList& list, int* timeParm = NULL, bool allowIf = false );
 	bool RunScript( int n );
 	bool RunScriptList( idGuiScriptList* src );
 	void SetRegs( const char* key, const char* val );
-	intptr_t ParseExpression( idTokenParser* src, idWinVar* var = NULL, intptr_t component = 0 );
+	virtual intptr_t ParseExpression( idTokenParser* src, idWinVar* var = NULL, intptr_t component = 0 );
+	virtual intptr_t ParseExpression( idParser* src, idWinVar* var = NULL, intptr_t component = 0 );
 	int ExpressionConstant( float f );
 	idRegisterList* RegList()
 	{
 		return &regList;
 	}
 	void AddCommand( const char* cmd );
-	void AddUpdateVar( idWinVar* var );
+	virtual void AddUpdateVar( idWinVar* var );
 	bool Interactive();
 	bool ContainsStateVars();
 	void SetChildWinVarVal( const char* name, const char* var, const char* val );
@@ -351,17 +362,17 @@ public:
 
 	void		AddDefinedVar( idWinVar* var );
 
-	idWindow*	FindChildByPoint( float x, float y, idWindow* below = NULL );
-	int			GetChildIndex( idWindow* window );
-	int			GetChildCount();
-	idWindow*	GetChild( int index );
-	void		RemoveChild( idWindow* win );
-	bool		InsertChild( idWindow* win, idWindow* before );
+	virtual idWindow*	FindChildByPoint( float x, float y, idWindow* below = NULL );
+	virtual int			GetChildIndex( idWindow* window );
+	virtual int			GetChildCount();
+	virtual idWindow*	GetChild( int index );
+	virtual void		RemoveChild( idWindow* win );
+	virtual bool		InsertChild( idWindow* win, idWindow* before );
 
 	void		ScreenToClient( idRectangle* rect );
 	void		ClientToScreen( idRectangle* rect );
 
-	bool		UpdateFromDictionary( idDict& dict );
+	virtual bool		UpdateFromDictionary( idDict& dict );
 
 protected:
 
@@ -384,17 +395,26 @@ protected:
 	wexpOp_t* ExpressionOp();
 	intptr_t EmitOp( intptr_t a, intptr_t b, wexpOpType_t opType, wexpOp_t** opp = NULL );
 	intptr_t ParseEmitOp( idTokenParser* src, intptr_t a, wexpOpType_t opType, int priority, wexpOp_t** opp = NULL );
+	intptr_t ParseEmitOp( idParser* src, intptr_t a, wexpOpType_t opType, int priority, wexpOp_t** opp = NULL );
 	intptr_t ParseTerm( idTokenParser* src, idWinVar* var = NULL, intptr_t component = 0 );
+	intptr_t ParseTerm( idParser* src, idWinVar* var = NULL, intptr_t component = 0 );
 	intptr_t ParseExpressionPriority( idTokenParser* src, int priority, idWinVar* var = NULL, intptr_t component = 0 );
+	intptr_t ParseExpressionPriority( idParser* src, int priority, idWinVar* var = NULL, intptr_t component = 0 );
+
 	void EvaluateRegisters( float* registers );
 	void SaveExpressionParseState();
 	void RestoreExpressionParseState();
 	void ParseBracedExpression( idTokenParser* src );
 	bool ParseScriptEntry( const char* name, idTokenParser* src );
-	bool ParseRegEntry( const char* name, idTokenParser* src );
+	bool ParseScriptEntry( const char* name, idParser* src );
+	virtual bool ParseRegEntry( const char* name, idTokenParser* src );
+	virtual bool ParseRegEntry( const char* name, idParser* src );
 	virtual bool ParseInternalVar( const char* name, idTokenParser* src );
+	virtual bool ParseInternalVar( const char* name, idParser* src );
 	void ParseString( idTokenParser* src, idStr& out );
+	void ParseString( idParser* src, idStr& out );
 	void ParseVec4( idTokenParser* src, idVec4& out );
+	void ParseVec4( idParser* src, idVec4& out );
 	void ConvertRegEntry( const char* name, idTokenParser* src, idStr& out, int tabs );
 
 	float actualX;					// physical coords

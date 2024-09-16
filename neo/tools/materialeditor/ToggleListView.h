@@ -57,9 +57,9 @@ public:
 
 	//Windows messages
 	afx_msg int			OnCreate( LPCREATESTRUCT lpCreateStruct );
-	afx_msg void 		OnSize( UINT nType, int cx, int cy );
-	afx_msg void 		MeasureItem( LPMEASUREITEMSTRUCT lpMeasureItemStruct );
-	afx_msg void 		OnNMClick( NMHDR* pNMHDR, LRESULT* pResult );
+	afx_msg void		OnSize( UINT nType, int cx, int cy );
+	afx_msg void		MeasureItem( LPMEASUREITEMSTRUCT lpMeasureItemStruct );
+	afx_msg void		OnNMClick( NMHDR* pNMHDR, LRESULT* pResult );
 
 	DECLARE_MESSAGE_MAP()
 
@@ -85,5 +85,3 @@ protected:
 	HICON				disabledIcon;
 
 };
-
-

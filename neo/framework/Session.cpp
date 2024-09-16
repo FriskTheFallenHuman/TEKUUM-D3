@@ -939,7 +939,7 @@ void idSessionLocal::RunGameTic()
 
 	// run the game logic every player move
 	int	start = Sys_Milliseconds();
-	gameReturn_t	ret = game->RunFrame( &cmd );
+	gameReturn_t	ret = game->RunFrame( &cmd, com_editors );
 
 	int end = Sys_Milliseconds();
 	time_gameFrame += end - start;	// note time used for com_speeds

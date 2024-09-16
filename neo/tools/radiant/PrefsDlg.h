@@ -38,11 +38,11 @@ If you have questions concerning this license or the applicable additional terms
 
 #define MAX_TEXTURE_QUALITY 3
 
-class CPrefsDlg : public CDialog
+class CPrefsDlg : public CDialogEx
 {
 // Construction
 public:
-	CPrefsDlg( CWnd* pParent = NULL );   // standard constructor
+	CPrefsDlg( CWnd* pParent = NULL ); // standard constructor
 
 	void				LoadPrefs();
 	void				SavePrefs();
@@ -54,45 +54,34 @@ public:
 
 	CSpinButtonCtrl		m_wndUndoSpin;
 	CSpinButtonCtrl		m_wndFontSpin;
-	//CSliderCtrl			m_wndTexturequality; // sikk - Removed
 	CSliderCtrl			m_wndCamSpeed;
 	CSpinButtonCtrl		m_wndSpin;
 	BOOL				m_bTextureLock;
-	BOOL				m_bLoadLast;
 	BOOL				m_bRunBefore;
-	CString				m_strLastProject;
 	CString				m_strLastMap;
-	//BOOL				m_bFace;	// sikk - Removed
-	//BOOL				m_bRightClick;	// sikk - Removed
 	BOOL				m_bVertex;
 	BOOL				m_bAutoSave;
 	BOOL				m_bNewApplyHandling;
 	CString				m_strAutoSave;
 	BOOL				m_bLoadLastMap;
 	BOOL				m_bGatewayHack;
-	//BOOL				m_bTextureWindow;	// sikk - Removed
 	BOOL				m_bSnapShots;
 	float				m_fTinySize;
 	BOOL				m_bCleanTiny;
 	int					m_nStatusSize;
-	BOOL				m_bCamXYUpdate;
 	BOOL				m_bNewLightDraw;
 	BOOL				m_bALTEdge;
-	BOOL				m_bQE4Painting;
 	BOOL				m_bSnapTToGrid;
 	BOOL				m_bXZVis;
 	BOOL				m_bYZVis;
 	BOOL				m_bZVis;
 	BOOL				m_bSizePaint;
 	BOOL				m_bRotateLock;
-	BOOL				m_bWideToolbar;
 	BOOL				m_bNoClamp;
 	int					m_nRotation;
 	BOOL				m_bHiColorTextures;
 	BOOL				m_bChaseMouse;
-	BOOL				m_bTextureScrollbar;
-//	BOOL				m_bDisplayLists;	// sikk - Removed
-	BOOL				m_bNoStipple;
+	//BOOL				m_bNoStipple;
 	int					m_nUndoLevels;
 	CString				m_strMaps;
 	CString				m_strModels;
@@ -109,16 +98,13 @@ public:
 	BOOL				m_selectByBoundingBrush;
 	int					m_nEntityShowState;
 	int					m_nTextureScale;
-	BOOL				m_bNormalizeColors;
 	BOOL				m_bSwitchClip;
-	BOOL				m_bSelectWholeEntities;
-	//int					m_nTextureQuality; // sikk - Removed
 	BOOL				m_bGLLighting;
 
 	// ClassWizard generated virtual function overrides
 	//{{AFX_VIRTUAL(CPrefsDlg)
 protected:
-	virtual void		DoDataExchange( CDataExchange* pDX );    // DDX/DDV support
+	virtual void		DoDataExchange( CDataExchange* pDX );  // DDX/DDV support
 	//}}AFX_VIRTUAL
 
 protected:

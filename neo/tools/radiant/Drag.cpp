@@ -113,7 +113,8 @@ extern void SetActiveDrag( CDragPoint* p );
 Draw_Setup
 ================
 */
-static void Drag_Setup( int x, int y, int buttons, const idVec3& xaxis, const idVec3& yaxis, const idVec3& origin, const idVec3& dir )
+static void Drag_Setup( int x, int y, int buttons,
+						const idVec3& xaxis, const idVec3& yaxis, const idVec3& origin, const idVec3& dir )
 {
 	qertrace_t	t;
 	face_t*		f;
@@ -181,8 +182,10 @@ static void Drag_Setup( int x, int y, int buttons, const idVec3& xaxis, const id
 
 	if( selected_brushes.next == &selected_brushes )
 	{
+		//
 		// in this case a new brush is created when the dragging takes place in the XYWnd,
-		// A useless undo is created when the dragging takes place in the CamWnd
+		// An useless undo is created when the dragging takes place in the CamWnd
+		//
 		Undo_Start( "create brush" );
 
 		Sys_Status( "No selection to drag\n", 0 );
@@ -281,7 +284,7 @@ static void Drag_Setup( int x, int y, int buttons, const idVec3& xaxis, const id
 		bool bOK = ( g_PrefsDlg.m_bALTEdge ) ? ( ::GetAsyncKeyState( VK_MENU ) != 0 ) : true;
 		if( bOK )
 		{
-			for( brush_t* pBrush = selected_brushes.next; pBrush != &selected_brushes; pBrush = pBrush->next )
+			for( idEditorBrush* pBrush = selected_brushes.next; pBrush != &selected_brushes; pBrush = pBrush->next )
 			{
 				if( buttons & MK_CONTROL )
 				{
@@ -326,7 +329,8 @@ extern void Face_GetScale_BrushPrimit( face_t* face, float* s, float* t, float* 
 Drag_Begin
 ================
 */
-void Drag_Begin( int x, int y, int buttons, const idVec3& xaxis, const idVec3& yaxis, const idVec3& origin, const idVec3& dir )
+void Drag_Begin( int x, int y, int buttons,
+				 const idVec3& xaxis, const idVec3& yaxis, const idVec3& origin, const idVec3& dir )
 {
 	qertrace_t	t;
 
@@ -539,7 +543,7 @@ void Drag_Begin( int x, int y, int buttons, const idVec3& xaxis, const idVec3& y
 }
 
 
-void Brush_GetBounds( brush_t* b, idVec3& mins, idVec3& maxs )
+void Brush_GetBounds( idEditorBrush* b, idVec3& mins, idVec3& maxs )
 {
 	int		i;
 
@@ -572,7 +576,7 @@ MoveSelection
 static void MoveSelection( const idVec3& orgMove )
 {
 	int		i, success;
-	brush_t* b;
+	idEditorBrush* b;
 	CString strStatus;
 	idVec3	vTemp, vTemp2, end, move;
 
@@ -592,13 +596,13 @@ static void MoveSelection( const idVec3& orgMove )
 		float	fDeg = -move[2];
 		float	fAdj = move[2];
 		int axis = 0;
-		if( g_pParentWnd->ActiveXY()->GetViewType() == XY )
+		if( g_pParentWnd->ActiveXY()->GetViewType() == ViewType::XY )
 		{
 			fDeg = -move[1];
 			fAdj = move[1];
 			axis = 2;
 		}
-		else if( g_pParentWnd->ActiveXY()->GetViewType() == XZ )
+		else if( g_pParentWnd->ActiveXY()->GetViewType() == ViewType::XZ )
 		{
 			fDeg = move[2];
 			fAdj = move[2];
@@ -606,11 +610,14 @@ static void MoveSelection( const idVec3& orgMove )
 		}
 
 		g_pParentWnd->ActiveXY()->Rotation()[g_qeglobals.rotateAxis] += fAdj;
-		strStatus.Format( "%s x:: %.1f  y:: %.1f  z:: %.1f",
-						  g_bPatchBendMode ? "Bend angle" : "Rotation",
-						  g_pParentWnd->ActiveXY()->Rotation()[0],
-						  g_pParentWnd->ActiveXY()->Rotation()[1],
-						  g_pParentWnd->ActiveXY()->Rotation()[2] );
+		strStatus.Format
+		(
+			"%s x:: %.1f  y:: %.1f  z:: %.1f",
+			( g_bPatchBendMode ) ? "Bend angle" : "Rotation",
+			g_pParentWnd->ActiveXY()->Rotation()[0],
+			g_pParentWnd->ActiveXY()->Rotation()[1],
+			g_pParentWnd->ActiveXY()->Rotation()[2]
+		);
 		g_pParentWnd->SetStatusText( 2, strStatus );
 
 		if( g_bPatchBendMode )
@@ -632,7 +639,7 @@ static void MoveSelection( const idVec3& orgMove )
 	{
 		idVec3	v;
 		v[0] = v[1] = v[2] = 1.0f;
-		for( int i = 0; i < 3; i++ )
+		for( i = 0; i < 3; i++ )
 		{
 			if( move[i] > 0.0f )
 			{

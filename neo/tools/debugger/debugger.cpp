@@ -29,14 +29,21 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/rc/debugger_resource.h"
-#include "DebuggerApp.h"
-#include "DebuggerServer.h"
+
+#if defined( ID_ALLOW_TOOLS )
+	#include "DebuggerServer.h"
+	#include "../../sys/win32/rc/resource.h"
+	#include "DebuggerApp.h"
+#else
+	#include "DebuggerServer.h"
+#endif
 
 DWORD CALLBACK DebuggerThread( LPVOID param );
 
-rvDebuggerApp*					gDebuggerApp = NULL;
-HWND							gDebuggerWindow = NULL;
+#if defined( ID_ALLOW_TOOLS )
+	rvDebuggerApp					gDebuggerApp;
+	HWND							gDebuggerWindow = NULL;
+#endif
 bool							gDebuggerSuspend = false;
 bool							gDebuggerConnnected = false;
 HANDLE							gDebuggerGameThread = NULL;
@@ -46,6 +53,7 @@ HANDLE							gDebuggerServerThread   = NULL;
 DWORD							gDebuggerServerThreadID = 0;
 bool							gDebuggerServerQuit     = false;
 
+#if defined( ID_ALLOW_TOOLS )
 /*
 ================
 DebuggerMain
@@ -61,18 +69,15 @@ void DebuggerClientInit( const char* cmdline )
 		goto DebuggerClientInitDone;
 	}
 
-	gDebuggerApp = new rvDebuggerApp;
-	if( !gDebuggerApp )
-	{
-		return;
-	}
-
-	if( !gDebuggerApp->Initialize( win32.hInstance ) )
+	if( !gDebuggerApp.Initialize( win32.hInstance ) )
 	{
 		goto DebuggerClientInitDone;
 	}
 
-	gDebuggerApp->Run( );
+	// hide the doom window by default
+	::ShowWindow( win32.hWnd, SW_HIDE );
+
+	gDebuggerApp.Run( );
 
 DebuggerClientInitDone:
 
@@ -114,13 +119,14 @@ void DebuggerClientLaunch()
 	GetCurrentDirectory( MAX_PATH, curDir );
 
 	GetModuleFileName( NULL, exeFile, MAX_PATH );
-	const char* s = va( "%s +set fs_game %s +set fs_cdpath %s +debugger", exeFile, cvarSystem->GetCVarString( "fs_game" ), cvarSystem->GetCVarString( "fs_cdpath" ) );
+	const char* s = va( "%s +set fs_game %s +set fs_basepath %s +debugger", exeFile, cvarSystem->GetCVarString( "fs_game" ), cvarSystem->GetCVarString( "fs_basepath" ) );
 	CreateProcess( NULL, ( LPSTR )s,
 				   NULL, NULL, FALSE, 0, NULL, curDir, &startup, &process );
 
 	CloseHandle( process.hThread );
 	CloseHandle( process.hProcess );
 }
+#endif // #if defined( ID_ALLOW_TOOLS )
 
 /*
 ================
@@ -136,12 +142,11 @@ DWORD CALLBACK DebuggerServerThread( LPVOID param )
 	while( !gDebuggerServerQuit )
 	{
 		gDebuggerServer->ProcessMessages( );
-		Sleep( 1 );
+		Sys_Sleep( 1 );
 	}
 
 	return 0;
 }
-
 /*
 ================
 DebuggerServerInit
@@ -151,8 +156,11 @@ Starts up the debugger server
 */
 bool DebuggerServerInit()
 {
+	com_enableDebuggerServer.ClearModified( );
+
 	// Dont do this if we are in the debugger already
-	if( com_editors & EDITOR_DEBUGGER )
+	if( gDebuggerServer != NULL
+			|| ( com_editors & EDITOR_DEBUGGER ) )
 	{
 		return false;
 	}
@@ -204,7 +212,11 @@ void DebuggerServerShutdown()
 		// Cleanup the thread handle
 		CloseHandle( gDebuggerServerThread );
 		gDebuggerServerThread = NULL;
+
+		com_editors &= ~EDITOR_DEBUGGER;
 	}
+
+	com_enableDebuggerServer.ClearModified( );
 }
 
 /*
@@ -240,4 +252,3 @@ void DebuggerServerPrint( const char* text )
 
 	gDebuggerServer->Print( text );
 }
-

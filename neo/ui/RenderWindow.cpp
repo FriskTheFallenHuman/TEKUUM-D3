@@ -29,16 +29,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "DeviceContext.h"
 #include "Window.h"
 #include "UserInterfaceLocal.h"
 #include "RenderWindow.h"
-
-// NO LONGER SUPPORTED!
-//
-// D3 could render a 3D model in a subrect of a full screen
-// GUI for the main menus, but we have cut that ability so
-// we don't need to deal with offset viewports on all platforms.
 
 idRenderWindow::idRenderWindow( idUserInterfaceLocal* g ) : idWindow( g )
 {

@@ -33,15 +33,19 @@ If you have questions concerning this license or the applicable additional terms
 #include "Radiant.h"
 #include "mediapreviewdlg.h"
 
+#ifdef _DEBUG
+	#define new DEBUG_NEW
+#endif
 
 // CMediaPreviewDlg dialog
 
-IMPLEMENT_DYNAMIC( CMediaPreviewDlg, CDialog )
-CMediaPreviewDlg::CMediaPreviewDlg( CWnd* pParent /*=NULL*/ )
-	: CDialog( CMediaPreviewDlg::IDD, pParent )
+IMPLEMENT_DYNAMIC( CMediaPreviewDlg, CDialogEx )
+
+CMediaPreviewDlg::CMediaPreviewDlg( CWnd* pParent )
+	: CDialogEx( CMediaPreviewDlg::IDD, pParent ),
+	  mode( MATERIALS ),
+	  media( "" )
 {
-	mode = MATERIALS;
-	media = "";
 }
 
 void CMediaPreviewDlg::SetMedia( const char* _media )
@@ -57,13 +61,12 @@ void CMediaPreviewDlg::Refresh()
 		const idMaterial* mat = declManager->FindMaterial( "guisurfs/guipreview" );
 		mat->SetGui( media );
 		drawMaterial.setMedia( "guisurfs/guipreview" );
-		drawMaterial.setScale( 4.4f );
 	}
 	else
 	{
 		drawMaterial.setMedia( media );
-		drawMaterial.setScale( 1.0f );
 	}
+	drawMaterial.setScale( 20.0f );
 	wndPreview.setDrawable( &drawMaterial );
 	wndPreview.Invalidate();
 	wndPreview.RedrawWindow();
@@ -76,12 +79,11 @@ CMediaPreviewDlg::~CMediaPreviewDlg()
 
 void CMediaPreviewDlg::DoDataExchange( CDataExchange* pDX )
 {
-	CDialog::DoDataExchange( pDX );
+	CDialogEx::DoDataExchange( pDX );
 	DDX_Control( pDX, IDC_PREVIEW, wndPreview );
 }
 
-
-BEGIN_MESSAGE_MAP( CMediaPreviewDlg, CDialog )
+BEGIN_MESSAGE_MAP( CMediaPreviewDlg, CDialogEx )
 	ON_WM_SIZE()
 	ON_WM_DESTROY()
 	ON_WM_LBUTTONDOWN()
@@ -89,41 +91,43 @@ BEGIN_MESSAGE_MAP( CMediaPreviewDlg, CDialog )
 	ON_WM_MOUSEMOVE()
 END_MESSAGE_MAP()
 
-
 // CMediaPreviewDlg message handlers
 
 BOOL CMediaPreviewDlg::OnInitDialog()
 {
-	CDialog::OnInitDialog();
+	CDialogEx::OnInitDialog();
 
 	wndPreview.setDrawable( &testDrawable );
 	CRect rct;
 	LONG lSize = sizeof( rct );
 	if( LoadRegistryInfo( "Radiant::EditPreviewWindow", &rct, &lSize ) )
 	{
-		SetWindowPos( NULL, rct.left, rct.top, rct.Width(), rct.Height(), SWP_SHOWWINDOW );
+		SetWindowPos( nullptr, rct.left, rct.top, rct.Width(), rct.Height(), SWP_SHOWWINDOW );
 	}
 
 	GetClientRect( rct );
 	int h = ( mode == GUIS ) ? ( rct.Width() - 8 ) / 1.333333f : rct.Height() - 8;
-	wndPreview.SetWindowPos( NULL, 4, 4, rct.Width() - 8, h, SWP_SHOWWINDOW );
+	wndPreview.SetWindowPos( nullptr, 4, 4, rct.Width() - 8, h, SWP_SHOWWINDOW );
 
-	return TRUE;  // return TRUE unless you set the focus to a control
-	// EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;
 }
 
 void CMediaPreviewDlg::OnSize( UINT nType, int cx, int cy )
 {
-	CDialog::OnSize( nType, cx, cy );
-	if( wndPreview.GetSafeHwnd() == NULL )
+
+	float scaling_factor = Win_GetWindowScalingFactor( GetSafeHwnd() );
+	int s8 = int( 8 * scaling_factor );
+	int s4 = int( 4 * scaling_factor );
+
+	CDialogEx::OnSize( nType, cx, cy );
+	if( wndPreview.GetSafeHwnd() == nullptr )
 	{
 		return;
 	}
 	CRect rect;
 	GetClientRect( rect );
-	//int h = (mode == GUIS) ? (rect.Width() - 8) / 1.333333f : rect.Height() - 8;
-	int h = rect.Height() - 8;
-	wndPreview.SetWindowPos( NULL, 4, 4, rect.Width() - 8, h, SWP_SHOWWINDOW );
+	int h = rect.Height() - s8;
+	wndPreview.SetWindowPos( nullptr, s4, s4, rect.Width() - s8, h, SWP_SHOWWINDOW );
 }
 
 void CMediaPreviewDlg::OnDestroy()
@@ -132,10 +136,10 @@ void CMediaPreviewDlg::OnDestroy()
 	{
 		CRect rct;
 		GetWindowRect( rct );
-		SaveRegistryInfo( "Radiant::EditPreviewWindow", &rct, sizeof( rct ) );
+		SaveRegistryInfo( "radiant_editpreviewwindow", &rct, sizeof( rct ) );
 	}
 
-	CDialog::OnDestroy();
+	CDialogEx::OnDestroy();
 }
 
 void CMediaPreviewDlg::OnLButtonDown( UINT nFlags, CPoint point )
@@ -145,7 +149,7 @@ void CMediaPreviewDlg::OnLButtonDown( UINT nFlags, CPoint point )
 		idUserInterface* gui = uiManager->FindGui( media );
 		if( gui )
 		{
-			sysEvent_t  ev;
+			sysEvent_t ev;
 			memset( &ev, 0, sizeof( ev ) );
 			ev.evType = SE_KEY;
 			ev.evValue = K_MOUSE1;
@@ -153,7 +157,7 @@ void CMediaPreviewDlg::OnLButtonDown( UINT nFlags, CPoint point )
 			gui->HandleEvent( &ev, 0 );
 		}
 	}
-	CDialog::OnLButtonDown( nFlags, point );
+	CDialogEx::OnLButtonDown( nFlags, point );
 }
 
 void CMediaPreviewDlg::OnLButtonUp( UINT nFlags, CPoint point )
@@ -163,7 +167,7 @@ void CMediaPreviewDlg::OnLButtonUp( UINT nFlags, CPoint point )
 		idUserInterface* gui = uiManager->FindGui( media );
 		if( gui )
 		{
-			sysEvent_t  ev;
+			sysEvent_t ev;
 			memset( &ev, 0, sizeof( ev ) );
 			ev.evType = SE_KEY;
 			ev.evValue = K_MOUSE1;
@@ -171,7 +175,7 @@ void CMediaPreviewDlg::OnLButtonUp( UINT nFlags, CPoint point )
 			gui->HandleEvent( &ev, 0 );
 		}
 	}
-	CDialog::OnLButtonUp( nFlags, point );
+	CDialogEx::OnLButtonUp( nFlags, point );
 }
 
 void CMediaPreviewDlg::OnMouseMove( UINT nFlags, CPoint point )
@@ -183,7 +187,7 @@ void CMediaPreviewDlg::OnMouseMove( UINT nFlags, CPoint point )
 		{
 			CRect rct;
 			wndPreview.GetClientRect( rct );
-			sysEvent_t  ev;
+			sysEvent_t ev;
 			memset( &ev, 0, sizeof( ev ) );
 			ev.evType = SE_MOUSE;
 			ev.evValue = ( point.x / rct.Width() ) * 640.0f;
@@ -191,5 +195,5 @@ void CMediaPreviewDlg::OnMouseMove( UINT nFlags, CPoint point )
 			gui->HandleEvent( &ev, 0 );
 		}
 	}
-	CDialog::OnMouseMove( nFlags, point );
+	CDialogEx::OnMouseMove( nFlags, point );
 }

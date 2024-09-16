@@ -64,4 +64,3 @@ bool rvGEDeleteModifier::Undo()
 
 	return true;
 }
-

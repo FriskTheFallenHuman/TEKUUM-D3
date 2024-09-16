@@ -128,6 +128,7 @@ void idRenderProgManager::Init()
 		{ BUILTIN_TEXTURE_VERTEXCOLOR_SRGB, "builtin/texture_color", "_sRGB", BIT( USE_SRGB ), false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT },
 		{ BUILTIN_TEXTURE_VERTEXCOLOR_SKINNED, "builtin/texture_color_skinned", "", 0, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT },
 		{ BUILTIN_TEXTURE_TEXGEN_VERTEXCOLOR, "builtin/texture_color_texgen", "",  0, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT },
+		{ BUILTIN_TEXTURE_YCOCG, "builtin/texture_ycocg", "",  0, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT },
 
 		// RB begin
 		{ BUILTIN_INTERACTION, "builtin/lighting/interaction", "", 0, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT },

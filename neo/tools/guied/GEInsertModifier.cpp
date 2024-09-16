@@ -110,4 +110,3 @@ bool rvGEInsertModifier::Undo()
 
 	return true;
 }
-

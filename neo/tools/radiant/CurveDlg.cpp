@@ -36,9 +36,9 @@ If you have questions concerning this license or the applicable additional terms
 
 // CCurveDlg dialog
 
-IMPLEMENT_DYNAMIC( CCurveDlg, CDialog )
-CCurveDlg::CCurveDlg( CWnd* pParent /*=NULL*/ )
-	: CDialog( CCurveDlg::IDD, pParent )
+IMPLEMENT_DYNAMIC( CCurveDlg, CDialogEx )
+CCurveDlg::CCurveDlg( CWnd* pParent )
+	: CDialogEx( CCurveDlg::IDD, pParent )
 {
 }
 
@@ -48,7 +48,7 @@ CCurveDlg::~CCurveDlg()
 
 void CCurveDlg::DoDataExchange( CDataExchange* pDX )
 {
-	CDialog::DoDataExchange( pDX );
+	CDialogEx::DoDataExchange( pDX );
 	DDX_Control( pDX, IDC_COMBO_CURVES, comboCurve );
 }
 
@@ -58,11 +58,8 @@ void CCurveDlg::OnOK()
 	CString str;
 	comboCurve.GetWindowText( str );
 	strCurveType = str;
-	CDialog::OnOK();
+	CDialogEx::OnOK();
 }
 
-BEGIN_MESSAGE_MAP( CCurveDlg, CDialog )
+BEGIN_MESSAGE_MAP( CCurveDlg, CDialogEx )
 END_MESSAGE_MAP()
-
-
-// CCurveDlg message handlers

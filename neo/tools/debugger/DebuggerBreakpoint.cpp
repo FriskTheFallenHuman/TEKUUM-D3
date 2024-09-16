@@ -29,16 +29,19 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "DebuggerApp.h"
+#if defined( ID_ALLOW_TOOLS )
+	#include "DebuggerApp.h"
+#endif
 #include "DebuggerBreakpoint.h"
 
 int rvDebuggerBreakpoint::mNextID = 1;
 
-rvDebuggerBreakpoint::rvDebuggerBreakpoint( const char* filename, int linenumber, int id )
+rvDebuggerBreakpoint::rvDebuggerBreakpoint( const char* filename, int linenumber, int id, bool onceOnly )
 {
 	mFilename = filename;
 	mLineNumber = linenumber;
 	mEnabled = true;
+	mOnceOnly = onceOnly;
 
 	if( id == -1 )
 	{

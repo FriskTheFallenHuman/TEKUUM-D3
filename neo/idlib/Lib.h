@@ -285,6 +285,7 @@ public:
 // geometry
 #include "geometry/RenderMatrix.h"
 #include "geometry/JointTransform.h"
+#include "geometry/Rectangle.h"
 #include "geometry/DrawVert.h"
 #include "geometry/Winding.h"
 #include "geometry/Winding2D.h"

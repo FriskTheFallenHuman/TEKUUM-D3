@@ -29,14 +29,27 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../renderer/tr_local.h"
+#include "../../renderer/RenderCommon.h"
 #include "../../sys/win32/win_local.h"
 
 #include "GEApp.h"
 #include "GESelectionMgr.h"
+#include "GEItemScriptsDlg.h"
 
 #define GUIED_GRABSIZE		7
 #define GUIED_CENTERSIZE	5
+
+#ifndef NOMINMAX
+
+	#ifndef max
+		#define max(a,b)            (((a) > (b)) ? (a) : (b))
+	#endif
+
+	#ifndef min
+		#define min(a,b)            (((a) < (b)) ? (a) : (b))
+	#endif
+
+#endif  /* NOMINMAX */
 
 rvGESelectionMgr::rvGESelectionMgr( )
 {
@@ -92,6 +105,8 @@ void rvGESelectionMgr::Add( idWindow* window, bool expand )
 	gApp.GetNavigator( ).Refresh( );
 	gApp.GetTransformer( ).Update( );
 	gApp.GetProperties().Update( );
+	gApp.GetItemProperties().Update( );
+	GEItescriptsDlg_Init( gApp.GetScriptWindow() );
 
 	UpdateExpression( );
 }
@@ -116,6 +131,8 @@ void rvGESelectionMgr::Remove( idWindow* window )
 		return;
 	}
 
+	GEItescriptsDlg_Apply( gApp.GetScriptWindow() );
+
 	wrapper->SetSelected( false );
 
 	mSelections.Remove( window );
@@ -124,6 +141,8 @@ void rvGESelectionMgr::Remove( idWindow* window )
 	gApp.GetNavigator( ).Refresh( );
 	gApp.GetTransformer( ).Update( );
 	gApp.GetProperties().Update( );
+	gApp.GetItemProperties().Update( );
+	GEItescriptsDlg_Init( gApp.GetScriptWindow() );
 
 	UpdateExpression( );
 }
@@ -139,6 +158,11 @@ void rvGESelectionMgr::Clear()
 {
 	int i;
 
+	if( mSelections.Num() > 0 )
+	{
+		GEItescriptsDlg_Apply( gApp.GetScriptWindow() );
+	}
+
 	for( i = 0; i < mSelections.Num( ); i ++ )
 	{
 		rvGEWindowWrapper::GetWrapper( mSelections[i] )->SetSelected( false );
@@ -150,6 +174,8 @@ void rvGESelectionMgr::Clear()
 	gApp.GetNavigator( ).Refresh( );
 	gApp.GetTransformer( ).Update( );
 	gApp.GetProperties().Update( );
+	gApp.GetItemProperties().Update( );
+	GEItescriptsDlg_Init( gApp.GetScriptWindow() );
 
 	mExpression = false;
 }
@@ -322,10 +348,10 @@ void rvGESelectionMgr::UpdateRectangle()
 		idRectangle selRect;
 		selRect = rvGEWindowWrapper::GetWrapper( mSelections[i] )->GetScreenRect( );
 
-		mRect.w = max( selRect.x + selRect.w, mRect.w );
-		mRect.h = max( selRect.y + selRect.h, mRect.h );
-		mRect.x = min( selRect.x, mRect.x );
-		mRect.y = min( selRect.y, mRect.y );
+		mRect.w = Max( selRect.x + selRect.w, mRect.w );
+		mRect.h = Max( selRect.y + selRect.h, mRect.h );
+		mRect.x = Min( selRect.x, mRect.x );
+		mRect.y = Min( selRect.y, mRect.y );
 	}
 
 	mRect.w -= mRect.x;

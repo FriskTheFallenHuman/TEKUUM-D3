@@ -420,8 +420,6 @@ void StageView::OnLvnItemchanged( NMHDR* pNMHDR, LRESULT* pResult )
 */
 void StageView::OnLvnDeleteallitems( NMHDR* pNMHDR, LRESULT* pResult )
 {
-	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>( pNMHDR );
-
 	//The list has been cleared so clear the prop view
 	m_propView->SetPropertyListType( -1 );
 
@@ -948,7 +946,3 @@ void StageView::DropItemOnList()
 	}
 	m_propView->SetPropertyListType( type, toStage );
 }
-
-
-
-

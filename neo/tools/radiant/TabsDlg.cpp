@@ -33,16 +33,13 @@ If you have questions concerning this license or the applicable additional terms
 #include "TabsDlg.h"
 // CTabsDlg dialog
 
-//IMPLEMENT_DYNAMIC ( CTabsDlg , CDialog )
-CTabsDlg::CTabsDlg( UINT ID , CWnd* pParent /*=NULL*/ )
-	: CDialog( ID, pParent )
+CTabsDlg::CTabsDlg( UINT ID , CWnd* pParent )
+	: CDialogEx( ID, pParent )
 {
 	m_DragTabActive = false;
 }
 
-BEGIN_MESSAGE_MAP( CTabsDlg, CDialog )
-	//}}AFX_MSG_MAP
-//	ON_NOTIFY(TCN_SELCHANGE, IDC_TAB1, OnTcnSelchangeTab1)
+BEGIN_MESSAGE_MAP( CTabsDlg, CDialogEx )
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
 	ON_WM_MOUSEMOVE()
@@ -51,7 +48,7 @@ END_MESSAGE_MAP()
 
 void CTabsDlg::DoDataExchange( CDataExchange* pDX )
 {
-	CDialog::DoDataExchange( pDX );
+	CDialogEx::DoDataExchange( pDX );
 	DDX_Control( pDX, IDC_TAB_INSPECTOR, m_Tabs );
 }
 
@@ -59,9 +56,8 @@ void CTabsDlg::DoDataExchange( CDataExchange* pDX )
 
 BOOL CTabsDlg::OnInitDialog()
 {
-	CDialog::OnInitDialog();
-
-	return TRUE;  // return TRUE  unless you set the focus to a control
+	CDialogEx::OnInitDialog();
+	return TRUE;
 }
 
 void CTabsDlg::OnTcnSelchange( NMHDR* pNMHDR, LRESULT* pResult )
@@ -82,8 +78,7 @@ void CTabsDlg::OnTcnSelchange( NMHDR* pNMHDR, LRESULT* pResult )
 		info->m_TabControlIndex = ID;
 		info->m_Window->ShowWindow( TRUE );
 
-		g_Inspectors->prevMode = info->m_ID;	// sikk - Added
-
+		g_Inspectors->prevMode = info->m_ID;
 	}
 }
 
@@ -178,7 +173,7 @@ int CTabsDlg::PreTranslateMessage( MSG* msg )
 		m_DragTabActive = false;
 	}
 
-	return CDialog::PreTranslateMessage( msg );
+	return CDialogEx::PreTranslateMessage( msg );
 }
 
 bool CTabsDlg::RectWithinDockManager( CRect& rect )
@@ -193,7 +188,7 @@ bool CTabsDlg::RectWithinDockManager( CRect& rect )
 
 void CTabsDlg::OnLButtonDown( UINT nFlags, CPoint point )
 {
-	CDialog::OnLButtonDown( nFlags, point );
+	CDialogEx::OnLButtonDown( nFlags, point );
 }
 
 void CTabsDlg::OnLButtonUp( UINT nFlags, CPoint point )
@@ -203,7 +198,7 @@ void CTabsDlg::OnLButtonUp( UINT nFlags, CPoint point )
 		HandleUndock();
 		m_DragTabActive = false;
 	}
-	CDialog::OnLButtonUp( nFlags, point );
+	CDialogEx::OnLButtonUp( nFlags, point );
 }
 
 
@@ -224,7 +219,7 @@ void CTabsDlg::HandleUndock()
 
 void CTabsDlg::OnMouseMove( UINT nFlags, CPoint point )
 {
-	CDialog::OnMouseMove( nFlags, point );
+	CDialogEx::OnMouseMove( nFlags, point );
 }
 
 
@@ -297,6 +292,7 @@ void CTabsDlg::UpdateTabControlIndices()
 		info->m_TabControlIndex = i;
 	}
 }
+
 void CTabsDlg::OnDestroy()
 {
 	TCITEM item;
@@ -312,9 +308,8 @@ void CTabsDlg::OnDestroy()
 
 		delete info;
 	}
-	CDialog::OnDestroy();
+	CDialogEx::OnDestroy();
 }
-
 
 bool CTabsDlg::IsDocked( CWnd* wnd )
 {

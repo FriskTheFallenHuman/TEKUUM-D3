@@ -32,10 +32,8 @@ If you have questions concerning this license or the applicable additional terms
 
 
 // CTabsDlg dialog
-class CTabsDlg : public CDialog
+class CTabsDlg : public CDialogEx
 {
-//	DECLARE_DYNAMIC ( CTabsDlg )
-	// Construction
 public:
 
 	CTabsDlg( UINT ID , CWnd* pParent = NULL );	// standard constructor

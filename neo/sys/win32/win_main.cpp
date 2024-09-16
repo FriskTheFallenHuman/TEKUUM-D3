@@ -46,7 +46,6 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "../sys_local.h"
 #include "win_local.h"
-#include "rc/CreateResourceIDs.h"
 #include "../../renderer/RenderCommon.h"
 
 idCVar Win32Vars_t::sys_cpustring( "sys_cpustring", "detect", CVAR_SYSTEM | CVAR_INIT, "" );
@@ -421,6 +420,32 @@ ID_TIME_T Sys_FileTimeStamp( idFileHandle fp )
 	itime.QuadPart -= reinterpret_cast<LARGE_INTEGER&>( base_ft ).QuadPart;
 	itime.QuadPart /= 10000000LL;
 	return itime.QuadPart;
+}
+
+/*
+=================
+Sys_IsFile
+=================
+*/
+bool Sys_IsFile( const char* path )
+{
+	DWORD dwAttrib = GetFileAttributesA( path );
+
+	return ( dwAttrib != INVALID_FILE_ATTRIBUTES &&
+			 !( dwAttrib & FILE_ATTRIBUTE_DIRECTORY ) );
+}
+
+/*
+=================
+Sys_IsDirectory
+=================
+*/
+bool Sys_IsDirectory( const char* path )
+{
+	DWORD dwAttrib = GetFileAttributesA( path );
+
+	return ( dwAttrib != INVALID_FILE_ATTRIBUTES &&
+			 ( dwAttrib & FILE_ATTRIBUTE_DIRECTORY ) );
 }
 
 /*
@@ -1160,9 +1185,6 @@ void Sys_Init()
 //	SetTimer( NULL, 0, 100, NULL );
 
 	cmdSystem->AddCommand( "in_restart", Sys_In_Restart_f, CMD_FL_SYSTEM, "restarts the input system" );
-#ifdef DEBUG
-	cmdSystem->AddCommand( "createResourceIDs", CreateResourceIDs_f, CMD_FL_TOOL, "assigns resource IDs in _resouce.h files" );
-#endif
 #if 0
 	cmdSystem->AddCommand( "setAsyncSound", Sys_SetAsyncSound_f, CMD_FL_SYSTEM, "set the async sound option" );
 #endif
@@ -1362,6 +1384,62 @@ void Win_Frame()
 	}
 }
 
+// the MFC tools use Win_GetWindowScalingFactor() for High-DPI support
+#ifdef ID_ALLOW_TOOLS
+
+typedef enum D3_MONITOR_DPI_TYPE
+{
+	D3_MDT_EFFECTIVE_DPI = 0,
+	D3_MDT_ANGULAR_DPI = 1,
+	D3_MDT_RAW_DPI = 2,
+	D3_MDT_DEFAULT = D3_MDT_EFFECTIVE_DPI
+} D3_MONITOR_DPI_TYPE;
+
+// https://docs.microsoft.com/en-us/windows/win32/api/shellscalingapi/nf-shellscalingapi-getdpiformonitor
+// GetDpiForMonitor() - Win8.1+, shellscalingapi.h, Shcore.dll
+static HRESULT( STDAPICALLTYPE* D3_GetDpiForMonitor )( HMONITOR hmonitor, D3_MONITOR_DPI_TYPE dpiType, UINT* dpiX, UINT* dpiY ) = NULL;
+
+// https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getdpiforwindow
+// GetDpiForWindow() - Win10 1607+, winuser.h/Windows.h, User32.dll
+static UINT( WINAPI* D3_GetDpiForWindow )( HWND hwnd ) = NULL;
+
+float Win_GetWindowScalingFactor( HWND window )
+{
+	// the best way - supported by Win10 1607 and newer
+	if( D3_GetDpiForWindow != NULL )
+	{
+		UINT dpi = D3_GetDpiForWindow( window );
+		return static_cast<float>( dpi ) / 96.0f;
+	}
+
+	// probably second best, supported by Win8.1 and newer
+	if( D3_GetDpiForMonitor != NULL )
+	{
+		HMONITOR monitor = MonitorFromWindow( window, MONITOR_DEFAULTTOPRIMARY );
+		UINT dpiX = 96, dpiY;
+		D3_GetDpiForMonitor( monitor, D3_MDT_EFFECTIVE_DPI, &dpiX, &dpiY );
+		return static_cast<float>( dpiX ) / 96.0f;
+	}
+
+	// on older versions of windows, DPI was system-wide (not per monitor)
+	// and changing DPI required logging out and in again (AFAIK), so we only need to get it once
+	static float scaling_factor = -1.0f;
+	if( scaling_factor == -1.0f )
+	{
+		HDC hdc = GetDC( window );
+		if( hdc == NULL )
+		{
+			return 1.0f;
+		}
+		// "Number of pixels per logical inch along the screen width. In a system with multiple display monitors, this value is the same for all monitors."
+		int ppi = GetDeviceCaps( hdc, LOGPIXELSX );
+		scaling_factor = static_cast<float>( ppi ) / 96.0f;
+	}
+	return scaling_factor;
+}
+
+#endif // ID_ALLOW_TOOLS
+
 // code that tells windows we're High DPI aware so it doesn't scale our windows
 // taken from Yamagi Quake II
 
@@ -1370,7 +1448,7 @@ typedef enum D3_PROCESS_DPI_AWARENESS
 	D3_PROCESS_DPI_UNAWARE = 0,
 	D3_PROCESS_SYSTEM_DPI_AWARE = 1,
 	D3_PROCESS_PER_MONITOR_DPI_AWARE = 2
-} YQ2_PROCESS_DPI_AWARENESS;
+} D3_PROCESS_DPI_AWARENESS;
 
 static void setHighDPIMode( void )
 {
@@ -1393,7 +1471,7 @@ static void setHighDPIMode( void )
 
 	if( shcoreDLL )
 	{
-		SetProcessDpiAwareness = ( HRESULT( WINAPI* )( YQ2_PROCESS_DPI_AWARENESS ) )
+		SetProcessDpiAwareness = ( HRESULT( WINAPI* )( D3_PROCESS_DPI_AWARENESS ) )
 								 GetProcAddress( shcoreDLL, "SetProcessDpiAwareness" );
 	}
 
@@ -1406,6 +1484,18 @@ static void setHighDPIMode( void )
 	{
 		SetProcessDPIAware();
 	}
+
+#ifdef ID_ALLOW_TOOLS // also init function pointers for Win_GetWindowScalingFactor() here
+	if( userDLL )
+	{
+		D3_GetDpiForWindow = ( UINT( WINAPI* )( HWND ) )GetProcAddress( userDLL, "GetDpiForWindow" );
+	}
+	if( shcoreDLL )
+	{
+		D3_GetDpiForMonitor = ( HRESULT( STDAPICALLTYPE* )( HMONITOR, D3_MONITOR_DPI_TYPE, UINT*, UINT* ) )
+							  GetProcAddress( shcoreDLL, "GetDpiForMonitor" );
+	}
+#endif // ID_ALLOW_TOOLS
 }
 
 /*
@@ -1479,15 +1569,14 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
 	::SetCursor( hcurSave );
 
+#ifdef ID_ALLOW_TOOLS
 	// Launch the script debugger
 	if( strstr( lpCmdLine, "+debugger" ) )
 	{
-
-#ifdef ID_ALLOW_TOOLS
 		DebuggerClientInit( lpCmdLine );
-#endif
 		return 0;
 	}
+#endif
 
 	::SetFocus( win32.hWnd );
 

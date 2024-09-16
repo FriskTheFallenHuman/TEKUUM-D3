@@ -181,7 +181,8 @@ void ToggleListView::OnSize( UINT nType, int cx, int cy )
 */
 void ToggleListView::MeasureItem( LPMEASUREITEMSTRUCT lpMeasureItemStruct )
 {
-	lpMeasureItemStruct->itemHeight = TOGGLELIST_ITEMHEIGHT;
+	float scaling_factor = Win_GetWindowScalingFactor( GetSafeHwnd() );
+	lpMeasureItemStruct->itemHeight = TOGGLELIST_ITEMHEIGHT * scaling_factor;
 }
 
 /**
@@ -314,7 +315,7 @@ void ToggleListView::DrawItem( LPDRAWITEMSTRUCT lpDrawItemStruct )
 
 	int colorIndex = ( ( lpDrawItemStruct->itemState & ODS_SELECTED ) ? COLOR_HIGHLIGHTTEXT : COLOR_WINDOWTEXT );
 	SetTextColor( lpDrawItemStruct->hDC, GetSysColor( colorIndex ) );
-	DrawText( lpDrawItemStruct->hDC, szBuff, strlen( szBuff ), &rDraw, DT_LEFT | DT_VCENTER | DT_SINGLELINE );
+	DrawTextA( lpDrawItemStruct->hDC, szBuff, strlen( szBuff ), &rDraw, DT_LEFT | DT_VCENTER | DT_SINGLELINE );
 
 }
 
@@ -338,7 +339,3 @@ void ToggleListView::Draw3dRect( HDC hDC, RECT* rect, HBRUSH topLeft, HBRUSH bot
 	SetRect( &rOut, rect->left, rect->bottom, rect->right, rect->bottom - 1 );
 	FillRect( hDC, &rOut, bottomRight );
 }
-
-
-
-

@@ -29,7 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/rc/DeclEditor_resource.h"
+
+#include "../../sys/win32/rc/resource.h"
 
 #include "../comafx/CPathTreeCtrl.h"
 #include "DialogDeclBrowser.h"
@@ -214,6 +215,7 @@ void DialogDeclNew::OnBnClickedFile()
 
 	switch( type )
 	{
+		// FIXME: SteelStorm2 has a _v1 suffix for materials, def and fx - why?
 		case DECL_TABLE:
 			folder = "materials";
 			ext = "(*.mtr)|*.mtr|(*.*)|*.*||";

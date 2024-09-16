@@ -31,7 +31,6 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "../../sys/win32/win_local.h"
 
-#include "../../ui/Rectangle.h"
 #include "../../ui/Window.h"
 #include "../../ui/UserInterfaceLocal.h"
 
@@ -63,6 +62,10 @@ If you have questions concerning this license or the applicable additional terms
 	#include "GEStatusBar.h"
 #endif // GESTATUSBAR_H_
 
+#ifndef GEITEMPROPS_H_
+	#include "GEItemPropsDlg.h"
+#endif
+
 // Utility functions
 const char* StringFromVec4( idVec4& vec );
 bool		IsExpression( const char* s );
@@ -88,10 +91,16 @@ public:
 	rvGEProperties&		GetProperties();
 	rvGETransformer&	GetTransformer();
 	rvGEOptions&		GetOptions();
+	rvGEItemProps&		GetItemProperties();
 	HINSTANCE			GetInstance();
 	HWND				GetMDIFrame();
 	HWND				GetMDIClient();
 	rvGEStatusBar&		GetStatusBar();
+	HWND				GetScriptWindow();
+	void				SetScriptWindow( HWND hWnd )
+	{
+		mScripts = hWnd;
+	}
 
 	bool				OpenFile( const char* filename );
 	bool				SaveFile( const char* filename );
@@ -104,6 +113,11 @@ public:
 	int					ToolWindowActivate( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam );
 
 	int					MessageBox( const char* text, int flags );
+
+	bool				ApplyProperties( idDict* dict, bool keyShortcut = false );
+
+	// helper bool to not exit if user chooses to not do so during quit dialogs
+	static bool				mDontExit;
 
 protected:
 
@@ -124,6 +138,8 @@ protected:
 	rvGETransformer			mTransformer;
 	rvGEStatusBar			mStatusBar;
 	rvGEProperties			mProperties;
+	rvGEItemProps			mItemProperties;
+	HWND					mScripts;
 
 	HMENU					mRecentFileMenu;
 	int						mRecentFileInsertPos;
@@ -158,6 +174,16 @@ ID_INLINE rvGEProperties& rvGEApp::GetProperties()
 ID_INLINE rvGETransformer& rvGEApp::GetTransformer()
 {
 	return mTransformer;
+}
+
+ID_INLINE HWND rvGEApp::GetScriptWindow( void )
+{
+	return mScripts;
+}
+
+ID_INLINE rvGEItemProps& rvGEApp::GetItemProperties( void )
+{
+	return mItemProperties;
 }
 
 ID_INLINE rvGEOptions& rvGEApp::GetOptions()

@@ -101,7 +101,9 @@ extern idCVar		com_showAsyncStats;
 extern idCVar		com_showSoundDecoders;
 extern idCVar		com_makingBuild;
 extern idCVar		com_updateLoadSize;
-extern idCVar		com_videoRam;
+extern idCVar		com_enableDebuggerServer;
+extern idCVar		com_dbgClientAdr;
+extern idCVar		com_dbgServerAdr;
 extern idCVar		com_productionMode;
 
 // RB begin
@@ -152,6 +154,9 @@ struct MemInfo_t
 	int				soundAssetsTotal;
 };
 
+class idInterpreter;
+class idProgram;
+
 class idCommon
 {
 public:
@@ -199,6 +204,9 @@ public:
 	// Writes cvars with the given flags to a file.
 	virtual void				WriteFlaggedCVarsToFile( const char* filename, int flags, const char* setCmd ) = 0;
 
+
+	// Debbugger hook to check if a breakpoint has been hit
+	virtual void				DebuggerCheckBreakpoint( idInterpreter* interpreter, idProgram* program, int instructionPointer ) = 0;
 
 	// Begins redirection of console output to the given buffer.
 	virtual void				BeginRedirect( char* buffer, int buffersize, void ( *flush )( const char* ) ) = 0;

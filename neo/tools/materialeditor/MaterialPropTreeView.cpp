@@ -269,8 +269,3 @@ void MaterialPropTreeView::RefreshProperties()
 
 	Invalidate();
 }
-
-
-
-
-

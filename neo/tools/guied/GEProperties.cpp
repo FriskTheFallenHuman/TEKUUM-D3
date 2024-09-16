@@ -29,7 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/rc/guied_resource.h"
+
+#include "../../sys/win32/rc/resource.h"
 
 #include "GEApp.h"
 #include "GEProperties.h"
@@ -186,6 +187,7 @@ bool rvGEProperties::AddModifier( const char* name, const char* value )
 	mWorkspace->GetModifierStack().Append( new rvGEStateModifier( "Property Change", mWrapper->GetWindow(), tempstate ) );
 	mWorkspace->SetModified( true );
 	gApp.GetNavigator().Update( );
+	gApp.GetItemProperties().Update( );
 
 	return true;
 }
@@ -199,7 +201,7 @@ Window Procedure for the properties window
 */
 LRESULT CALLBACK rvGEProperties::WndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
-	rvGEProperties* kv = ( rvGEProperties* ) GetWindowLong( hWnd, GWL_USERDATA );
+	rvGEProperties* kv = ( rvGEProperties* ) GetWindowLongPtr( hWnd, GWLP_USERDATA );
 
 	if( kv && kv->mGrid.ReflectMessage( hWnd, msg, wParam, lParam ) )
 	{
@@ -271,7 +273,7 @@ LRESULT CALLBACK rvGEProperties::WndProc( HWND hWnd, UINT msg, WPARAM wParam, LP
 			// Attach the class to the window first
 			cs = ( LPCREATESTRUCT ) lParam;
 			kv = ( rvGEProperties* ) cs->lpCreateParams;
-			SetWindowLong( hWnd, GWL_USERDATA, ( LONG )kv );
+			SetWindowLongPtr( hWnd, GWLP_USERDATA, ( LONG_PTR )kv );
 
 			kv->mGrid.Create( hWnd, 999, PGS_ALLOWINSERT );
 
@@ -307,5 +309,3 @@ LRESULT CALLBACK rvGEProperties::WndProc( HWND hWnd, UINT msg, WPARAM wParam, LP
 
 	return DefWindowProc( hWnd, msg, wParam, lParam );
 }
-
-

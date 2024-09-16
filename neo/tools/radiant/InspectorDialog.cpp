@@ -31,7 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "qe3.h"
 #include "Radiant.h"
-#include "GLWidget.h"
+#include "../common/GLWidget.h"
 #include "ConsoleDlg.h"
 #include "InspectorDialog.h"
 #include "TabsDlg.h"
@@ -41,13 +41,14 @@ CInspectorDialog* g_Inspectors = NULL;
 
 void InspectorsDockingCallback( bool docked, int ID, CWnd* wnd )
 {
-	g_Inspectors->SetDockedTabs( docked, ID );
+	g_Inspectors->SetDockedTabs( docked , ID );
 }
 
-
 // CInspectorDialog dialog
+//
 //IMPLEMENT_DYNAMIC(CInspectorDialog,CTabsDlg)
-CInspectorDialog::CInspectorDialog( CWnd* pParent /*=NULL*/ )
+
+CInspectorDialog::CInspectorDialog( CWnd* pParent )
 	: CTabsDlg( CInspectorDialog::IDD, pParent )
 {
 	initialized = false;
@@ -62,43 +63,44 @@ CInspectorDialog::~CInspectorDialog()
 BEGIN_MESSAGE_MAP( CInspectorDialog, CTabsDlg )
 	ON_NOTIFY( TCN_SELCHANGE, IDC_TAB_INSPECTOR, OnTcnSelchange )
 	ON_WM_SIZE()
+	ON_WM_SIZING()
+	ON_WM_MOVING()
 	ON_WM_DESTROY()
 	ON_WM_CLOSE()
 END_MESSAGE_MAP()
 
 // CInspectorDialog message handlers
+
 BOOL CInspectorDialog::OnInitDialog()
 {
 	CTabsDlg::OnInitDialog();
 
 	ASSERT( m_Tabs.GetSafeHwnd() );
 
-	LoadWindowPlacement( GetSafeHwnd(), "radiant_InspectorsWindow" );
+	LoadWindowPlacement( GetSafeHwnd() , "radiant_InspectorsWindow" );
 
 	consoleWnd.Create( IDD_DIALOG_CONSOLE, this );
 	texWnd.Create( TEXTURE_WINDOW_CLASS, "", QE3_SPLITTER_STYLE, CRect( 5, 5, 10, 10 ), this, 1299 );
 	mediaDlg.Create( IDD_DIALOG_TEXTURELIST, this );
 	entityDlg.Create( IDD_DIALOG_ENTITY, this );
 
-	dockedTabs = GetCvarInt( "radiant_InspectorDockedDialogs", W_CONSOLE | W_TEXTURE | W_MEDIA );
+	dockedTabs = GetCvarInt( "radiant_InspectorDockedDialogs" , W_CONSOLE | W_TEXTURE | W_MEDIA );
 
-	AddDockedWindow( &consoleWnd, W_CONSOLE, 1, "Console", ( dockedTabs & W_CONSOLE ) != 0, InspectorsDockingCallback );
-	AddDockedWindow( &texWnd, W_TEXTURE, 2, "Textures", ( dockedTabs & W_TEXTURE ) != 0, InspectorsDockingCallback );
-	AddDockedWindow( &mediaDlg, W_MEDIA, 3, "Media", ( dockedTabs & W_MEDIA ) != 0, InspectorsDockingCallback );
-	AddDockedWindow( &entityDlg, W_ENTITY, 4, "Entity", ( dockedTabs & W_ENTITY ) != 0, InspectorsDockingCallback );
+	AddDockedWindow( &consoleWnd , W_CONSOLE , 1 , "Console"	 , ( dockedTabs & W_CONSOLE ) != 0 , InspectorsDockingCallback );
+	AddDockedWindow( &texWnd	  , W_TEXTURE , 2 , "Textures"   , ( dockedTabs & W_TEXTURE ) != 0 , InspectorsDockingCallback );
+	AddDockedWindow( &mediaDlg	  , W_MEDIA	  , 3 , "Media"	     , ( dockedTabs & W_MEDIA ) != 0 , InspectorsDockingCallback );
+	AddDockedWindow( &entityDlg  , W_ENTITY  , 4 , "Entity"	 , ( dockedTabs & W_ENTITY ) != 0 , InspectorsDockingCallback );
 
 	SetMode( W_CONSOLE );
 	initialized = true;
+	prevMode = W_CONSOLE;
 
-	prevMode = W_CONSOLE;	// sikk - Added
-
-	return TRUE;  // return TRUE unless you set the focus to a control
-	// EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;
 }
 
 void CInspectorDialog::SetMode( int mode, bool updateTabs )
 {
-// ---> sikk - Added - TODO: Needs some work
+	// TODO: Needs some work
 	if( IsWindowVisible() && prevMode == mode )
 	{
 		ShowWindow( 0 );
@@ -107,12 +109,13 @@ void CInspectorDialog::SetMode( int mode, bool updateTabs )
 	{
 		ShowWindow( 1 );
 	}
-	prevMode = mode;	// sikk - Added
-// <--- sikk - Added
+
+	prevMode = mode;
+
 	FocusWindow( mode );
 }
 
-void CInspectorDialog::UpdateEntitySel( eclass_t* ent )
+void CInspectorDialog::UpdateEntitySel( const eclass_t* ent )
 {
 	entityDlg.UpdateEntitySel( ent );
 }
@@ -145,6 +148,10 @@ void CInspectorDialog::OnSize( UINT nType, int cx, int cy )
 	POSITION pos;
 	WORD wID;
 
+	float scaling_factor = Win_GetWindowScalingFactor( GetSafeHwnd() );
+	int s5 = int( 5 * scaling_factor );
+	int s4 = int( 4 * scaling_factor );
+
 	if( !initialized )
 	{
 		return;
@@ -156,16 +163,16 @@ void CInspectorDialog::OnSize( UINT nType, int cx, int cy )
 	CRect tabRect;
 	m_Tabs.GetWindowRect( tabRect );
 	// retain vert size but size 4 in from edges and 4 up from bottom
-	tabRect.left = 4;
-	tabRect.right = rect.Width() - 4;
-	tabRect.top = rect.Height() - tabRect.Height() - 4;
-	tabRect.bottom = rect.Height() - 4;
+	tabRect.left = s4;
+	tabRect.right = rect.Width() - s4;
+	tabRect.top = rect.Height() - tabRect.Height() - s4;
+	tabRect.bottom = rect.Height() - s4;
 	// adjust rect for children size
-	rect.bottom -= 5 + tabRect.Height();
+	rect.bottom -= s5 + tabRect.Height();
 
 	m_Tabs.SetWindowPos( NULL, tabRect.left, tabRect.top, tabRect.Width(), tabRect.Height(), 0 );
 
-	for( pos = m_Windows.GetStartPosition(); pos != NULL; )
+	for( pos = m_Windows.GetStartPosition(); pos != NULL ; )
 	{
 		m_Windows.GetNextAssoc( pos, wID, ( void*& )info );
 
@@ -173,12 +180,29 @@ void CInspectorDialog::OnSize( UINT nType, int cx, int cy )
 		{
 			info->m_Window->SetWindowPos( NULL, rect.left, rect.top, rect.Width(), rect.Height(), 0 );
 		}
+
+	}
+}
+
+void CInspectorDialog::OnSizing( UINT nSide, LPRECT lpRect )
+{
+	if( TryDocking( GetSafeHwnd(), nSide, lpRect, 0 ) )
+	{
+		return;
+	}
+}
+
+void CInspectorDialog::OnMoving( UINT nSide, LPRECT lpRect )
+{
+	if( TryDocking( GetSafeHwnd(), nSide, lpRect, 0 ) )
+	{
+		return;
 	}
 }
 
 void CInspectorDialog::OnDestroy()
 {
-	::SaveWindowPlacement( GetSafeHwnd(), "radiant_InspectorsWindow" );
+	::SaveWindowPlacement( GetSafeHwnd() , "radiant_InspectorsWindow" );
 	SetCvarInt( "radiant_InspectorDockedDialogs" , dockedTabs );
 
 	CTabsDlg::OnDestroy();
@@ -186,18 +210,18 @@ void CInspectorDialog::OnDestroy()
 
 void CInspectorDialog::OnClose()
 {
-// sikk - Added - Closing inspector dialog simply hides it
 	ShowWindow( 0 );
-//	CTabsDlg::OnClose();
+	//	CTabsDlg::OnClose();
 }
 
 BOOL CInspectorDialog::PreTranslateMessage( MSG* pMsg )
 {
-// ---> sikk - Added
-	//if ( pMsg->message == WM_LBUTTONDOWN || pMsg->message == WM_RBUTTONDOWN || pMsg->message == WM_MBUTTONDOWN ) {
-	//	g_Inspectors->BringWindowToTop();
-	//}
-// <--- sikk - Added
+	/*
+	if ( pMsg->message == WM_LBUTTONDOWN || pMsg->message == WM_RBUTTONDOWN || pMsg->message == WM_MBUTTONDOWN ) {
+		g_Inspectors->BringWindowToTop();
+	}
+	*/
+
 	// TODO: Add your specialized code here and/or call the base class
 	if( pMsg->message == WM_KEYDOWN || pMsg->message == WM_KEYUP )
 	{
@@ -206,7 +230,7 @@ BOOL CInspectorDialog::PreTranslateMessage( MSG* pMsg )
 	return CTabsDlg::PreTranslateMessage( pMsg );
 }
 
-void CInspectorDialog::SetDockedTabs( bool docked, int ID )
+void CInspectorDialog::SetDockedTabs( bool docked , int ID )
 {
 	if( docked )
 	{

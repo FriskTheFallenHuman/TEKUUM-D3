@@ -83,27 +83,27 @@ protected:
 	DECLARE_DYNCREATE( StageView )
 
 	afx_msg int				OnCreate( LPCREATESTRUCT lpCreateStruct );
-	afx_msg void 			OnLvnItemchanged( NMHDR* pNMHDR, LRESULT* pResult );
-	afx_msg void 			OnLvnDeleteallitems( NMHDR* pNMHDR, LRESULT* pResult );
-	afx_msg void 			OnLvnBegindrag( NMHDR* pNMHDR, LRESULT* pResult );
-	afx_msg void 			OnLButtonUp( UINT nFlags, CPoint point );
-	afx_msg void 			OnMouseMove( UINT nFlags, CPoint point );
-	afx_msg void 			OnNMRclick( NMHDR* pNMHDR, LRESULT* pResult );
+	afx_msg void			OnLvnItemchanged( NMHDR* pNMHDR, LRESULT* pResult );
+	afx_msg void			OnLvnDeleteallitems( NMHDR* pNMHDR, LRESULT* pResult );
+	afx_msg void			OnLvnBegindrag( NMHDR* pNMHDR, LRESULT* pResult );
+	afx_msg void			OnLButtonUp( UINT nFlags, CPoint point );
+	afx_msg void			OnMouseMove( UINT nFlags, CPoint point );
+	afx_msg void			OnNMRclick( NMHDR* pNMHDR, LRESULT* pResult );
 
-	afx_msg void 			OnRenameStage();
-	afx_msg void 			OnDeleteStage();
-	afx_msg void 			OnDeleteAllStages();
-	afx_msg void 			OnAddStage();
-	afx_msg void 			OnAddBumpmapStage();
-	afx_msg void 			OnAddDiffuseStage();
-	afx_msg void 			OnAddSpecualarStage();
+	afx_msg void			OnRenameStage();
+	afx_msg void			OnDeleteStage();
+	afx_msg void			OnDeleteAllStages();
+	afx_msg void			OnAddStage();
+	afx_msg void			OnAddBumpmapStage();
+	afx_msg void			OnAddDiffuseStage();
+	afx_msg void			OnAddSpecualarStage();
 
-	afx_msg void 			OnCopy();
-	afx_msg void 			OnPaste();
+	afx_msg void			OnCopy();
+	afx_msg void			OnPaste();
 
-	afx_msg void 			OnLvnBeginlabeledit( NMHDR* pNMHDR, LRESULT* pResult );
-	afx_msg void 			OnLvnEndlabeledit( NMHDR* pNMHDR, LRESULT* pResult );
-	afx_msg void 			OnChar( UINT nChar, UINT nRepCnt, UINT nFlags );
+	afx_msg void			OnLvnBeginlabeledit( NMHDR* pNMHDR, LRESULT* pResult );
+	afx_msg void			OnLvnEndlabeledit( NMHDR* pNMHDR, LRESULT* pResult );
+	afx_msg void			OnChar( UINT nChar, UINT nRepCnt, UINT nFlags );
 	DECLARE_MESSAGE_MAP()
 
 	//Overrides
@@ -132,5 +132,3 @@ protected:
 
 	bool					internalChange;
 };
-
-

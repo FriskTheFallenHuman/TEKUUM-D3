@@ -29,7 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/rc/Common_resource.h"
+
+#include "../../sys/win32/rc/resource.h"
 
 #include "DialogGoToLine.h"
 

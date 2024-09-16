@@ -707,7 +707,7 @@ void MaterialDoc::Save()
 	}
 	else
 	{
-		MessageBox( GetMaterialEditorWindow(), va( "Unable to save '%s'. It may be read-only", name.c_str() ), "Save Error", MB_OK | MB_ICONERROR );
+		MessageBoxA( GetMaterialEditorWindow(), va( "Unable to save '%s'. It may be read-only", name.c_str() ), "Save Error", MB_OK | MB_ICONERROR );
 	}
 }
 
@@ -756,7 +756,7 @@ void MaterialDoc::ParseMaterialText( const char* source )
 	src.SkipUntilString("{");*/
 
 	//Now let the material parse the text
-	renderMaterial->Parse( source, strlen( source ) );
+	renderMaterial->Parse( source, strlen( source ), false );
 }
 
 /**
@@ -880,7 +880,6 @@ void MaterialDoc::ParseStage( idLexer* src )
 void MaterialDoc::AddSpecialMapStage( const char* stageName, const char* map )
 {
 	MEStage_t* newStage = new MEStage_t();
-	int index = editMaterial.stages.Append( newStage );
 	newStage->stageData.Set( "name", stageName );
 	newStage->stageData.Set( "map", map );
 	newStage->stageData.SetInt( "stagetype", STAGE_TYPE_SPECIALMAP );
@@ -1101,4 +1100,3 @@ void MaterialDoc::WriteMaterialDef( int stage, idFile_Memory* file, int type, in
 		}
 	}
 }
-

@@ -35,8 +35,6 @@ If you have questions concerning this license or the applicable additional terms
 
 #ifdef _DEBUG
 	#define new DEBUG_NEW
-	#undef THIS_FILE
-	static char THIS_FILE[] = __FILE__;
 #endif
 
 /////////////////////////////////////////////////////////////////////////////
@@ -44,10 +42,9 @@ If you have questions concerning this license or the applicable additional terms
 
 CPatchDialog g_PatchDialog;
 
-CPatchDialog::CPatchDialog( CWnd* pParent /*=NULL*/ )
-	: CDialog( CPatchDialog::IDD, pParent )
+CPatchDialog::CPatchDialog( CWnd* pParent )
+	: CDialogEx( CPatchDialog::IDD, pParent )
 {
-	//{{AFX_DATA_INIT(CPatchDialog)
 	m_strName = _T( "" );
 	m_fS = 0.0f;
 	m_fT = 0.0f;
@@ -59,15 +56,13 @@ CPatchDialog::CPatchDialog( CWnd* pParent /*=NULL*/ )
 	m_fRotate = 45;
 	m_fVScale = 0.05f;
 	m_fVShift = 0.05f;
-	//}}AFX_DATA_INIT
 	m_Patch = NULL;
 }
 
 
 void CPatchDialog::DoDataExchange( CDataExchange* pDX )
 {
-	CDialog::DoDataExchange( pDX );
-	//{{AFX_DATA_MAP(CPatchDialog)
+	CDialogEx::DoDataExchange( pDX );
 	DDX_Control( pDX, IDC_SPIN_VSHIFT, m_wndVShift );
 	DDX_Control( pDX, IDC_SPIN_VSCALE, m_wndVScale );
 	DDX_Control( pDX, IDC_SPIN_ROTATE, m_wndRotate );
@@ -87,12 +82,9 @@ void CPatchDialog::DoDataExchange( CDataExchange* pDX )
 	DDX_Text( pDX, IDC_ROTATE, m_fRotate );
 	DDX_Text( pDX, IDC_VSCALE, m_fVScale );
 	DDX_Text( pDX, IDC_VSHIFT, m_fVShift );
-	//}}AFX_DATA_MAP
 }
 
-
-BEGIN_MESSAGE_MAP( CPatchDialog, CDialog )
-	//{{AFX_MSG_MAP(CPatchDialog)
+BEGIN_MESSAGE_MAP( CPatchDialog, CDialogEx )
 	ON_BN_CLICKED( IDC_BTN_PATCHDETAILS, OnBtnPatchdetails )
 	ON_BN_CLICKED( IDC_BTN_PATCHFIT, OnBtnPatchfit )
 	ON_BN_CLICKED( IDC_BTN_PATCHNATURAL, OnBtnPatchnatural )
@@ -107,10 +99,8 @@ BEGIN_MESSAGE_MAP( CPatchDialog, CDialog )
 	ON_NOTIFY( UDN_DELTAPOS, IDC_SPIN_HSHIFT, OnDeltaposSpin )
 	ON_WM_DESTROY()
 	ON_BN_CLICKED( IDC_APPLY, OnApply )
-	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
-/////////////////////////////////////////////////////////////////////////////
 // CPatchDialog message handlers
 
 void CPatchDialog::OnBtnPatchdetails()
@@ -154,14 +144,12 @@ void CPatchDialog::OnSelchangeComboRow()
 void CPatchDialog::OnSelchangeComboType()
 {
 	// TODO: Add your control notification handler code here
-
 }
 
 void CPatchDialog::OnOK()
 {
 	m_Patch = NULL;
-
-	CDialog::OnOK();
+	CDialogEx::OnOK();
 }
 
 void CPatchDialog::OnDeltaposSpin( NMHDR* pNMHDR, LRESULT* pResult )
@@ -173,7 +161,7 @@ void CPatchDialog::OnDeltaposSpin( NMHDR* pNMHDR, LRESULT* pResult )
 
 BOOL CPatchDialog::OnInitDialog()
 {
-	CDialog::OnInitDialog();
+	CDialogEx::OnInitDialog();
 
 	m_wndHScale.SetRange( 0, 1000 );
 	m_wndVScale.SetRange( 0, 1000 );
@@ -183,13 +171,8 @@ BOOL CPatchDialog::OnInitDialog()
 
 	GetPatchInfo();
 
-	// TODO: Add extra initialization here
-
-	return TRUE;  // return TRUE unless you set the focus to a control
-	// EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;
 }
-
-
 
 void CPatchDialog::GetPatchInfo()
 {
@@ -197,16 +180,15 @@ void CPatchDialog::GetPatchInfo()
 	if( m_Patch != NULL )
 	{
 		CString str;
-		int i;
 		m_wndRows.ResetContent();
-		for( i = 0; i < m_Patch->height; i++ )
+		for( int i = 0; i < m_Patch->height; i++ )
 		{
 			str.Format( "%i", i );
 			m_wndRows.AddString( str );
 		}
 		m_wndRows.SetCurSel( 0 );
 		m_wndCols.ResetContent();
-		for( i = 0; i < m_Patch->width; i++ )
+		for( int i = 0; i < m_Patch->width; i++ )
 		{
 			str.Format( "%i", i );
 			m_wndCols.AddString( str );
@@ -228,7 +210,7 @@ void DoPatchInspector()
 		g_PatchDialog.Create( IDD_DIALOG_PATCH );
 		CRect rct;
 		LONG lSize = sizeof( rct );
-		if( LoadRegistryInfo( "Radiant::PatchWindow", &rct, &lSize ) )
+		if( LoadRegistryInfo( "radiant_patchwindow", &rct, &lSize ) )
 		{
 			g_PatchDialog.SetWindowPos( NULL, rct.left, rct.top, 0, 0, SWP_NOSIZE );
 		}
@@ -243,7 +225,6 @@ void UpdatePatchInspector()
 	{
 		g_PatchDialog.UpdateInfo();
 	}
-
 }
 
 void CPatchDialog::OnDestroy()
@@ -252,7 +233,7 @@ void CPatchDialog::OnDestroy()
 	{
 		CRect rct;
 		GetWindowRect( rct );
-		SaveRegistryInfo( "Radiant::PatchWindow", &rct, sizeof( rct ) );
+		SaveRegistryInfo( "radiant_patchwindow", &rct, sizeof( rct ) );
 	}
 	CDialog::OnDestroy();
 }
@@ -260,7 +241,6 @@ void CPatchDialog::OnDestroy()
 void CPatchDialog::UpdateRowColInfo()
 {
 	m_fX = m_fY = m_fZ = m_fS = m_fT = 0.0;
-
 	if( m_Patch != NULL )
 	{
 		int r = m_wndRows.GetCurSel();
@@ -270,10 +250,8 @@ void CPatchDialog::UpdateRowColInfo()
 			m_fX = m_Patch->ctrl( c, r ).xyz[0];
 			m_fY = m_Patch->ctrl( c, r ).xyz[1];
 			m_fZ = m_Patch->ctrl( c, r ).xyz[2];
-			// RB: BFG idDrawVert
 			m_fS = m_Patch->ctrl( c, r ).GetTexCoord().x;
 			m_fT = m_Patch->ctrl( c, r ).GetTexCoord().y;
-			// RB end
 		}
 	}
 	UpdateData( FALSE );
@@ -296,9 +274,7 @@ void CPatchDialog::OnApply()
 			m_Patch->ctrl( c, r ).xyz[0] = m_fX;
 			m_Patch->ctrl( c, r ).xyz[1] = m_fY;
 			m_Patch->ctrl( c, r ).xyz[2] = m_fZ;
-			// RB: BFG idDrawVert
 			m_Patch->ctrl( c, r ).SetTexCoord( m_fS, m_fT );
-			// RB end
 			Patch_MakeDirty( m_Patch );
 			Sys_UpdateWindows( W_ALL );
 		}
@@ -313,7 +289,6 @@ void CPatchDialog::UpdateSpinners( bool bUp, int nID )
 	td.scale[0] = td.scale[1] = 0.0;
 	td.shift[0] = td.shift[1] = 0.0;
 	td.value = 0;
-
 
 	UpdateData( TRUE );
 
@@ -350,7 +325,6 @@ void CPatchDialog::UpdateSpinners( bool bUp, int nID )
 			td.scale[1] = 1 + m_fVScale;
 		}
 	}
-
 	else if( nID == IDC_SPIN_HSHIFT )
 	{
 		if( bUp )
@@ -377,5 +351,3 @@ void CPatchDialog::UpdateSpinners( bool bUp, int nID )
 	Patch_SetTextureInfo( &td );
 	Sys_UpdateWindows( W_CAMERA );
 }
-
-

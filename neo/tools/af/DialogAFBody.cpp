@@ -29,7 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/rc/AFEditor_resource.h"
+
+#include "../../sys/win32/rc/resource.h"
 
 #include "DialogAF.h"
 #include "DialogAFName.h"
@@ -92,7 +93,7 @@ toolTip_t DialogAFBody::toolTips[] =
 	{ IDC_BUTTON_CM_BROWSE, "browse custom collision model" },
 	{ IDC_COMBO_BONE_JOINT1, "first joint of bone collision model" },
 	{ IDC_COMBO_BONE_JOINT2, "second joint of bone collision model" },
-	{ IDC_EDIT_CM_HEIGHT, "hieght of the collision model" },
+	{ IDC_EDIT_CM_HEIGHT, "height of the collision model" },
 	{ IDC_EDIT_CM_WIDTH, "width of the collision model" },
 	{ IDC_EDIT_CM_LENGTH, "length of the collision model" },
 	{ IDC_EDIT_CM_NUMSIDES, "number of sides of the collision model" },
@@ -800,7 +801,7 @@ BOOL DialogAFBody::OnInitDialog()
 DialogAFBody::OnToolHitTest
 ================
 */
-int DialogAFBody::OnToolHitTest( CPoint point, TOOLINFO* pTI ) const
+INT_PTR DialogAFBody::OnToolHitTest( CPoint point, TOOLINFO* pTI ) const
 {
 	CDialog::OnToolHitTest( point, pTI );
 	return DefaultOnToolHitTest( toolTips, this, point, pTI );

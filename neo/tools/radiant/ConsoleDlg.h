@@ -25,25 +25,23 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
-#pragma once
-#include "afxwin.h"
 
+#pragma once
 
 // CConsoleDlg dialog
 
-class CConsoleDlg : public CDialog
+class CConsoleDlg : public CDialogEx
 {
 	DECLARE_DYNCREATE( CConsoleDlg )
 
 public:
-	CConsoleDlg( CWnd* pParent = NULL ); // standard constructor
+	CConsoleDlg( CWnd* pParent = NULL );   // standard constructor
 	virtual ~CConsoleDlg();
 
-// Dialog Data
 	enum { IDD = IDD_DIALOG_CONSOLE };
 
 protected:
-	virtual void DoDataExchange( CDataExchange* pDX );  // DDX/DDV support
+	virtual void DoDataExchange( CDataExchange* pDX );    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
 public:

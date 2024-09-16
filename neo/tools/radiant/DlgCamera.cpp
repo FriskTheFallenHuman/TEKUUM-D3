@@ -29,7 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/rc/common_resource.h"
+
+#include "../../sys/win32/rc/resource.h"
 #include "../comafx/DialogName.h"
 
 #include "qe3.h"
@@ -40,8 +41,6 @@ If you have questions concerning this license or the applicable additional terms
 
 #ifdef _DEBUG
 	#define new DEBUG_NEW
-	#undef THIS_FILE
-	static char THIS_FILE[] = __FILE__;
 #endif
 
 CDlgCamera g_dlgCamera;
@@ -54,7 +53,7 @@ void showCameraInspector()
 		g_dlgCamera.Create( IDD_DLG_CAMERA );
 		CRect rct;
 		LONG lSize = sizeof( rct );
-		if( LoadRegistryInfo( "Radiant::CameraInspector", &rct, &lSize ) )
+		if( LoadRegistryInfo( "radiant_camerainspector", &rct, &lSize ) )
 		{
 			g_dlgCamera.SetWindowPos( NULL, rct.left, rct.top, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW );
 		}
@@ -63,14 +62,12 @@ void showCameraInspector()
 	g_dlgCamera.ShowWindow( SW_SHOW );
 	g_dlgCamera.setupFromCamera();
 }
-/////////////////////////////////////////////////////////////////////////////
+
 // CDlgCamera dialog
 
-
-CDlgCamera::CDlgCamera( CWnd* pParent /*=NULL*/ )
-	: CDialog( CDlgCamera::IDD, pParent )
+CDlgCamera::CDlgCamera( CWnd* pParent )
+	: CDialogEx( CDlgCamera::IDD, pParent )
 {
-	//{{AFX_DATA_INIT(CDlgCamera)
 	m_strName = _T( "" );
 	m_fSeconds = 0.0f;
 	m_trackCamera = TRUE;
@@ -78,14 +75,12 @@ CDlgCamera::CDlgCamera( CWnd* pParent /*=NULL*/ )
 	m_currentSegment = 0;
 	m_strType = _T( "" );
 	m_editPoints = 0;
-	//}}AFX_DATA_INIT
 }
 
 
 void CDlgCamera::DoDataExchange( CDataExchange* pDX )
 {
-	CDialog::DoDataExchange( pDX );
-	//{{AFX_DATA_MAP(CDlgCamera)
+	CDialogEx::DoDataExchange( pDX );
 	DDX_Control( pDX, IDC_SCROLLBAR_SEGMENT, m_wndSegments );
 	DDX_Control( pDX, IDC_LIST_EVENTS, m_wndEvents );
 	DDX_Control( pDX, IDC_COMBO_SPLINES, m_wndSplines );
@@ -96,12 +91,10 @@ void CDlgCamera::DoDataExchange( CDataExchange* pDX )
 	DDX_Text( pDX, IDC_EDIT_SEGMENT, m_currentSegment );
 	DDX_Text( pDX, IDC_EDIT_TYPE, m_strType );
 	DDX_Radio( pDX, IDC_RADIO_EDITPOINTS, m_editPoints );
-	//}}AFX_DATA_MAP
 }
 
 
-BEGIN_MESSAGE_MAP( CDlgCamera, CDialog )
-	//{{AFX_MSG_MAP(CDlgCamera)
+BEGIN_MESSAGE_MAP( CDlgCamera, CDialogEx )
 	ON_BN_CLICKED( IDC_BTN_ADDEVENT, OnBtnAddevent )
 	ON_BN_CLICKED( IDC_BTN_ADDTARGET, OnBtnAddtarget )
 	ON_BN_CLICKED( IDC_BTN_DELEVENT, OnBtnDelevent )
@@ -120,10 +113,8 @@ BEGIN_MESSAGE_MAP( CDlgCamera, CDialog )
 	ON_BN_CLICKED( IDC_BTN_SELECTALL, OnBtnSelectall )
 	ON_BN_CLICKED( IDC_RADIO_EDITPOINTS, OnRadioEditpoints )
 	ON_BN_CLICKED( IDC_RADIO_EDITPOINTS2, OnRadioAddPoints )
-	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
-/////////////////////////////////////////////////////////////////////////////
 // CDlgCamera message handlers
 
 void CDlgCamera::OnBtnAddevent()
@@ -194,7 +185,7 @@ void CDlgCamera::OnSelchangeComboSplines()
 
 void CDlgCamera::OnSelchangeListEvents()
 {
-	int sel = m_wndEvents.GetCurSel();
+	//int sel = m_wndEvents.GetCurSel();
 	//g_splineList->setActiveSegment(sel >= 0 ? sel : 0);
 }
 
@@ -208,13 +199,12 @@ void CDlgCamera::setupFromCamera()
 {
 	if( m_wndSplines.GetSafeHwnd() )
 	{
-		int i;
 		idStr str;
 		m_strName = g_splineList->getName();
 		m_strType = g_splineList->getPositionObj()->typeStr();
 		m_wndSplines.ResetContent();
 		m_wndSplines.AddString( "Path" );
-		for( i = 0; i < g_splineList->numTargets(); i++ )
+		for( int i = 0; i < g_splineList->numTargets(); i++ )
 		{
 			m_wndSplines.AddString( g_splineList->getActiveTarget( i )->getName() );
 		}
@@ -223,7 +213,7 @@ void CDlgCamera::setupFromCamera()
 		m_wndSegments.SetScrollRange( 0, g_splineList->getTotalTime() * 4.0 );
 
 		m_wndEvents.ResetContent();
-		for( i = 0; i < g_splineList->numEvents(); i++ )
+		for( int i = 0; i < g_splineList->numEvents(); i++ )
 		{
 			str = va( "%s\t%s", g_splineList->getEvent( i )->typeStr(), g_splineList->getEvent( i )->getParam() );
 			m_wndEvents.AddString( str );
@@ -237,10 +227,9 @@ void CDlgCamera::setupFromCamera()
 
 BOOL CDlgCamera::OnInitDialog()
 {
-	CDialog::OnInitDialog();
+	CDialogEx::OnInitDialog();
 	setupFromCamera();
-	return TRUE;  // return TRUE unless you set the focus to a control
-	// EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;
 }
 
 void CDlgCamera::OnOK()
@@ -257,9 +246,9 @@ void CDlgCamera::OnDestroy()
 	{
 		CRect rct;
 		GetWindowRect( rct );
-		SaveRegistryInfo( "Radiant::CameraInspector", &rct, sizeof( rct ) );
+		SaveRegistryInfo( "radiant_camerainspector", &rct, sizeof( rct ) );
 	}
-	CDialog::OnDestroy();
+	CDialogEx::OnDestroy();
 	Sys_UpdateWindows( W_ALL );
 }
 
@@ -275,7 +264,7 @@ void CDlgCamera::OnApply()
 
 void CDlgCamera::OnHScroll( UINT nSBCode, UINT nPos, CScrollBar* pScrollBar )
 {
-	CDialog::OnHScroll( nSBCode, nPos, pScrollBar );
+	CDialogEx::OnHScroll( nSBCode, nPos, pScrollBar );
 	int max = g_splineList->getTotalTime() * 4;
 	if( max == 0 )
 	{
@@ -352,7 +341,7 @@ void CDlgCamera::OnFileOpen()
 	if( dlg.DoModal() == IDOK )
 	{
 		g_splineList->clear();
-		g_splineList->load( va( "cameras/%s.camera", dlg.m_strName ) );
+		g_splineList->load( va( "cameras/%s.camera", dlg.m_strName.GetString() ) );
 	}
 }
 
@@ -361,7 +350,7 @@ void CDlgCamera::OnFileSave()
 	DialogName dlg( "Save Camera File" );
 	if( dlg.DoModal() == IDOK )
 	{
-		g_splineList->save( va( "cameras/%s.camera", dlg.m_strName ) );
+		g_splineList->save( va( "cameras/%s.camera", dlg.m_strName.GetString() ) );
 	}
 }
 

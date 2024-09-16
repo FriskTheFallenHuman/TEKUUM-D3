@@ -55,6 +55,7 @@ public:
 	virtual void			AddModel( idRenderModel* model );
 	virtual void			RemoveModel( idRenderModel* model );
 	virtual void			ReloadModels( bool forceAll = false );
+	virtual void			CreateModelVertexCaches();
 	virtual void			FreeModelVertexCaches();
 	virtual void			WritePrecacheCommands( idFile* file );
 	virtual void			BeginLevelLoad();
@@ -640,6 +641,20 @@ void idRenderModelManagerLocal::ReloadModels( bool forceAll )
 
 /*
 =================
+idRenderModelManagerLocal::CreateModelVertexCaches
+=================
+*/
+void idRenderModelManagerLocal::CreateModelVertexCaches()
+{
+	for( int i = 0; i < models.Num(); i++ )
+	{
+		idRenderModel* model = models[i];
+		model->CreateVertexCache();
+	}
+}
+
+/*
+=================
 idRenderModelManagerLocal::FreeModelVertexCaches
 =================
 */
@@ -819,13 +834,7 @@ void idRenderModelManagerLocal::EndLevelLoad()
 
 
 		idRenderModel* model = models[i];
-		if( model->IsLoaded() )
-		{
-			for( int j = 0; j < model->NumSurfaces(); j++ )
-			{
-				R_CreateStaticBuffersForTri( *( model->Surface( j )->geometry ) );
-			}
-		}
+		model->CreateVertexCache();
 	}
 
 

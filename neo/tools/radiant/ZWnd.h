@@ -25,51 +25,32 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
-#if !defined(AFX_ZWND_H__44B4BA02_781B_11D1_B53C_00AA00A410FC__INCLUDED_)
-#define AFX_ZWND_H__44B4BA02_781B_11D1_B53C_00AA00A410FC__INCLUDED_
 
-#if _MSC_VER >= 1000
-	#pragma once
-#endif // _MSC_VER >= 1000
-// ZWnd.h : header file
-//
+#pragma once
 
 #include "zclip.h"
 
-/////////////////////////////////////////////////////////////////////////////
 // CZWnd window
 
-class CZWnd : public CWnd
+class CZWnd : public CDialogEx
 {
 	DECLARE_DYNCREATE( CZWnd );
-// Construction
+
 public:
 	CZWnd();
 
-// Attributes
-public:
-
-// Operations
-public:
-
-// Overrides
-	// ClassWizard generated virtual function overrides
-	//{{AFX_VIRTUAL(CZWnd)
 protected:
 	virtual BOOL PreCreateWindow( CREATESTRUCT& cs );
-	//}}AFX_VIRTUAL
 
-// Implementation
 public:
 	virtual ~CZWnd();
 
 	CZClip* m_pZClip;
 
-	// Generated message map functions
 protected:
 	HDC m_dcZ;
 	HGLRC m_hglrcZ;
-	//{{AFX_MSG(CZWnd)
+
 	afx_msg int OnCreate( LPCREATESTRUCT lpCreateStruct );
 	afx_msg void OnDestroy();
 	afx_msg void OnKeyDown( UINT nChar, UINT nRepCnt, UINT nFlags );
@@ -80,10 +61,8 @@ protected:
 	afx_msg void OnGetMinMaxInfo( MINMAXINFO FAR* lpMMI );
 	afx_msg void OnMouseMove( UINT nFlags, CPoint point );
 	afx_msg void OnSize( UINT nType, int cx, int cy );
-// ---> sikk - Window Snapping
 	afx_msg void OnSizing( UINT nSide, LPRECT lpRect );
 	afx_msg void OnMoving( UINT nSide, LPRECT lpRect );
-// <--- sikk - Window Snapping
 	afx_msg void OnNcCalcSize( BOOL bCalcValidRects, NCCALCSIZE_PARAMS FAR* lpncsp );
 	afx_msg void OnKillFocus( CWnd* pNewWnd );
 	afx_msg void OnSetFocus( CWnd* pOldWnd );
@@ -93,13 +72,6 @@ protected:
 	afx_msg void OnRButtonUp( UINT nFlags, CPoint point );
 	afx_msg BOOL OnMouseWheel( UINT nFlags, short zDelta, CPoint pt );
 	afx_msg void OnKeyUp( UINT nChar, UINT nRepCnt, UINT nFlags );
-	//}}AFX_MSG
+
 	DECLARE_MESSAGE_MAP()
 };
-
-/////////////////////////////////////////////////////////////////////////////
-
-//{{AFX_INSERT_LOCATION}}
-// Microsoft Developer Studio will insert additional declarations immediately before the previous line.
-
-#endif // !defined(AFX_ZWND_H__44B4BA02_781B_11D1_B53C_00AA00A410FC__INCLUDED_)

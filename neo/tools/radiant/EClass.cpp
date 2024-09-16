@@ -31,7 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "qe3.h"
 #include "io.h"
-#include "../../renderer/tr_local.h"
+#include "../../renderer/RenderCommon.h"
 
 struct evarPrefix_t
 {
@@ -56,10 +56,6 @@ const int NumEvarPrefixes = sizeof( EvarPrefixes ) / sizeof( evarPrefix_t );
 
 eclass_t*	eclass = NULL;
 eclass_t*	eclass_bad = NULL;
-char		eclass_directory[1024];
-
-// md3 cache for misc_models
-eclass_t* g_md3Cache = NULL;
 
 /*
 
@@ -90,7 +86,6 @@ void CleanEntityList( eclass_t*& pList )
 void CleanUpEntities()
 {
 	CleanEntityList( eclass );
-	CleanEntityList( g_md3Cache );
 
 	if( eclass_bad )
 	{
@@ -99,39 +94,16 @@ void CleanUpEntities()
 	}
 }
 
-void ExtendBounds( idVec3 v, idVec3& vMin, idVec3& vMax )
-{
-	for( int i = 0 ; i < 3 ; i++ )
-	{
-		float	f = v[i];
-
-		if( f < vMin[i] )
-		{
-			vMin[i] = f;
-		}
-
-		if( f > vMax[i] )
-		{
-			vMax[i] = f;
-		}
-	}
-}
-
 bool LoadModel( const char* pLocation, eclass_t* e, idVec3& vMin, idVec3& vMax, const char* pSkin )
 {
 	vMin[0] = vMin[1] = vMin[2] = 999999;
 	vMax[0] = vMax[1] = vMax[2] = -999999;
 
-	// RB: added other model formats
-	if( strstr( pLocation, ".ase" ) != NULL || strstr( pLocation, ".dae" ) != NULL )	// FIXME: not correct!
-		// RB end
+	if( strstr( pLocation, ".ase" ) != NULL )	// FIXME: not correct!
 	{
 		idBounds b;
 		e->modelHandle = renderModelManager->FindModel( pLocation );
-
-		// RB begin
 		e->modelHandle->CreateVertexCache();
-		// RB end
 
 		b = e->modelHandle->Bounds( NULL );
 		VectorCopy( b[0], vMin );
@@ -143,23 +115,15 @@ bool LoadModel( const char* pLocation, eclass_t* e, idVec3& vMin, idVec3& vMax, 
 
 eclass_t* EClass_Alloc()
 {
-	eclass_t* e;
-	e = new eclass_t;
-	if( e == NULL )
-	{
-		return NULL;
-	}
+	eclass_t* e = new eclass_t;
 	e->fixedsize = false;
-	e->unknown = false;
 	e->mins.Zero();
 	e->maxs.Zero();
 	e->color.Zero();
 	memset( &e->texdef, 0, sizeof( e->texdef ) );
 	e->modelHandle = NULL;
 	e->entityModel = NULL;
-	e->nFrame = 0;
 	e->nShowFlags = 0;
-	e->hPlug = 0;
 	e->next = NULL;
 	return e;
 }
@@ -413,7 +377,7 @@ void Eclass_InsertAlphabetized( eclass_t* e )
 }
 
 
-void Eclass_InitForSourceDirectory( const char* path )
+void Eclass_InitForSourceDirectory()
 {
 	int c = declManager->GetNumDecls( DECL_ENTITYDEF );
 	for( int i = 0; i < c; i++ )
@@ -476,39 +440,4 @@ eclass_t* Eclass_ForName( const char* name, bool has_brushes )
 	Eclass_InsertAlphabetized( e );
 
 	return e;
-}
-
-
-eclass_t* GetCachedModel( entity_t* pEntity, const char* pName, idVec3& vMin, idVec3& vMax )
-{
-	eclass_t* e = NULL;
-	if( pName == NULL || strlen( pName ) == 0 )
-	{
-		return NULL;
-	}
-
-	for( e = g_md3Cache; e ; e = e->next )
-	{
-		if( !strcmp( pName, e->name ) )
-		{
-			pEntity->md3Class = e;
-			VectorCopy( e->mins, vMin );
-			VectorCopy( e->maxs, vMax );
-			return e;
-		}
-	}
-
-	e = ( eclass_t* )Mem_ClearedAlloc( sizeof( *e ) );
-	memset( e, 0, sizeof( *e ) );
-	e->name = Mem_CopyString( pName );
-	e->color[0] = e->color[2] = 0.85f;
-	if( LoadModel( pName, e, vMin, vMax, NULL ) )
-	{
-		EClass_InsertSortedList( g_md3Cache, e );
-		VectorCopy( vMin, e->mins );
-		VectorCopy( vMax, e->maxs );
-		pEntity->md3Class = e;
-		return e;
-	}
-	return NULL;
 }

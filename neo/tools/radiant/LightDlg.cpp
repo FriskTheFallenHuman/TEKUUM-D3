@@ -31,7 +31,6 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "qe3.h"
 #include "Radiant.h"
-#include "../../game/game.h"
 #include "../comafx/DialogColorPicker.h"
 #include "LightDlg.h"
 
@@ -41,6 +40,12 @@ If you have questions concerning this license or the applicable additional terms
 	#define DEBUG_NEW new
 #endif
 
+// returns true if light editor has been opened in D3Radiant,
+// false if it has been opened from within a running game
+static bool InRadiant()
+{
+	return ( com_editors & EDITOR_RADIANT ) != 0;
+}
 
 void CLightInfo::Defaults()
 {
@@ -208,6 +213,10 @@ void CLightInfo::ToDictWriteAllInfo( idDict* e )
 	{
 		e->Set( "texture", strTexture );
 	}
+	else
+	{
+		e->Set( "texture", "" );
+	}
 
 	idVec3 temp = color;
 	temp /= 255;
@@ -312,17 +321,14 @@ CLightInfo::CLightInfo()
 }
 
 
-
-/////////////////////////////////////////////////////////////////////////////
 // CLightDlg dialog
 
 CLightDlg* g_LightDialog = NULL;
 
 
-CLightDlg::CLightDlg( CWnd* pParent /*=NULL*/ )
-	: CDialog( CLightDlg::IDD, pParent )
+CLightDlg::CLightDlg( CWnd* pParent )
+	: CDialogEx( CLightDlg::IDD, pParent )
 {
-	//{{AFX_DATA_INIT(CLightDlg)
 	m_bEqualRadius = FALSE;
 	m_bExplicitFalloff = FALSE;
 	m_bPointLight = FALSE;
@@ -357,7 +363,7 @@ CLightDlg::CLightDlg( CWnd* pParent /*=NULL*/ )
 	m_centerY = 0.0f;
 	m_centerZ = 0.0f;
 	m_bIsParallel = FALSE;
-	//}}AFX_DATA_INIT
+
 	m_drawMaterial = new idGLDrawableMaterial();
 }
 
@@ -368,12 +374,8 @@ CLightDlg::~CLightDlg()
 
 void CLightDlg::DoDataExchange( CDataExchange* pDX )
 {
-	CDialog::DoDataExchange( pDX );
-	//{{AFX_DATA_MAP(CLightDlg)
-	if( com_editorActive )
-	{
-		DDX_Control( pDX, IDC_LIGHTPREVIEW, m_wndPreview );
-	}
+	CDialogEx::DoDataExchange( pDX );
+	DDX_Control( pDX, IDC_LIGHTPREVIEW, m_wndPreview );
 	DDX_Control( pDX, IDC_COMBO_TEXTURE, m_wndLights );
 	DDX_Check( pDX, IDC_CHECK_EQUALRADIUS, m_bEqualRadius );
 	DDX_Check( pDX, IDC_CHECK_EXPLICITFALLOFF, m_bExplicitFalloff );
@@ -406,12 +408,10 @@ void CLightDlg::DoDataExchange( CDataExchange* pDX )
 	DDX_Text( pDX, IDC_EDIT_CENTERX, m_centerX );
 	DDX_Text( pDX, IDC_EDIT_CENTERY, m_centerY );
 	DDX_Text( pDX, IDC_EDIT_CENTERZ, m_centerZ );
-	//}}AFX_DATA_MAP
 }
 
 
-BEGIN_MESSAGE_MAP( CLightDlg, CDialog )
-	//{{AFX_MSG_MAP(CLightDlg)
+BEGIN_MESSAGE_MAP( CLightDlg, CDialogEx )
 	ON_BN_CLICKED( IDC_BTN_TEXTURE, OnBtnTexture )
 	ON_BN_CLICKED( IDC_CHECK_EQUALRADIUS, OnCheckEqualradius )
 	ON_BN_CLICKED( IDC_CHECK_EXPLICITFALLOFF, OnCheckExplicitfalloff )
@@ -425,10 +425,8 @@ BEGIN_MESSAGE_MAP( CLightDlg, CDialog )
 	ON_CBN_SELCHANGE( IDC_COMBO_TEXTURE, OnSelchangeComboTexture )
 	ON_BN_CLICKED( IDC_CHECK_CENTER, OnCheckCenter )
 	ON_BN_CLICKED( IDC_CHECK_PARALLEL, OnCheckParallel )
-	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
 
-/////////////////////////////////////////////////////////////////////////////
 // CLightDlg message handlers
 
 void CLightDlg::SetSpecifics()
@@ -637,12 +635,11 @@ void CLightDlg::UpdateLightInfoFromDialog()
 
 void CLightDlg::SaveLightInfo( const idDict* differences )
 {
-
-	if( com_editorActive )
+	if( InRadiant() )
 	{
 
 		// used from Radiant
-		for( brush_t* b = selected_brushes.next; b && b != &selected_brushes; b = b->next )
+		for( idEditorBrush* b = selected_brushes.next; b && b != &selected_brushes; b = b->next )
 		{
 			if( ( b->owner->eclass->nShowFlags & ECLASS_LIGHT ) && !b->entityModel )
 			{
@@ -737,13 +734,9 @@ BOOL CLightDlg::OnInitDialog()
 
 	LoadLightTextures();
 
-	if( com_editorActive )
-	{
-		m_wndPreview.setDrawable( m_drawMaterial );
-	}
+	m_wndPreview.setDrawable( m_drawMaterial );
 
-	return TRUE;  // return TRUE unless you set the focus to a control
-	// EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;
 }
 
 void CLightDlg::OnDestroy()
@@ -795,14 +788,14 @@ void CLightDlg::OnOK()
 	UpdateLightInfoFromDialog();
 	SaveLightInfo( NULL );
 	Sys_UpdateWindows( W_ALL );
-	CDialog::OnOK();
+	CDialogEx::OnOK();
 }
 
-entity_t* SingleLightSelected()
+idEditorEntity* SingleLightSelected()
 {
 	if( QE_SingleBrush( true, true ) )
 	{
-		brush_t* b = selected_brushes.next;
+		idEditorBrush* b = selected_brushes.next;
 		if( ( b->owner->eclass->nShowFlags & ECLASS_LIGHT ) && !b->entityModel )
 		{
 			return b->owner;
@@ -818,10 +811,10 @@ void CLightDlg::UpdateDialog( bool updateChecks )
 	lightInfo.Defaults();
 	lightInfoOriginal.Defaults();
 
-	if( com_editorActive )
+	if( InRadiant() )
 	{
 		// used from Radiant
-		entity_t* e = SingleLightSelected();
+		idEditorEntity* e = SingleLightSelected();
 		if( e )
 		{
 			lightInfo.FromDict( &e->epairs );
@@ -832,7 +825,7 @@ void CLightDlg::UpdateDialog( bool updateChecks )
 		{
 			//find the last brush belonging to the last entity selected and use that as the source
 			e = NULL;
-			for( brush_t* b = selected_brushes.next ; b != &selected_brushes ; b = b->next )
+			for( idEditorBrush* b = selected_brushes.next ; b != &selected_brushes ; b = b->next )
 			{
 				if( ( b->owner->eclass->nShowFlags & ECLASS_LIGHT ) && !b->entityModel )
 				{
@@ -904,7 +897,7 @@ void LightEditorInit( const idDict* spawnArgs )
 		g_LightDialog->Create( IDD_DIALOG_LIGHT );
 		CRect rct;
 		LONG lSize = sizeof( rct );
-		if( LoadRegistryInfo( "Radiant::LightWindow", &rct, &lSize ) )
+		if( LoadRegistryInfo( "radiant_lightwindow", &rct, &lSize ) )
 		{
 			g_LightDialog->SetWindowPos( NULL, rct.left, rct.top, 0, 0, SWP_NOSIZE );
 		}
@@ -924,12 +917,7 @@ void LightEditorInit( const idDict* spawnArgs )
 
 void LightEditorRun()
 {
-#if _MSC_VER >= 1300
 	MSG* msg = AfxGetCurrentMessage();			// TODO Robert fix me!!
-#else
-	MSG* msg = &m_msgCur;
-#endif
-
 	while( ::PeekMessage( msg, NULL, NULL, NULL, PM_NOREMOVE ) )
 	{
 		// pump message
@@ -984,7 +972,7 @@ void CLightDlg::OnBtnColor()
 	r = color[0];
 	g = color[1];
 	b = color[2];
-	if( DoNewColor( &r, &g, &b, &ob, UpdateLightDialog ) )
+	if( DoColor( &r, &g, &b, &ob, UpdateLightDialog ) )
 	{
 		color[0] = ob * r;
 		color[1] = ob * g;
@@ -995,12 +983,12 @@ void CLightDlg::OnBtnColor()
 
 void CLightDlg::OnCancel()
 {
-	CDialog::OnCancel();
+	CDialogEx::OnCancel();
 }
 
 HBRUSH CLightDlg::OnCtlColor( CDC* pDC, CWnd* pWnd, UINT nCtlColor )
 {
-	HBRUSH hbr = CDialog::OnCtlColor( pDC, pWnd, nCtlColor );
+	HBRUSH hbr = CDialogEx::OnCtlColor( pDC, pWnd, nCtlColor );
 
 	return hbr;
 }
@@ -1011,9 +999,9 @@ BOOL CLightDlg::DestroyWindow()
 	{
 		CRect rct;
 		GetWindowRect( rct );
-		SaveRegistryInfo( "Radiant::LightWindow", &rct, sizeof( rct ) );
+		SaveRegistryInfo( "radiant_lightwindow", &rct, sizeof( rct ) );
 	}
-	return CDialog::DestroyWindow();
+	return CDialogEx::DestroyWindow();
 }
 
 void CLightDlg::OnSelchangeComboTexture()
@@ -1025,10 +1013,7 @@ void CLightDlg::OnSelchangeComboTexture()
 	{
 		m_wndLights.GetLBText( sel, str );
 		m_drawMaterial->setMedia( str );
-		if( com_editorActive )
-		{
-			m_wndPreview.RedrawWindow();
-		}
+		m_wndPreview.RedrawWindow();
 	}
 	Sys_UpdateWindows( W_ALL );
 }
@@ -1074,20 +1059,20 @@ void CLightDlg::OnCheckParallel()
 //jhefty - only apply settings that are different
 void CLightDlg::OnApplyDifferences()
 {
-	idDict differences, modified, original;
+	idDict differences, modifiedlight, originallight;
 
 	UpdateLightInfoFromDialog();
 
-	lightInfo.ToDict( &modified );
-	lightInfoOriginal.ToDictWriteAllInfo( &original );
+	lightInfo.ToDict( &modifiedlight );
+	lightInfoOriginal.ToDictWriteAllInfo( &originallight );
 
-	differences = modified;
+	differences = modifiedlight;
 
 	// jhefty - compile a set of modified values to apply
-	for( int i = 0; i < modified.GetNumKeyVals(); i ++ )
+	for( int i = 0; i < modifiedlight.GetNumKeyVals(); i ++ )
 	{
-		const idKeyValue* valModified = modified.GetKeyVal( i );
-		const idKeyValue* valOriginal = original.FindKey( valModified->GetKey() );
+		const idKeyValue* valModified = modifiedlight.GetKeyVal( i );
+		const idKeyValue* valOriginal = originallight.FindKey( valModified->GetKey() );
 
 		//if it hasn't changed, remove it from the list of values to apply
 		if( !valOriginal || ( valModified->GetValue() == valOriginal->GetValue() ) )
@@ -1098,7 +1083,7 @@ void CLightDlg::OnApplyDifferences()
 
 	SaveLightInfo( &differences );
 
-	lightInfoOriginal.FromDict( &modified );
+	lightInfoOriginal.FromDict( &modifiedlight );
 
 	Sys_UpdateWindows( W_ALL );
 }

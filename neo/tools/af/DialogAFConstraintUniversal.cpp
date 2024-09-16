@@ -29,7 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/rc/AFEditor_resource.h"
+
+#include "../../sys/win32/rc/resource.h"
 
 #include "DialogAF.h"
 #include "DialogAFConstraint.h"
@@ -215,7 +216,6 @@ void DialogAFConstraintUniversal::LoadConstraint( idDeclAF_Constraint* c )
 {
 	int i, s1, s2;
 	idAngles angles;
-	idMat3 mat;
 
 	constraint = c;
 
@@ -317,7 +317,6 @@ void DialogAFConstraintUniversal::SaveConstraint()
 	int s1, s2;
 	CString str;
 	idAngles angles;
-	idMat3 mat;
 
 	if( !file || !constraint )
 	{
@@ -400,7 +399,7 @@ void DialogAFConstraintUniversal::UpdateFile()
 DialogAFConstraintUniversal::OnToolHitTest
 ================
 */
-int DialogAFConstraintUniversal::OnToolHitTest( CPoint point, TOOLINFO* pTI ) const
+INT_PTR DialogAFConstraintUniversal::OnToolHitTest( CPoint point, TOOLINFO* pTI ) const
 {
 	CDialog::OnToolHitTest( point, pTI );
 	return DefaultOnToolHitTest( toolTips, this, point, pTI );

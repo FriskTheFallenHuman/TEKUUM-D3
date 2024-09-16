@@ -100,6 +100,7 @@ const uint32_t NUM_FRAME_DATA = 2;
 #include "../renderer/ModelManager.h"
 #include "../renderer/RenderSystem.h"
 #include "../renderer/RenderWorld.h"
+#include "../renderer/DeviceContext.h"
 
 // sound engine
 #include "../sound/sound.h"
@@ -157,7 +158,7 @@ const uint32_t NUM_FRAME_DATA = 2;
 		#endif
 
 		// Compilers for map, model, video etc. processing.
-		#ifdef ID_ALLOW_CMD_TOOLS
+		#if defined( ID_ALLOW_CMD_TOOLS ) || defined( ID_ALLOW_TOOLS )
 			#include "../tools/compilers/compiler_public.h"
 		#endif
 

@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
+
 #include "GEApp.h"
 #include "GEModifierStack.h"
 
@@ -85,6 +86,7 @@ bool rvGEModifierStack::Append( rvGEModifier* modifier )
 
 				gApp.GetProperties().Update( );
 				gApp.GetTransformer().Update( );
+				gApp.GetItemProperties().Update( );
 
 				delete modifier;
 				return true;
@@ -101,6 +103,7 @@ bool rvGEModifierStack::Append( rvGEModifier* modifier )
 
 	gApp.GetProperties().Update( );
 	gApp.GetTransformer().Update( );
+	gApp.GetItemProperties().Update( );
 
 	return true;
 }
@@ -116,6 +119,7 @@ bool rvGEModifierStack::Undo()
 	mCurrentModifier--;
 
 	gApp.GetProperties().Update( );
+	gApp.GetItemProperties().Update( );
 	gApp.GetTransformer().Update( );
 
 	return true;
@@ -130,8 +134,8 @@ bool rvGEModifierStack::Redo()
 	}
 
 	gApp.GetProperties().Update( );
+	gApp.GetItemProperties().Update( );
 	gApp.GetTransformer().Update( );
 
 	return true;
 }
-

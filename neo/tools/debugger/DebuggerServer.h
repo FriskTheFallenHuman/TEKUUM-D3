@@ -36,13 +36,12 @@ If you have questions concerning this license or the applicable additional terms
 	#include "DebuggerBreakpoint.h"
 #endif
 
-#ifndef __GAME_LOCAL_H__
-	#include "../../game/Game.h"
-#endif
-
+#include "../framework/Game.h"
 class idInterpreter;
 class idProgram;
+
 class function_t;
+typedef struct prstack_s prstack_t;
 
 class rvDebuggerServer
 {
@@ -64,9 +63,28 @@ public:
 
 	void		OSPathToRelativePath( const char* osPath, idStr& qpath );
 
-protected:
+	bool		GameSuspended();
+private:
 
-	// protected member variables
+	void		ClearBreakpoints();
+
+	void		Break( idInterpreter* interpreter, idProgram* program, int instructionPointer );
+	void		Resume();
+
+	void		SendMessage( EDebuggerMessage dbmsg );
+	void		SendPacket( void* data, int datasize );
+
+	// Message handlers
+	void		HandleAddBreakpoint( idBitMsg* msg );
+	void		HandleRemoveBreakpoint( idBitMsg* msg );
+	void		HandleResume( idBitMsg* msg );
+	void		HandleInspectVariable( idBitMsg* msg );
+	void		HandleInspectCallstack( idBitMsg* msg );
+	void		HandleInspectThreads( idBitMsg* msg );
+	void		HandleInspectScripts( idBitMsg* msg );
+	void		HandleExecCommand( idBitMsg* msg );
+	////
+
 	bool							mConnected;
 	netadr_t						mClientAdr;
 	idPort							mPort;
@@ -74,8 +92,8 @@ protected:
 	CRITICAL_SECTION				mCriticalSection;
 
 	HANDLE							mGameThread;
-
 	bool							mBreak;
+
 	bool							mBreakNext;
 	bool							mBreakStepOver;
 	bool							mBreakStepInto;
@@ -88,29 +106,9 @@ protected:
 
 	idStr							mLastStatementFile;
 	int								mLastStatementLine;
+	uintptr_t						mGameDLLHandle;
+	idStrList						mScriptFileList;
 
-private:
-
-	void		ClearBreakpoints();
-
-	void		Break( idInterpreter* interpreter, idProgram* program, int instructionPointer );
-	void		Resume();
-
-	void		SendMessage( EDebuggerMessage dbmsg );
-	void		SendPacket( void* data, int datasize );
-
-	// Message handlers
-	// RB: changed msg_t* to idBitMsg&
-	void		HandleAddBreakpoint( idBitMsg& msg );
-	void		HandleRemoveBreakpoint( idBitMsg& msg );
-	void		HandleResume( idBitMsg& msg );
-	void		HandleInspectVariable( idBitMsg& msg );
-	void		HandleInspectCallstack( idBitMsg& msg );
-	void		HandleInspectThreads( idBitMsg& msg );
-
-	// MSG helper routines
-	void		MSG_WriteCallstackFunc( idBitMsg& msg, const struct prstack_s* stack );
-	// RB end
 };
 
 /*
@@ -131,6 +129,16 @@ rvDebuggerServer::SendPacket
 ID_INLINE void rvDebuggerServer::SendPacket( void* data, int size )
 {
 	mPort.SendPacket( mClientAdr, data, size );
+}
+
+/*
+================
+rvDebuggerServer::GameSuspended
+================
+*/
+ID_INLINE bool rvDebuggerServer::GameSuspended()
+{
+	return mBreak;
 }
 
 #endif // DEBUGGERSERVER_H_

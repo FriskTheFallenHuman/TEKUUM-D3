@@ -42,9 +42,9 @@ If you have questions concerning this license or the applicable additional terms
 #define BIG_DISTANCE 10000000L
 
 #define DIST(r1,g1,b1,r2,g2,b2) \
-	    (long) (3L*(long)((r1)-(r2))*(long)((r1)-(r2)) + \
-		    4L*(long)((g1)-(g2))*(long)((g1)-(g2)) + \
-		    2L*(long)((b1)-(b2))*(long)((b1)-(b2)))
+		(long) (3L*(long)((r1)-(r2))*(long)((r1)-(r2)) + \
+			4L*(long)((g1)-(g2))*(long)((g1)-(g2)) + \
+			2L*(long)((b1)-(b2))*(long)((b1)-(b2)))
 
 
 static unsigned char masktable[] = { 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01 };
@@ -391,7 +391,7 @@ void CDIB::Expand( int nXDest, int nYDest, int xRatio, int yRatio, CDIB& dibSrc,
 	yErr = nDHeight % yRatio;
 
 	unsigned char* buffer, *srcPtr, *destPtr, *ptr;
-	int i, j, k;
+	int i, j, k = 0;
 
 	buffer = ( unsigned char* )malloc( nDWidth + 20 );
 	if( !buffer )
@@ -762,7 +762,6 @@ BOOL CDIB::Make8Bit( CDIB& dib )
 		default:
 			return FALSE;
 	}
-	return FALSE;
 }
 
 /*
@@ -876,7 +875,7 @@ BOOL CDIB::SwitchPalette( CDIB& dib )
 
 int CDIB::ClosestColor( RGBQUAD* pRgb )
 {
-	unsigned int dist = BIG_DISTANCE, i, d, c;
+	unsigned int dist = BIG_DISTANCE, i, d, c = 0;
 	RGBQUAD* pQuad = m_pRGB;
 	unsigned int pSize = GetPaletteSize();
 	for( i = 0; i < pSize; i++ )

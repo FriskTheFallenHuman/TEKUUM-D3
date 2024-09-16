@@ -38,6 +38,7 @@ If you have questions concerning this license or the applicable additional terms
 #endif // GEMODIFIERSTACK_H_
 
 class rvGEApp;
+class rvGEModifierGroup;
 
 class rvGEClipboardItem
 {
@@ -46,18 +47,13 @@ public:
 	idDict	mStateDict;
 	idDict	mScriptDict;
 	idDict	mVarDict;
+
+	idList<rvGEClipboardItem*> mChildren;
 };
 
 class rvGEWorkspace
 {
 public:
-
-	enum ESourceControlState
-	{
-		SCS_NONE,
-		SCS_CHECKEDOUT,
-		SCS_CHECKEDIN,
-	};
 
 	enum EZoomLevel
 	{
@@ -96,12 +92,6 @@ public:
 	bool					LoadFile( const char* filename, idStr* error = NULL );
 	bool					SaveFile( const char* filename );
 	const char*				GetFilename();
-
-	// Source control methods
-	bool					CheckOut();
-	bool					CheckIn();
-	bool					UndoCheckout();
-	ESourceControlState		GetSourceControlState();
 
 	void					Render( HDC hDC );
 
@@ -150,6 +140,7 @@ public:
 	idWindow*				AddWindow( rvGEWindowWrapper::EWindowType type );
 
 //	void					Cut						();
+	void					Duplicate( void );
 	void					Copy();
 	void					Paste();
 
@@ -246,6 +237,9 @@ protected:
 
 private:
 
+	void						PasteClipboardItem( rvGEClipboardItem* item, idWindow* parent, rvGEModifierGroup* group, idWindow* before = NULL );
+	static rvGEClipboardItem*	CreateClipboardItem( idWindow* window );
+
 	static bool				CleanupEnumProc( rvGEWindowWrapper* wrapper, void* data );
 	static bool				ShowAllEnumProc( rvGEWindowWrapper* wrapper, void* data );
 	static bool				BuildSelectMenuEnumProc( rvGEWindowWrapper* wrapper, void* data );
@@ -254,7 +248,7 @@ private:
 	bool					mModified;
 	bool					mNew;
 	bool					mDontAdd;
-	ESourceControlState		mSourceControlState;
+	bool					mWasDuplicate;
 
 	// Resources
 	HCURSOR					mHandCursor;
@@ -267,7 +261,7 @@ ID_INLINE rvGEWorkspace::EZoomLevel rvGEWorkspace::GetZoom()
 
 ID_INLINE rvGEWorkspace* rvGEWorkspace::GetWorkspace( HWND wnd )
 {
-	return ( rvGEWorkspace* ) GetWindowLong( wnd, GWL_USERDATA );
+	return ( rvGEWorkspace* ) GetWindowLongPtr( wnd, GWLP_USERDATA );
 }
 
 ID_INLINE const char* rvGEWorkspace::GetFilename()
@@ -328,11 +322,6 @@ ID_INLINE HWND rvGEWorkspace::GetWindow()
 ID_INLINE idList<rvGEClipboardItem*> rvGEWorkspace::GetClipboard()
 {
 	return mClipboard;
-}
-
-ID_INLINE rvGEWorkspace::ESourceControlState rvGEWorkspace::GetSourceControlState()
-{
-	return mSourceControlState;
 }
 
 #endif // _GEWORKSPACE_H_

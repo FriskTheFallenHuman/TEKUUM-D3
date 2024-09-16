@@ -34,23 +34,16 @@ If you have questions concerning this license or the applicable additional terms
 
 #ifdef _DEBUG
 	#define new DEBUG_NEW
-	#undef THIS_FILE
-	static char THIS_FILE[] = __FILE__;
 #endif
 
-/////////////////////////////////////////////////////////////////////////////
 // CWaitDlg dialog
 
-
 CWaitDlg::CWaitDlg( CWnd* pParent, const char* msg )
-	: CDialog( CWaitDlg::IDD, pParent )
+	: CDialogEx( CWaitDlg::IDD, pParent )
 {
-	//{{AFX_DATA_INIT(CWaitDlg)
 	waitStr = msg;
-	//}}AFX_DATA_INIT
 	cancelPressed = false;
 	Create( CWaitDlg::IDD );
-	//g_pParentWnd->SetBusy(true);
 }
 
 CWaitDlg::~CWaitDlg()
@@ -60,24 +53,19 @@ CWaitDlg::~CWaitDlg()
 
 void CWaitDlg::DoDataExchange( CDataExchange* pDX )
 {
-	CDialog::DoDataExchange( pDX );
-	//{{AFX_DATA_MAP(CWaitDlg)
+	CDialogEx::DoDataExchange( pDX );
 	DDX_Text( pDX, IDC_WAITSTR, waitStr );
-	//}}AFX_DATA_MAP
+	DDX_Control( pDX, IDD_WAITDLG_PROGRESS, m_progress );
 }
 
-
-BEGIN_MESSAGE_MAP( CWaitDlg, CDialog )
-	//{{AFX_MSG_MAP(CWaitDlg)
-	//}}AFX_MSG_MAP
+BEGIN_MESSAGE_MAP( CWaitDlg, CDialogEx )
 END_MESSAGE_MAP()
 
-/////////////////////////////////////////////////////////////////////////////
 // CWaitDlg message handlers
 
 BOOL CWaitDlg::OnInitDialog()
 {
-	CDialog::OnInitDialog();
+	CDialogEx::OnInitDialog();
 	//GetDlgItem(IDC_WAITSTR)->SetWindowText(waitStr);
 	GetDlgItem( IDC_WAITSTR )->SetFocus();
 	UpdateData( FALSE );
@@ -86,13 +74,10 @@ BOOL CWaitDlg::OnInitDialog()
 	// cancel disabled by default
 	AllowCancel( false );
 
-	// TODO: Add extra initialization here
-
-	return TRUE;  // return TRUE unless you set the focus to a control
-	// EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;
 }
 
-void CWaitDlg::SetText( const char* msg, bool append )
+void CWaitDlg::SetText( const char* msg, float percent, bool append )
 {
 	if( append )
 	{
@@ -105,6 +90,10 @@ void CWaitDlg::SetText( const char* msg, bool append )
 		waitStr = msg;
 		text = msg;
 	}
+
+	m_progress.SetRange( 0, 100 );
+	m_progress.SetPos( percent * 100 );
+
 	UpdateData( FALSE );
 	Invalidate();
 	UpdateWindow();
@@ -128,12 +117,7 @@ void CWaitDlg::AllowCancel( bool enable )
 
 bool CWaitDlg::CancelPressed()
 {
-#if _MSC_VER >= 1300
 	MSG* msg = AfxGetCurrentMessage();			// TODO Robert fix me!!
-#else
-	MSG* msg = &m_msgCur;
-#endif
-
 	while( ::PeekMessage( msg, NULL, NULL, NULL, PM_NOREMOVE ) )
 	{
 		// pump message

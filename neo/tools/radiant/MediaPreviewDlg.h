@@ -27,16 +27,16 @@ If you have questions concerning this license or the applicable additional terms
 */
 #pragma once
 
-
 // CMediaPreviewDlg dialog
 
-class CMediaPreviewDlg : public CDialog
+class CMediaPreviewDlg : public CDialogEx
 {
+
 	DECLARE_DYNAMIC( CMediaPreviewDlg )
 
 public:
 	enum { MATERIALS, GUIS };
-	CMediaPreviewDlg( CWnd* pParent = NULL ); // standard constructor
+	CMediaPreviewDlg( CWnd* pParent = nullptr );   // standard constructor
 	virtual ~CMediaPreviewDlg();
 
 	void SetMode( int _mode )
@@ -47,7 +47,7 @@ public:
 	void SetMedia( const char* _media );
 	void Refresh();
 
-// Dialog Data
+	// Dialog Data
 	enum { IDD = IDD_DIALOG_EDITPREVIEW };
 
 protected:
@@ -57,11 +57,12 @@ protected:
 	int mode;
 	idStr media;
 
-	virtual void DoDataExchange( CDataExchange* pDX );  // DDX/DDV support
+	virtual void DoDataExchange( CDataExchange* pDX ) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
+
 public:
-	virtual BOOL OnInitDialog();
+	virtual BOOL OnInitDialog() override;
 	afx_msg void OnSize( UINT nType, int cx, int cy );
 	afx_msg void OnDestroy();
 	afx_msg void OnLButtonDown( UINT nFlags, CPoint point );

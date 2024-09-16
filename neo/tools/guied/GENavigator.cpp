@@ -29,7 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/rc/guied_resource.h"
+
+#include "../../sys/win32/rc/resource.h"
 
 #include "GEApp.h"
 
@@ -139,7 +140,7 @@ Window Procedure
 */
 LRESULT CALLBACK rvGENavigator::WndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
-	rvGENavigator* nav = ( rvGENavigator* ) GetWindowLong( hWnd, GWL_USERDATA );
+	rvGENavigator* nav = ( rvGENavigator* ) GetWindowLongPtr( hWnd, GWLP_USERDATA );
 
 	switch( msg )
 	{
@@ -247,7 +248,7 @@ LRESULT CALLBACK rvGENavigator::WndProc( HWND hWnd, UINT msg, WPARAM wParam, LPA
 
 				int colorIndex = ( ( dis->itemState & ODS_SELECTED ) ? COLOR_HIGHLIGHTTEXT : COLOR_WINDOWTEXT );
 				SetTextColor( dis->hDC, GetSysColor( colorIndex ) );
-				DrawText( dis->hDC, name, name.Length(), &rDraw, DT_LEFT | DT_VCENTER | DT_SINGLELINE );
+				DrawTextA( dis->hDC, name, name.Length(), &rDraw, DT_LEFT | DT_VCENTER | DT_SINGLELINE );
 
 				if( wrapper->GetVariableDict().GetNumKeyVals( ) || wrapper->GetScriptDict().GetNumKeyVals( ) )
 				{
@@ -273,16 +274,16 @@ LRESULT CALLBACK rvGENavigator::WndProc( HWND hWnd, UINT msg, WPARAM wParam, LPA
 			// Attach the class to the window first
 			cs = ( LPCREATESTRUCT ) lParam;
 			nav = ( rvGENavigator* ) cs->lpCreateParams;
-			SetWindowLong( hWnd, GWL_USERDATA, ( LONG )nav );
+			SetWindowLongPtr( hWnd, GWLP_USERDATA, ( LONG_PTR )nav );
 
 			// Create the List view
 			nav->mTree = CreateWindowEx( 0, "SysListView32", "", WS_VSCROLL | WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_OWNERDRAWFIXED | LVS_NOCOLUMNHEADER | LVS_SHOWSELALWAYS, 0, 0, 0, 0, hWnd, ( HMENU )IDC_GUIED_WINDOWTREE, win32.hInstance, 0 );
 			ListView_SetExtendedListViewStyle( nav->mTree, LVS_EX_FULLROWSELECT );
 			ListView_SetBkColor( nav->mTree, GetSysColor( COLOR_3DFACE ) );
 			ListView_SetTextBkColor( nav->mTree, GetSysColor( COLOR_3DFACE ) );
-			nav->mListWndProc = ( WNDPROC )GetWindowLong( nav->mTree, GWL_WNDPROC );
-			SetWindowLong( nav->mTree, GWL_USERDATA, ( LONG )nav );
-			SetWindowLong( nav->mTree, GWL_WNDPROC, ( LONG )ListWndProc );
+			nav->mListWndProc = ( WNDPROC )GetWindowLongPtr( nav->mTree, GWLP_WNDPROC );
+			SetWindowLongPtr( nav->mTree, GWLP_USERDATA, ( LONG_PTR )nav );
+			SetWindowLongPtr( nav->mTree, GWLP_WNDPROC, ( LONG_PTR )ListWndProc );
 
 			// Insert the only column
 			col.mask = 0;
@@ -429,7 +430,7 @@ Window Procedure for the embedded list control
 */
 LRESULT CALLBACK rvGENavigator::ListWndProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
-	rvGENavigator* nav = ( rvGENavigator* ) GetWindowLong( hWnd, GWL_USERDATA );
+	rvGENavigator* nav = ( rvGENavigator* ) GetWindowLongPtr( hWnd, GWLP_USERDATA );
 	assert( nav );
 
 	switch( msg )
@@ -472,7 +473,7 @@ void rvGENavigator::AddWindow( idWindow* window )
 	ZeroMemory( &item, sizeof( item ) );
 	item.mask = LVIF_PARAM | LVIF_STATE | LVIF_IMAGE;
 	item.iItem = ListView_GetItemCount( mTree );
-	item.lParam = ( LONG ) window;
+	item.lParam = ( LONG_PTR ) window;
 	item.iImage = 0;
 	item.state = rvGEWindowWrapper::GetWrapper( window )->IsSelected() ? LVIS_SELECTED : 0;
 	item.stateMask = LVIS_SELECTED;
@@ -593,4 +594,3 @@ void rvGENavigator::Show( bool visible )
 	gApp.GetOptions().SetNavigatorVisible( visible );
 	ShowWindow( mWnd, visible ? SW_SHOW : SW_HIDE );
 }
-

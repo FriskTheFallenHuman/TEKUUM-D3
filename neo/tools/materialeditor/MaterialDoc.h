@@ -161,4 +161,3 @@ protected:
 	void			WriteSpecialMapStage( int stage, idFile_Memory* file );
 	void			WriteMaterialDef( int stage, idFile_Memory* file, int type, int indent );
 };
-

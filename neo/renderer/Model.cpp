@@ -3690,6 +3690,31 @@ void idRenderModelStatic::PurgeModel()
 
 /*
 ==============
+idRenderModelStatic::CreateVertexCache
+==============
+*/
+void idRenderModelStatic::CreateVertexCache()
+{
+	if( IsLoaded() )
+	{
+		for( int j = 0; j < surfaces.Num(); j++ )
+		{
+			srfTriangles_t* tri = surfaces[j].geometry;
+			if( tri == NULL )
+			{
+				continue;
+			}
+
+			if( !vertexCache.CacheIsCurrent( tri->ambientCache ) )
+			{
+				R_CreateStaticBuffersForTri( *tri );
+			}
+		}
+	}
+}
+
+/*
+==============
 idRenderModelStatic::FreeVertexCache
 
 We are about to restart the vertex cache, so dump everything

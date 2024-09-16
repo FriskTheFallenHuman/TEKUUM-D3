@@ -441,6 +441,9 @@ public:
 
 	static int					FloatHash( const float* array, const int numFloats );
 
+	template<typename T>
+	static T                    Diff( T a, T b );
+
 	static float				LerpToWithScale( const float cur, const float dest, const float scale );
 
 	static const float			PI;							// pi
@@ -1572,6 +1575,12 @@ ID_INLINE
 int Lerp( const int from, const int to, float f )
 {
 	return idMath::Ftoi( ( float ) from + ( ( ( float ) to - ( float ) from ) * f ) );
+}
+
+template< typename T >
+ID_INLINE T idMath::Diff( T a, T b )
+{
+	return std::abs( a - b );
 }
 
 

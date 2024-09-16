@@ -32,4 +32,3 @@ If you have questions concerning this license or the applicable additional terms
 void DoRBFDialog( const char* FileName );
 
 #endif // __RENDERBUMPFLATDIALOG_H
-

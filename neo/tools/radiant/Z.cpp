@@ -37,7 +37,7 @@ z_t z;
 
 /*
  =======================================================================================================================
-    Z_Init
+	Z_Init
  =======================================================================================================================
  */
 void Z_Init()
@@ -54,13 +54,13 @@ static int	cursorx, cursory;
 
 /*
  =======================================================================================================================
-    Z_MouseDown
+	Z_MouseDown
  =======================================================================================================================
  */
 void Z_MouseDown( int x, int y, int buttons )
 {
 	idVec3	org, dir, vup, vright;
-	brush_t* b;
+	idEditorBrush* b;
 
 	Sys_GetCursorPos( &cursorx, &cursory );
 
@@ -180,7 +180,7 @@ void Z_MouseDown( int x, int y, int buttons )
 
 /*
  =======================================================================================================================
-    Z_MouseUp
+	Z_MouseUp
  =======================================================================================================================
  */
 void Z_MouseUp( int x, int y, int buttons )
@@ -190,7 +190,7 @@ void Z_MouseUp( int x, int y, int buttons )
 
 /*
  =======================================================================================================================
-    Z_MouseMoved
+	Z_MouseMoved
  =======================================================================================================================
  */
 void Z_MouseMoved( int x, int y, int buttons )
@@ -232,8 +232,8 @@ void Z_MouseMoved( int x, int y, int buttons )
 
 /*
  =======================================================================================================================
-    DRAWING �
-    Z_DrawGrid
+	DRAWING �
+	Z_DrawGrid
  =======================================================================================================================
  */
 void Z_DrawGrid()
@@ -251,13 +251,7 @@ void Z_DrawGrid()
 		zb = region_mins[2];
 	}
 
-#if defined(STANDALONE)
-	int stepSize = 100;
-#else
-	int stepSize = 64;
-#endif
-
-	zb = stepSize * floor( zb / stepSize );
+	zb = 64 * floor( zb / 64 );
 
 	ze = z.origin[2] + h;
 	if( ze > region_maxs[2] )
@@ -265,7 +259,7 @@ void Z_DrawGrid()
 		ze = region_maxs[2];
 	}
 
-	ze = stepSize * ceil( ze / stepSize );
+	ze = 64 * ceil( ze / 64 );
 
 	// draw major blocks
 	glColor3fv( g_qeglobals.d_savedinfo.colors[COLOR_GRIDMAJOR].ToFloatPtr() );
@@ -275,7 +269,7 @@ void Z_DrawGrid()
 	glVertex2f( 0, zb );
 	glVertex2f( 0, ze );
 
-	for( zz = zb; zz < ze; zz += stepSize )
+	for( zz = zb; zz < ze; zz += 64 )
 	{
 		glVertex2f( -w, zz );
 		glVertex2f( w, zz );
@@ -294,12 +288,10 @@ void Z_DrawGrid()
 		glBegin( GL_LINES );
 		for( zz = zb; zz < ze; zz += g_qeglobals.d_gridsize )
 		{
-			/*
-			if( !( ( int )zz & ( stepSize - 1 ) ) )
+			if( !( ( int )zz & 63 ) )
 			{
 				continue;
 			}
-			*/
 
 			glVertex2f( -w, zz );
 			glVertex2f( w, zz );
@@ -311,7 +303,7 @@ void Z_DrawGrid()
 	// draw coordinate text if needed
 	glColor3fv( g_qeglobals.d_savedinfo.colors[COLOR_GRIDTEXT].ToFloatPtr() );
 
-	for( zz = zb; zz < ze; zz += stepSize )
+	for( zz = zb; zz < ze; zz += 64 )
 	{
 		glRasterPos2f( -w + 1, zz );
 		sprintf( text, "%i", ( int )zz );
@@ -366,12 +358,12 @@ GLbitfield	glbitClear = GL_COLOR_BUFFER_BIT;	// HACK
 
 /*
  =======================================================================================================================
-    Z_Draw
+	Z_Draw
  =======================================================================================================================
  */
 void Z_Draw()
 {
-	brush_t*		brush;
+	idEditorBrush*		brush;
 	float		w, h;
 	float		top, bottom;
 	idVec3		org_top, org_bottom, dir_up, dir_down;
@@ -414,7 +406,6 @@ void Z_Draw()
 	h = z.height / 2 / z.scale;
 	glOrtho( -w, w, z.origin[2] - h, z.origin[2] + h, -8, 8 );
 
-	globalImages->BindNull();
 	glDisable( GL_DEPTH_TEST );
 	glDisable( GL_BLEND );
 
@@ -425,8 +416,6 @@ void Z_Draw()
 	glDisable( GL_CULL_FACE );
 
 	glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-
-	globalImages->BindNull();
 
 	// draw filled interiors and edges
 	dir_up[0] = 0;

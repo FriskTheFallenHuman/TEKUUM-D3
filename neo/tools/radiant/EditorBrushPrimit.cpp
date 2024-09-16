@@ -216,11 +216,8 @@ void EmitBrushPrimitTextureCoordinates( face_t* f, idWinding* w, patchMesh_t* pa
 			{
 				x = DotProduct( patch->ctrl( i, j ).xyz, texX );
 				y = DotProduct( patch->ctrl( i, j ).xyz, texY );
-
-				// RB: BFG idDrawVert
 				patch->ctrl( i, j ).SetTexCoord(	f->brushprimit_texdef.coords[0][0] * x + f->brushprimit_texdef.coords[0][1] * y + f->brushprimit_texdef.coords[0][2],
 													f->brushprimit_texdef.coords[1][0] * x + f->brushprimit_texdef.coords[1][1] * y + f->brushprimit_texdef.coords[1][2]	);
-				// RB end
 			}
 		}
 	}
@@ -231,14 +228,14 @@ void EmitBrushPrimitTextureCoordinates( face_t* f, idWinding* w, patchMesh_t* pa
 //    parse a brush in brush primitive format
 // =======================================================================================================================
 //
-void BrushPrimit_Parse( brush_t* b, bool newFormat, const idVec3 origin )
+void BrushPrimit_Parse( idEditorBrush* b, bool newFormat, const idVec3 origin )
 {
 	face_t*	f;
 	int		i, j;
 	GetToken( true );
 	if( strcmp( token, "{" ) )
 	{
-		Warning( "parsing brush primitive" );
+		idLib::Warning( "parsing brush primitive" );
 		return;
 	}
 
@@ -313,7 +310,7 @@ void BrushPrimit_Parse( brush_t* b, bool newFormat, const idVec3 origin )
 
 					if( strcmp( token, "(" ) )
 					{
-						Warning( "parsing brush" );
+						idLib::Warning( "parsing brush" );
 						return;
 					}
 
@@ -326,7 +323,7 @@ void BrushPrimit_Parse( brush_t* b, bool newFormat, const idVec3 origin )
 					GetToken( false );
 					if( strcmp( token, ")" ) )
 					{
-						Warning( "parsing brush" );
+						idLib::Warning( "parsing brush" );
 						return;
 					}
 				}
@@ -336,14 +333,14 @@ void BrushPrimit_Parse( brush_t* b, bool newFormat, const idVec3 origin )
 			GetToken( false );
 			if( strcmp( token, "(" ) )
 			{
-				Warning( "parsing brush primitive" );
+				idLib::Warning( "parsing brush primitive" );
 				return;
 			}
 
 			GetToken( false );
 			if( strcmp( token, "(" ) )
 			{
-				Warning( "parsing brush primitive" );
+				idLib::Warning( "parsing brush primitive" );
 				return;
 			}
 
@@ -356,14 +353,14 @@ void BrushPrimit_Parse( brush_t* b, bool newFormat, const idVec3 origin )
 			GetToken( false );
 			if( strcmp( token, ")" ) )
 			{
-				Warning( "parsing brush primitive" );
+				idLib::Warning( "parsing brush primitive" );
 				return;
 			}
 
 			GetToken( false );
 			if( strcmp( token, "(" ) )
 			{
-				Warning( "parsing brush primitive" );
+				idLib::Warning( "parsing brush primitive" );
 				return;
 			}
 
@@ -376,14 +373,14 @@ void BrushPrimit_Parse( brush_t* b, bool newFormat, const idVec3 origin )
 			GetToken( false );
 			if( strcmp( token, ")" ) )
 			{
-				Warning( "parsing brush primitive" );
+				idLib::Warning( "parsing brush primitive" );
 				return;
 			}
 
 			GetToken( false );
 			if( strcmp( token, ")" ) )
 			{
-				Warning( "parsing brush primitive" );
+				idLib::Warning( "parsing brush primitive" );
 				return;
 			}
 
@@ -809,12 +806,6 @@ void Face_FitTexture_BrushPrimit( face_t* f, idVec3 mins, idVec3 maxs, float hei
  */
 void Face_ScaleTexture_BrushPrimit( face_t* face, float sS, float sT )
 {
-	if( !g_qeglobals.m_bBrushPrimitMode )
-	{
-		Sys_Status( "BP mode required\n" );
-		return;
-	}
-
 	brushprimit_texdef_t*	pBP = &face->brushprimit_texdef;
 	BPMatScale( pBP->coords, sS, sT );
 
@@ -1247,7 +1238,7 @@ void Face_FlipTexture_BrushPrimit( face_t* f, bool y )
 #endif
 }
 
-void Brush_FlipTexture_BrushPrimit( brush_t* b, bool y )
+void Brush_FlipTexture_BrushPrimit( idEditorBrush* b, bool y )
 {
 	for( face_t* f = b->brush_faces; f; f = f->next )
 	{
@@ -1376,4 +1367,3 @@ void Face_SetAxialScale_BrushPrimit( face_t* face, bool y )
 
 	*/
 }
-

@@ -92,6 +92,7 @@ if( MSVC )
 		OBJECT_DEPENDS "precompiled.pch" )
 
 	add_library( ${PROJECT_NAME} ${ID_SOURCES_ALL} ${ID_INCLUDES_ALL} )
+	set_target_properties( ${PROJECT_NAME} PROPERTIES FOLDER "libs" )
 else()
 	include_directories( ${CMAKE_CURRENT_SOURCE_DIR} )
 

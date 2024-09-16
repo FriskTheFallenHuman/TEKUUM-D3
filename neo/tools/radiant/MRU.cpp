@@ -190,7 +190,7 @@ void DeleteMruMenu( LPMRUMENU lpMruMenu )
 //*************************************************************
 void SetNbLruShow( LPMRUMENU lpMruMenu, WORD wNbLruShowInit )
 {
-	lpMruMenu->wNbLruShow = min( wNbLruShowInit, lpMruMenu->wNbLruMenu );
+	//lpMruMenu->wNbLruShow = min( wNbLruShowInit, lpMruMenu->wNbLruMenu );
 }
 
 //*************************************************************
@@ -220,6 +220,7 @@ void SetNbLruShow( LPMRUMENU lpMruMenu, WORD wNbLruShowInit )
 //*************************************************************
 BOOL SetMenuItem( LPMRUMENU lpMruMenu, WORD wItem, LPSTR lpItem )
 {
+	/*
 	if( wItem >= NBMRUMENU )
 	{
 		return FALSE;
@@ -228,6 +229,7 @@ BOOL SetMenuItem( LPMRUMENU lpMruMenu, WORD wItem, LPSTR lpItem )
 			   ( ( lpMruMenu->wMaxSizeLruItem ) * ( UINT )wItem ),
 			   lpItem, lpMruMenu->wMaxSizeLruItem - 1 );
 	lpMruMenu->wNbItemFill = max( lpMruMenu->wNbItemFill, wItem + 1 );
+	*/
 	return TRUE;
 }
 
@@ -304,6 +306,7 @@ BOOL GetMenuItem( LPMRUMENU lpMruMenu, WORD wItem,
 //*************************************************************
 void AddNewItem( LPMRUMENU lpMruMenu, LPSTR lpItem )
 {
+	/*
 	WORD i, j;
 	for( i = 0; i < lpMruMenu->wNbItemFill; i++ )
 		if( lstrcmpi( lpItem, ( lpMruMenu->lpMRU ) +
@@ -321,6 +324,7 @@ void AddNewItem( LPMRUMENU lpMruMenu, LPSTR lpItem )
 		lstrcpy( lpMruMenu->lpMRU + ( lpMruMenu->wMaxSizeLruItem * ( UINT )i ),
 				 lpMruMenu->lpMRU + ( lpMruMenu->wMaxSizeLruItem * ( UINT )( i - 1 ) ) );
 	_fstrncpy( lpMruMenu->lpMRU, lpItem, lpMruMenu->wMaxSizeLruItem - 1 );
+	*/
 }
 
 //*************************************************************
@@ -391,6 +395,7 @@ BOOL DelMenuItem( LPMRUMENU lpMruMenu, WORD wItem, BOOL fIDMBased )
 //*************************************************************
 void PlaceMenuMRUItem( LPMRUMENU lpMruMenu, HMENU hMenu, UINT uiItem )
 {
+	/*
 	int  i;
 	WORD wNbShow;
 	if( hMenu == NULL )
@@ -424,7 +429,7 @@ void PlaceMenuMRUItem( LPMRUMENU lpMruMenu, HMENU hMenu, UINT uiItem )
 			GlobalFreePtr( lpTxt );
 		}
 	}
-
+	*/
 }
 
 ///////////////////////////////////////////
@@ -666,52 +671,5 @@ BOOL LoadMruInReg( LPMRUMENU lpMruMenu, LPSTR lpszKey )
 	RegCloseKey( hCurKey );
 	GlobalFreePtr( lpTxt );
 	return TRUE;
-}
-
-
-//*************************************************************
-//
-//  GetWin32Kind()
-//
-//  Purpose:
-//              Get the Win32 platform
-//
-//  Parameters:
-//
-//  Return: (WIN32KIND)
-//      WINNT -           Run under Windows NT
-//      WIN32S -          Run under Windows 3.1x + Win32s
-//      WIN95ORGREATHER - Run under Windows 95
-//
-//
-//  Comments:
-//      Win32 function designed for Windows NT and Windows 95
-//      See RegOpenKeyEx API for more info on lpszKey
-//
-//  History:    Date       Author       Comment
-//              09/24/94   G. Vollant   Created
-//
-//*************************************************************
-WIN32KIND GetWin32Kind()
-{
-	BOOL IsWin395OrHigher();
-
-	WORD wVer;
-
-	if( ( GetVersion() & 0x80000000 ) == 0 )
-	{
-		return WINNT;
-	}
-	wVer = LOWORD( GetVersion() );
-	wVer = ( ( ( WORD )LOBYTE( wVer ) ) << 8 ) | ( WORD )HIBYTE( wVer );
-
-	if( wVer >= 0x035F )
-	{
-		return WIN95ORGREATHER;
-	}
-	else
-	{
-		return WIN32S;
-	}
 }
 #endif

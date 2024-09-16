@@ -90,16 +90,17 @@ If you have questions concerning this license or the applicable additional terms
 // NOTE: a seperate core savegame version and game savegame version could be useful
 // 16: Doom v1.1
 // 17: Doom v1.2 / D3XP. Can still read old v16 with defaults for new data
-#define SAVEGAME_VERSION				17
+// 18: RBDOOM3
+#define SAVEGAME_VERSION				18
 
 // <= Doom v1.1: 1. no DS_VERSION token ( default )
 // Doom v1.2: 2
+// RBDOOM3 : 3
 #define RENDERDEMO_VERSION				3
 
 // editor info
-#define EDITOR_DEFAULT_PROJECT			"doom.qe4"
-#define EDITOR_REGISTRY_KEY				"DOOMRadiant"
-#define EDITOR_WINDOWTEXT				"DOOMEdit"
+#define EDITOR_REGISTRY_KEY				"IdStudio"
+#define EDITOR_WINDOWTEXT				"IdStudio"
 
 // win32 info
 #define WIN32_CONSOLE_CLASS				"DOOM3_WinConsole"

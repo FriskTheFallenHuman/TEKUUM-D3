@@ -252,6 +252,14 @@ int MaterialEditView::OnCreate( LPCREATESTRUCT lpCreateStruct )
 
 	m_tabs.SetFont( materialEditorFont );
 
+	// Load the icon
+	HICON hIcon = AfxGetApp()->LoadIconA( IDI_GUIED );
+	if( hIcon )
+	{
+		SetIcon( hIcon, TRUE );
+		SetIcon( hIcon, FALSE );
+	}
+
 	return 0;
 }
 
@@ -265,12 +273,23 @@ void MaterialEditView::OnSize( UINT nType, int cx, int cy )
 	CRect tabRect;
 	m_tabs.GetItemRect( 0, tabRect );
 
-	int tabHeight = tabRect.Height() + 5;
+
+	float scaling_factor = Win_GetWindowScalingFactor( GetSafeHwnd() );
+	int s2 = int( 2 * scaling_factor );
+	int s8 = int( 8 * scaling_factor );
+	int s4 = int( 4 * scaling_factor );
+	int s5 = int( 5 * scaling_factor );
+	int s6 = int( 6 * scaling_factor );
+	int s12 = int( 12 * scaling_factor );
+	int s16 = int( 16 * scaling_factor );
+	int s22 = int( 22 * scaling_factor );
+
+	int tabHeight = tabRect.Height() + s5;
 
 	//Hardcode the edit window height
 	if( m_nameEdit.GetSafeHwnd() )
 	{
-		m_nameEdit.MoveWindow( 1, 1, cx - 2, 20 );
+		m_nameEdit.MoveWindow( 1, 1, cx - s2, 20 );
 	}
 
 	if( m_tabs.GetSafeHwnd() )
@@ -280,12 +299,12 @@ void MaterialEditView::OnSize( UINT nType, int cx, int cy )
 
 	if( m_editSplitter.GetSafeHwnd() )
 	{
-		m_editSplitter.MoveWindow( 1, 22, cx - 2, cy - tabHeight - 22 );
+		m_editSplitter.MoveWindow( 1, 22, cx - s2, cy - tabHeight - s22 );
 	}
 
 	if( m_textView.GetSafeHwnd() )
 	{
-		m_textView.MoveWindow( 1, 22, cx - 2, cy - tabHeight - 22 );
+		m_textView.MoveWindow( 1, 22, cx - s2, cy - tabHeight - s22 );
 	}
 }
 
@@ -333,10 +352,3 @@ void MaterialEditView::OnEnChangeEdit( NMHDR* pNMHDR, LRESULT* pResult )
 		}
 	}
 }
-
-
-
-
-
-
-

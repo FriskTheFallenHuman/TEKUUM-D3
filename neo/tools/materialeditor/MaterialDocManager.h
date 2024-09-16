@@ -83,9 +83,9 @@ public:
 
 
 	//Used to get and/or create a MaterialDoc object for editing
-	MaterialDoc* 	CreateMaterialDoc( const char* materialName );
-	MaterialDoc* 	CreateMaterialDoc( idMaterial* material );
-	MaterialDoc* 	GetInProgressDoc( idMaterial* material );
+	MaterialDoc*	CreateMaterialDoc( const char* materialName );
+	MaterialDoc*	CreateMaterialDoc( idMaterial* material );
+	MaterialDoc*	GetInProgressDoc( idMaterial* material );
 
 	//Copy Paste
 	void			CopyMaterial( MaterialDoc* materialDoc = NULL, bool cut = false );

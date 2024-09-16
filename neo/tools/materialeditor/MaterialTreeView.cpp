@@ -123,8 +123,6 @@ void MaterialTreeView::InitializeMaterialList( bool includeFile, const char* fil
 void MaterialTreeView::BuildMaterialList( bool includeFile, const char* filename )
 {
 
-	CTreeCtrl& tree = GetTreeCtrl();
-
 	idStrList list( 1024 );
 
 	int count = declManager->GetNumDecls( DECL_MATERIAL );
@@ -146,11 +144,6 @@ void MaterialTreeView::BuildMaterialList( bool includeFile, const char* filename
 			if( !filename.Icmp( "<implicit file>" ) )
 			{
 				continue;
-			}
-
-			if( filename.Find( "def" ) != -1 )
-			{
-				int x = 0;
 			}
 
 			if( includeFile )
@@ -1096,11 +1089,11 @@ void MaterialTreeView::OnMouseMove( UINT nFlags, CPoint point )
 			if( item != hoverItem )
 			{
 				hoverItem = item;
-				hoverStartTime = timeGetTime();
+				hoverStartTime = Sys_Milliseconds();
 			}
 			else
 			{
-				DWORD currentTime = timeGetTime();
+				DWORD currentTime = Sys_Milliseconds();
 				if( currentTime - hoverStartTime > HOVER_EXPAND_DELAY )
 				{
 
@@ -1774,7 +1767,7 @@ void MaterialTreeView::AddStrList( const char* root, idStrList* list, bool inclu
 	HTREEITEM	item = base;
 	HTREEITEM	add;
 
-	list->Sort();
+	//list.SortWithTemplate( idSort_Str() );
 	int	count = list->Num();
 
 	idStr	last, qt;
@@ -2094,7 +2087,7 @@ void MaterialTreeView::SetItemImage( HTREEITEM item, bool mod, bool apply, bool 
 
 	CTreeCtrl& tree = GetTreeCtrl();
 
-	int image;
+	int image = 0;
 
 	DWORD itemType = tree.GetItemData( item );
 	switch( itemType )
@@ -2226,14 +2219,3 @@ idStr MaterialTreeView::GetQuicktreePath( HTREEITEM item )
 	}
 	return qt;
 }
-
-
-
-
-
-
-
-
-
-
-

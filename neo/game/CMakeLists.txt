@@ -53,6 +53,7 @@ if( MSVC )
 	target_include_directories( ${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/idlib )
 	add_dependencies( ${PROJECT_NAME} idlib )
 	target_link_libraries( ${PROJECT_NAME} idlib )
+	set_target_properties( ${PROJECT_NAME} PROPERTIES FOLDER "dlls" )
 
 	#GK: Make sure the name is right
 	set_target_properties( ${PROJECT_NAME} PROPERTIES OUTPUT_NAME "game" )

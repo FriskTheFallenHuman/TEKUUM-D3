@@ -464,4 +464,3 @@ void DeleteMaterialFolderModifier::Redo()
 
 	view->DeleteFolder( item, false );
 }
-

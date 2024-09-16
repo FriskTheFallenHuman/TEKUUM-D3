@@ -30,7 +30,6 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 #include "ListGUILocal.h"
-#include "DeviceContext.h"
 #include "Window.h"
 #include "UserInterfaceLocal.h"
 
@@ -144,7 +143,8 @@ void idUserInterfaceManagerLocal::EndLevelLoad( const char* mapName )
 	int c = guis.Num();
 	for( int i = 0; i < c; i++ )
 	{
-		if( guis[i]->GetRefs() == 0 )
+		// foresthale 2014-05-28: Brian Harris suggested the editors should never purge assets, because of potential for crashes on improperly refcounted assets
+		if( guis[i]->GetRefs() == 0 && !( com_editors ) )
 		{
 			//common->Printf( "purging %s.\n", guis[i]->GetSourceFile() );
 
@@ -162,7 +162,8 @@ void idUserInterfaceManagerLocal::EndLevelLoad( const char* mapName )
 			if( remove )
 			{
 				delete guis[ i ];
-				guis.RemoveIndex( i );
+				// foresthale 2014-06-08: changed the ~idUserInterfaceLocal method to remove its index automatically, so we don't want this line anymore
+				//guis.RemoveIndex( i );
 				i--;
 				c--;
 			}
@@ -254,7 +255,8 @@ void idUserInterfaceManagerLocal::DeAlloc( idUserInterface* gui )
 			if( guis[i] == gui )
 			{
 				delete guis[i];
-				guis.RemoveIndex( i );
+				// foresthale 2014-05-29: added the remove to the dtor, so this is no longer needed
+				//guis.RemoveIndex( i ); // motorsep 06-02-2014 was disabled by foresthale
 				return;
 			}
 		}
@@ -352,6 +354,8 @@ idUserInterfaceLocal::idUserInterfaceLocal()
 
 idUserInterfaceLocal::~idUserInterfaceLocal()
 {
+	// foresthale 2014-05-29: editGUIs shutdown code doesn't remove the gui before it gets destroyed
+	uiManagerLocal.guis.Remove( this ); // motorsep 06-02-2014 was introduced by foresthale, that's what crashes game (bug # 0000213)
 	delete desktop;
 	desktop = NULL;
 }
@@ -419,49 +423,94 @@ bool idUserInterfaceLocal::InitFromFile( const char* qpath, bool rebuild, bool c
 	}
 	state.Set( "text", "Test Text!" );
 
-	idTokenParser& bsrc = uiManagerLocal.GetBinaryParser();
-	if( !bsrc.IsLoaded() || !bsrc.StartParsing( source ) )
+	if( com_editors )
 	{
 		idParser src( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_ALLOWMULTICHARLITERALS | LEXFL_ALLOWBACKSLASHSTRINGCONCAT );
-		src.LoadFile( source );
+
+		//Load the timestamp so reload guis will work correctly
+		fileSystem->ReadFile( qpath, NULL, &timeStamp );
+
+		src.LoadFile( qpath );
+
 		if( src.IsLoaded() )
 		{
-			bsrc.LoadFromParser( src, source );
-			ID_TIME_T ts = fileSystem->GetTimestamp( source );
-			bsrc.UpdateTimeStamp( ts );
-		}
-	}
-	if( bsrc.IsLoaded() && bsrc.StartParsing( source ) )
-	{
-		idToken token;
-		while( bsrc.ReadToken( &token ) )
-		{
-			if( idStr::Icmp( token, "windowDef" ) == 0 )
+			idToken token;
+			while( src.ReadToken( &token ) )
 			{
-				if( desktop->Parse( &bsrc, rebuild ) )
+				if( idStr::Icmp( token, "windowDef" ) == 0 )
 				{
-					desktop->SetFlag( WIN_DESKTOP );
-					desktop->FixupParms();
+					if( desktop->Parse( &src, rebuild ) )
+					{
+						desktop->SetFlag( WIN_DESKTOP );
+						desktop->FixupParms();
+					}
+					continue;
 				}
-				continue;
 			}
+
+			state.Set( "name", qpath );
 		}
-		state.Set( "name", qpath );	// don't use localized name
-		bsrc.DoneParsing();
+		else
+		{
+			desktop->SetFlag( WIN_DESKTOP );
+			desktop->name = "Desktop";
+			desktop->text = va( "Invalid GUI: %s", qpath );
+			desktop->rect = idRectangle( 0.0f, 0.0f, 640.0f, 480.0f );
+			desktop->drawRect = desktop->rect;
+			desktop->foreColor = idVec4( 1.0f, 1.0f, 1.0f, 1.0f );
+			desktop->backColor = idVec4( 0.0f, 0.0f, 0.0f, 1.0f );
+			desktop->SetupFromState();
+			common->Warning( "Couldn't load gui: '%s'", source.c_str() );
+			loading = false;
+			return false;
+		}
 	}
 	else
 	{
-		desktop->SetFlag( WIN_DESKTOP );
-		desktop->name = "Desktop";
-		desktop->text = va( "Invalid GUI: %s", qpath );
-		desktop->rect = idRectangle( 0.0f, 0.0f, 640.0f, 480.0f );
-		desktop->drawRect = desktop->rect;
-		desktop->foreColor = idVec4( 1.0f, 1.0f, 1.0f, 1.0f );
-		desktop->backColor = idVec4( 0.0f, 0.0f, 0.0f, 1.0f );
-		desktop->SetupFromState();
-		common->Warning( "Couldn't load gui: '%s'", source.c_str() );
-		loading = false;
-		return false;
+		idTokenParser& bsrc = uiManagerLocal.GetBinaryParser();
+		if( rebuild || !bsrc.IsLoaded() || !bsrc.StartParsing( source ) )
+		{
+			idParser src( LEXFL_NOFATALERRORS | LEXFL_NOSTRINGCONCAT | LEXFL_ALLOWMULTICHARLITERALS | LEXFL_ALLOWBACKSLASHSTRINGCONCAT );
+			src.LoadFile( source );
+			if( src.IsLoaded() )
+			{
+				bsrc.LoadFromParser( src, source );
+				ID_TIME_T ts = fileSystem->GetTimestamp( source );
+				bsrc.UpdateTimeStamp( ts );
+			}
+		}
+		if( bsrc.IsLoaded() && bsrc.StartParsing( source ) )
+		{
+			idToken token;
+			while( bsrc.ReadToken( &token ) )
+			{
+				if( idStr::Icmp( token, "windowDef" ) == 0 )
+				{
+					if( desktop->Parse( &bsrc, rebuild ) )
+					{
+						desktop->SetFlag( WIN_DESKTOP );
+						desktop->FixupParms();
+					}
+					continue;
+				}
+			}
+			state.Set( "name", qpath );	// don't use localized name
+			bsrc.DoneParsing();
+		}
+		else
+		{
+			desktop->SetFlag( WIN_DESKTOP );
+			desktop->name = "Desktop";
+			desktop->text = va( "Invalid GUI: %s", qpath );
+			desktop->rect = idRectangle( 0.0f, 0.0f, 640.0f, 480.0f );
+			desktop->drawRect = desktop->rect;
+			desktop->foreColor = idVec4( 1.0f, 1.0f, 1.0f, 1.0f );
+			desktop->backColor = idVec4( 0.0f, 0.0f, 0.0f, 1.0f );
+			desktop->SetupFromState();
+			common->Warning( "Couldn't load gui: '%s'", source.c_str() );
+			loading = false;
+			return false;
+		}
 	}
 
 	interactive = desktop->Interactive();

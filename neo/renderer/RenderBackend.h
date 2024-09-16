@@ -335,7 +335,7 @@ private:
 
 public:
 	uint64_t				GL_GetCurrentState() const;
-private:
+//private:
 	uint64_t				GL_GetCurrentStateMinusStencil() const;
 	void				GL_SetDefaultState();
 

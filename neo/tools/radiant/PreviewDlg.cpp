@@ -41,9 +41,10 @@ extern HTREEITEM FindTreeItem( CTreeCtrl* tree, HTREEITEM root, const char* text
 
 // CPreviewDlg dialog
 
-IMPLEMENT_DYNAMIC( CPreviewDlg, CDialog )
-CPreviewDlg::CPreviewDlg( CWnd* pParent /*=NULL*/ )
-	: CDialog( CPreviewDlg::IDD, pParent )
+IMPLEMENT_DYNAMIC( CPreviewDlg, CDialogEx )
+
+CPreviewDlg::CPreviewDlg( CWnd* pParent )
+	: CDialogEx( CPreviewDlg::IDD, pParent )
 {
 	currentMode = MODELS;
 	disablePreview = false;
@@ -55,29 +56,33 @@ CPreviewDlg::~CPreviewDlg()
 
 void CPreviewDlg::DoDataExchange( CDataExchange* pDX )
 {
-	CDialog::DoDataExchange( pDX );
+	CDialogEx::DoDataExchange( pDX );
 	DDX_Control( pDX, IDC_TREE_MEDIA, treeMedia );
 	DDX_Control( pDX, IDC_EDIT_INFO, editInfo );
 	DDX_Control( pDX, IDC_PREVIEW, wndPreview );
 }
 
-
-BEGIN_MESSAGE_MAP( CPreviewDlg, CDialog )
+BEGIN_MESSAGE_MAP( CPreviewDlg, CDialogEx )
 	ON_NOTIFY( TVN_SELCHANGED, IDC_TREE_MEDIA, OnTvnSelchangedTreeMedia )
 	ON_BN_CLICKED( IDC_BUTTON_RELOAD, OnBnClickedButtonReload )
 	ON_BN_CLICKED( IDC_BUTTON_ADD, OnBnClickedButtonAdd )
 	ON_BN_CLICKED( IDC_BUTTON_PLAY, OnBnClickedButtonPlay )
+	ON_BN_CLICKED( IDC_PREVIEW_GUI, OnBnClickedPreviewGui )
 END_MESSAGE_MAP()
-
 
 // CPreviewDlg message handlers
 
 BOOL CPreviewDlg::OnInitDialog()
 {
-	CDialog::OnInitDialog();
+	CDialogEx::OnInitDialog();
 
-	m_image.Create( IDB_BITMAP_MATERIAL, 16, 1, RGB( 255, 255, 255 ) );
+	m_image.Create( 16, 16, ILC_COLOR32, 1, 1 );
+
+	m_bitmap.LoadBitmap( IDB_BITMAP_MATERIAL );
+	m_image.Add( &m_bitmap, RGB( 255, 0, 255 ) );
+
 	treeMedia.SetImageList( &m_image, TVSIL_NORMAL );
+
 	if( disablePreview )
 	{
 		wndPreview.ShowWindow( SW_HIDE );
@@ -100,8 +105,31 @@ BOOL CPreviewDlg::OnInitDialog()
 		}
 	}
 	mediaName = "";
+
+	CButton* but = ( CButton* )GetDlgItem( IDC_PREVIEW_GUI );
+	but->SetCheck( 1 );
+	if( strOnlyFilter.Icmp( "particles/" ) == 0 )
+	{
+		but->SetWindowTextA( "Particles Only" );
+	}
+	else
+	{
+		but->SetWindowTextA( "Gui Only" );
+	}
+
 	return TRUE;  // return TRUE unless you set the focus to a control
 
+}
+
+void CPreviewDlg::OnBnClickedPreviewGui( void )
+{
+	onlyFilter = !onlyFilter;
+}
+
+void CPreviewDlg::SetOnlyFilter( bool gOnly, idStr filter )
+{
+	onlyFilter = gOnly;
+	strOnlyFilter = filter;
 }
 
 void CPreviewDlg::BuildTree()
@@ -116,28 +144,23 @@ void CPreviewDlg::BuildTree()
 	if( currentMode == GUIS )
 	{
 		files = fileSystem->ListFilesTree( "guis", ".gui" );
-		AddStrList( "base", files->GetList(), GUIS );
+		AddStrList( BASE_GAMEDIR, files->GetList(), GUIS );
 		fileSystem->FreeFileList( files );
 	}
 	else if( currentMode == MODELS )
 	{
 		files = fileSystem->ListFilesTree( "models", ".lwo" );
-		AddStrList( "base", files->GetList(), MODELS );
+		AddStrList( BASE_GAMEDIR, files->GetList(), MODELS );
 		fileSystem->FreeFileList( files );
-
 		files = fileSystem->ListFilesTree( "models", ".ase" );
-		AddStrList( "base", files->GetList(), MODELS );
+		AddStrList( BASE_GAMEDIR, files->GetList(), MODELS );
 		fileSystem->FreeFileList( files );
-
 		files = fileSystem->ListFilesTree( "models", ".ma" );
-		AddStrList( "base", files->GetList(), MODELS );
+		AddStrList( BASE_GAMEDIR, files->GetList(), MODELS );
 		fileSystem->FreeFileList( files );
-
-		// RB: added .dae
-		files = fileSystem->ListFilesTree( "models", ".dae" );
-		AddStrList( "base", files->GetList(), MODELS );
+		files = fileSystem->ListFilesTree( "models", ".obj" );
+		AddStrList( BASE_GAMEDIR, files->GetList(), MODELS );
 		fileSystem->FreeFileList( files );
-		// RB end
 	}
 	else if( currentMode == SOUNDS )
 	{
@@ -176,10 +199,10 @@ void CPreviewDlg::AddCommentedItems()
 		src.LoadMemory( buffer, strlen( buffer ), path );
 		if( src.IsLoaded() )
 		{
-			idToken token, tok1, tok2, tok3;
-			while( src.ReadToken( &token ) )
+			idToken commenttoken, tok1, tok2, tok3;
+			while( src.ReadToken( &commenttoken ) )
 			{
-				if( token == "{" )
+				if( commenttoken == "{" )
 				{
 					// start a new commented item
 					CommentedItem ci;
@@ -207,8 +230,6 @@ void CPreviewDlg::AddCommentedItems()
 		}
 	}
 }
-
-
 
 void CPreviewDlg::AddStrList( const char* root, const idStrList& list, int id )
 {
@@ -326,7 +347,6 @@ void CPreviewDlg::AddStrList( const char* root, const idStrList& list, int id )
 
 void CPreviewDlg::OnTvnSelchangedTreeMedia( NMHDR* pNMHDR, LRESULT* pResult )
 {
-	LPNMTREEVIEW pNMTreeView = reinterpret_cast<LPNMTREEVIEW>( pNMHDR );
 	HTREEITEM item = treeMedia.GetSelectedItem();
 	mediaName = "";
 	CWnd* add = GetDlgItem( IDC_BUTTON_ADD );
@@ -356,7 +376,7 @@ void CPreviewDlg::OnTvnSelchangedTreeMedia( NMHDR* pNMHDR, LRESULT* pResult )
 			// strip the leading "base/"
 			if( id == MATERIALS )
 			{
-				mediaName.Strip( "Materials/" );
+				mediaName.Strip( "Materials/" ); // FIXME: SteelStorm2 has a _v1 suffix here
 			}
 			else if( id == WAVES )
 			{
@@ -421,14 +441,6 @@ void CPreviewDlg::OnTvnSelchangedTreeMedia( NMHDR* pNMHDR, LRESULT* pResult )
 				{
 					lsize = 768 * 1024;
 				}
-				if( size > lsize )
-				{
-					if( MessageBox( "Model appears to be quite large, are you sure you want to preview it?", "High Poly Model?", MB_YESNO ) == IDNO )
-					{
-						*pResult = 0;
-						return;
-					}
-				}
 				m_drawModel.setMedia( modelMedia );
 				if( currentMode == SKINS )
 				{
@@ -492,7 +504,7 @@ void CPreviewDlg::OnTvnSelchangedTreeMedia( NMHDR* pNMHDR, LRESULT* pResult )
 
 BOOL CPreviewDlg::Create( LPCTSTR lpszTemplateName, CWnd* pParentWnd )
 {
-	BOOL b =  CDialog::Create( lpszTemplateName, pParentWnd );
+	BOOL b =  CDialogEx::Create( lpszTemplateName, pParentWnd );
 	ShowWindow( SW_SHOW );
 	return b;
 }
@@ -507,7 +519,7 @@ void CPreviewDlg::OnCancel()
 	}
 	else
 	{
-		CDialog::OnCancel();
+		CDialogEx::OnCancel();
 	}
 	returnCode = IDCANCEL;
 }
@@ -522,7 +534,7 @@ void CPreviewDlg::OnOK()
 	}
 	else
 	{
-		CDialog::OnOK();
+		CDialogEx::OnOK();
 	}
 	returnCode = IDOK;
 }
@@ -540,7 +552,10 @@ void CPreviewDlg::SetModal()
 void CPreviewDlg::OnBnClickedButtonReload()
 {
 	BuildTree();
-	g_qeglobals.sw->StopAllSounds();
+	if( g_qeglobals.sw != NULL )
+	{
+		g_qeglobals.sw->StopAllSounds();
+	}
 }
 
 void CPreviewDlg::OnBnClickedButtonAdd()
@@ -593,10 +608,7 @@ void CPreviewDlg::AddSounds( bool rootItems )
 		const idSoundShader* poo = declManager->SoundByIndex( i, false );
 		list.AddUnique( poo->GetFileName() );
 	}
-
-	// RB: BFG sort
 	list.SortWithTemplate( idSort_PathStr() );
-	// RB end
 
 	for( i = 0; i < list.Num(); i++ )
 	{
@@ -612,11 +624,7 @@ void CPreviewDlg::AddSounds( bool rootItems )
 				list2.Append( poo->GetName() );
 			}
 		}
-
-		// RB: BFG sort
 		list2.SortWithTemplate( idSort_PathStr() );
-		// RB end
-
 		for( j = 0; j < list2.Num(); j++ )
 		{
 			HTREEITEM child2 = treeMedia.InsertItem( list2[j], child );
@@ -668,6 +676,11 @@ void CPreviewDlg::SetMode( int mode, const char* preSelect )
 			{
 				wnd->ShowWindow( SW_SHOW );
 			}
+			wnd = GetDlgItem( IDC_PREVIEW_GUI );
+			if( wnd )
+			{
+				wnd->ShowWindow( SW_HIDE );
+			}
 			break;
 		case MATERIALS :
 			wndPreview.ShowWindow( SW_SHOW );
@@ -686,6 +699,11 @@ void CPreviewDlg::SetMode( int mode, const char* preSelect )
 			{
 				wnd->ShowWindow( SW_HIDE );
 			}
+			wnd = GetDlgItem( IDC_PREVIEW_GUI );
+			if( wnd )
+			{
+				wnd->ShowWindow( SW_SHOW );
+			}
 			break;
 		case SOUNDS :
 		case WAVES :
@@ -701,6 +719,11 @@ void CPreviewDlg::SetMode( int mode, const char* preSelect )
 				wnd->ShowWindow( SW_HIDE );
 			}
 			wnd = GetDlgItem( IDC_EDIT_INFO );
+			if( wnd )
+			{
+				wnd->ShowWindow( SW_HIDE );
+			}
+			wnd = GetDlgItem( IDC_PREVIEW_GUI );
 			if( wnd )
 			{
 				wnd->ShowWindow( SW_HIDE );
@@ -731,14 +754,21 @@ void CPreviewDlg::AddMaterials( bool rootItems )
 					continue;
 				}
 			}
-			list.Append( mat->GetName() );
+
+			if( onlyFilter )
+			{
+				if( strstr( mat->GetName(), strOnlyFilter.c_str() ) != 0 )
+				{
+					list.Append( mat->GetName() );
+				}
+			}
+			else
+			{
+				list.Append( mat->GetName() );
+			}
 		}
-
-		// RB: BFG sort
 		list.SortWithTemplate( idSort_PathStr() );
-		// RB end
-
-		AddStrList( "Materials", list, MATERIALS );
+		AddStrList( "Materials", list, MATERIALS ); // FIXME: SteelStorm2 has a _v1 suffix here
 	}
 
 }
@@ -761,11 +791,7 @@ void CPreviewDlg::AddParticles( bool rootItems )
 			}
 			list.Append( ips->GetName() );
 		}
-
-		// RB: BFG sort
 		list.SortWithTemplate( idSort_PathStr() );
-		// RB end
-
 		AddStrList( "Particles", list, PARTICLES );
 	}
 }
@@ -802,12 +828,8 @@ void CPreviewDlg::AddSkins( bool rootItems )
 			}
 			list2.Append( skin->GetName() );
 		}
-
-		// RB: BFG sort
 		list.SortWithTemplate( idSort_PathStr() );
 		list2.SortWithTemplate( idSort_PathStr() );
-		// RB end
-
 		AddStrList( "Matching Skins", list, SKINS );
 		AddStrList( "Skins", list2, SKINS );
 	}

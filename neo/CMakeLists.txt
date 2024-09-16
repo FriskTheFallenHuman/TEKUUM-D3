@@ -7,12 +7,15 @@ else()
 	message( FATAL_ERROR "Vcpkg wasn't not found, aborting, make sure to git clone this with all submodules!")
 endif()
 
+set_property( GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER  "" )
+set_property( GLOBAL PROPERTY USE_FOLDERS ON )
+
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
 project(RBDOOM3 C CXX)
 
 option(USE_CMDLINE_TOOLS "Compile the built-in command line based tools" ON)
-option(USE_MFC_TOOLS "Compile the built-in MFC based tools" OFF)
+option(USE_MFC_TOOLS "Compile the built-in MFC based tools" ON)
 option(STANDALONE "Skip Doom 3 base/ folder" OFF)
 option(FORCE_COLOR_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 option(COMPILE_COMMANDS "Generate compile_commands.json" OFF)
@@ -217,6 +220,9 @@ add_subdirectory(libs)
 if( USE_CMDLINE_TOOLS )
 	add_subdirectory(tools/compilers)
 endif()
+if( USE_MFC_TOOLS )
+	add_subdirectory(tools)
+endif()
 
 file(GLOB AAS_INCLUDES aas/*.h)
 file(GLOB AAS_SOURCES aas/*.cpp)
@@ -318,17 +324,17 @@ file(GLOB EDITOR_SOUND_SOURCES tools/sound/*.cpp)
 file(GLOB_RECURSE WIN32_INCLUDES sys/win32/*.h)
 file(GLOB_RECURSE WIN32_SOURCES sys/win32/*.cpp)
 
-if(ANGLE)
-	list(REMOVE_ITEM WIN32_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/sys/win32/win_glimp.cpp)
-else()
-	list(REMOVE_ITEM WIN32_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/sys/win32/win_egl.cpp)
-endif()
+file(GLOB_RECURSE WIN32_NATVIS sys/win32/natvis/*.natvis)
+file(GLOB_RECURSE WIN32_MANIFEST sys/win32/manifest/*.manifest)
 
-file(GLOB_RECURSE WIN32_RESOURCES sys/win32/rc/res/*.BMP sys/win32/rc/res/*.ico sys/win32/rc/res/*.cur)
-if(USE_MFC_TOOLS)
+if( USE_MFC_TOOLS )
+	file(GLOB_RECURSE WIN32_RESOURCES sys/win32/rc/res/*.BMP sys/win32/rc/res/*.ico sys/win32/rc/res/*.cur)
 	list(APPEND WIN32_RESOURCES sys/win32/rc/doom.rc)
+	list(REMOVE_ITEM WIN32_INCLUDES ${CMAKE_SOURCE_DIR}/sys/win32/rc/rbdoom3_resource.h)
+	list(REMOVE_ITEM WIN32_RESOURCES ${CMAKE_SOURCE_DIR}/sys/win32/rc/rbdoom3.rc)
 else()
-	list(APPEND WIN32_RESOURCES sys/win32/rc/doom_nomfc.rc)
+	set(WIN32_RESOURCES sys/win32/rc/rbdoom3_resource.h sys/win32/rc/rbdoom3.rc sys/win32/rc/res/doom3.ico)
+	list(REMOVE_ITEM WIN32_INCLUDES ${CMAKE_SOURCE_DIR}/sys/win32/rc/resource.h)
 endif()
 
 set(POSIX_INCLUDES
@@ -383,7 +389,6 @@ source_group("Renderer\\OpenGL" FILES ${RENDERER_OPENGL_SOURCES})
 source_group("Renderer\\Vulkan" FILES ${RENDERER_VULKAN_INCLUDES})
 source_group("Renderer\\Vulkan" FILES ${RENDERER_VULKAN_SOURCES})
 source_group("Renderer\\SMAA" FILES ${RENDERER_SMAA_INCLUDES})
-
 source_group("Renderer\\Shaders" FILES ${SHADERS})
 source_group("Renderer\\Shaders\\builtin" FILES ${SHADERS_BUILTIN})
 source_group("Renderer\\Shaders\\builtin\\debug" FILES ${SHADERS_BUILTIN_DEBUG})
@@ -395,16 +400,12 @@ source_group("Renderer\\Shaders\\builtin\\SSAO" FILES ${SHADERS_BUILTIN_SSAO})
 source_group("Renderer\\Shaders\\builtin\\SSGI" FILES ${SHADERS_BUILTIN_SSGI})
 source_group("Renderer\\Shaders\\builtin\\video" FILES ${SHADERS_BUILTIN_VIDEO})
 source_group("Renderer\\Shaders\\builtin\\VR" FILES ${SHADERS_BUILTIN_VR})
-
 source_group("Sound" FILES ${SOUND_INCLUDES})
 source_group("Sound" FILES ${SOUND_SOURCES})
 source_group("UI" FILES ${UI_INCLUDES})
 source_group("UI" FILES ${UI_SOURCES})
 source_group("Sys" FILES ${SYS_INCLUDES})
 source_group("Sys" FILES ${SYS_SOURCES})
-#source_group("Sys\\win32" FILES ${WIN32_INCLUDES})
-#source_group("Sys\\win32" FILES ${WIN32_SOURCES})
-#source_group("Sys\\win32\\Resources" FILES ${WIN32_RESOURCES})
 source_group("Sys\\Posix" FILES ${POSIX_INCLUDES})
 source_group("Sys\\Posix" FILES ${POSIX_SOURCES})
 source_group("Sys\\Common" FILES ${COMMON_INCLUDES})
@@ -414,34 +415,8 @@ source_group("Sys\\SDL" FILES ${SDL_SOURCES})
 source_group("Sys\\Win32" FILES ${WIN32_INCLUDES})
 source_group("Sys\\Win32" FILES ${WIN32_SOURCES})
 source_group("Sys\\Win32\\Resources" FILES ${WIN32_RESOURCES})
-
-source_group("tools" FILES ${TOOLS_INCLUDES})
-source_group("tools\\comafx" FILES ${TOOLS_COMAFX_INCLUDES})
-source_group("tools\\comafx" FILES ${TOOLS_COMAFX_SOURCES})
-source_group("tools\\common" FILES ${TOOLS_COMMON_INCLUDES})
-source_group("tools\\common" FILES ${TOOLS_COMMON_SOURCES})
-source_group("tools\\common\\proptree" FILES ${TOOLS_COMMON_PROPTREE_INCLUDES})
-source_group("tools\\common\\proptree" FILES ${TOOLS_COMMON_PROPTREE_SOURCES})
-source_group("tools\\af" FILES ${EDITOR_AF_INCLUDES})
-source_group("tools\\af" FILES ${EDITOR_AF_SOURCES})
-source_group("tools\\debugger" FILES ${EDITOR_DEBUGGER_INCLUDES})
-source_group("tools\\debugger" FILES ${EDITOR_DEBUGGER_SOURCES})
-source_group("tools\\decl" FILES ${EDITOR_DECL_INCLUDES})
-source_group("tools\\decl" FILES ${EDITOR_DECL_SOURCES})
-source_group("tools\\guied" FILES ${EDITOR_GUIED_INCLUDES})
-source_group("tools\\guied" FILES ${EDITOR_GUIED_SOURCES})
-source_group("tools\\materialeditor" FILES ${EDITOR_MATERIALEDITOR_INCLUDES})
-source_group("tools\\materialeditor" FILES ${EDITOR_MATERIALEDITOR_SOURCES})
-source_group("tools\\particle" FILES ${EDITOR_PARTICLE_INCLUDES})
-source_group("tools\\particle" FILES ${EDITOR_PARTICLE_SOURCES})
-source_group("tools\\pda" FILES ${EDITOR_PDA_INCLUDES})
-source_group("tools\\pda" FILES ${EDITOR_PDA_SOURCES})
-source_group("tools\\radiant" FILES ${EDITOR_RADIANT_INCLUDES})
-source_group("tools\\radiant" FILES ${EDITOR_RADIANT_SOURCES})
-source_group("tools\\script" FILES ${EDITOR_SCRIPT_INCLUDES})
-source_group("tools\\script" FILES ${EDITOR_SCRIPT_SOURCES})
-source_group("tools\\sound" FILES ${EDITOR_SOUND_INCLUDES})
-source_group("tools\\sound" FILES ${EDITOR_SOUND_SOURCES})
+source_group("Sys\\Win32\\NatVis" FILES ${WIN32_NATVIS})
+source_group("Sys\\Win32\\Manifest" FILES ${WIN32_MANIFEST})
 
 set(TEKUUM_INCLUDES
 	${AAS_INCLUDES}
@@ -516,63 +491,15 @@ if(MSVC)
 		#add_definitions(-DUSE_XINPUT)
 	# endif()
 
-	if(USE_MFC_TOOLS)
-		# find_package(MFC REQUIRED)
-		# if(MFC_FOUND)
-			# include_directories(${MFC_INCLUDE_DIR})
-			# link_directories(${MFC_LIBRARY_DIR})
-		# endif()
-
-		include_directories(libs/atlmfc/include)
-		if(CMAKE_CL_64)
-			link_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/atlmfc/lib/amd64)
-		else(CMAKE_CL_64)
-			link_directories(${CMAKE_CURRENT_SOURCE_DIR}/libs/atlmfc/lib)
-		endif(CMAKE_CL_64)
-
-		add_definitions(-DUSE_MFC_TOOLS)
-
-		list(APPEND TEKUUM_INCLUDES
-			${TOOLS_INCLUDES}
-			${TOOLS_COMAFX_INCLUDES}
-			${TOOLS_COMMON_INCLUDES}
-			${TOOLS_COMMON_PROPTREE_INCLUDES}
-
-			${EDITOR_AF_INCLUDES}
-			#${EDITOR_DEBUGGER_INCLUDES}
-			${EDITOR_DECL_INCLUDES}
-			#${EDITOR_GUIED_INCLUDES}
-			#${EDITOR_MATERIALEDITOR_INCLUDES}
-			${EDITOR_PARTICLE_INCLUDES}
-			${EDITOR_PDA_INCLUDES}
-			${EDITOR_RADIANT_INCLUDES}
-			${EDITOR_SCRIPT_INCLUDES}
-			${EDITOR_SOUND_INCLUDES})
-
-		list(APPEND TEKUUM_SOURCES
-			${TOOLS_COMAFX_SOURCES}
-			${TOOLS_COMMON_SOURCES}
-			${TOOLS_COMMON_PROPTREE_SOURCES}
-
-			${EDITOR_AF_SOURCES}
-			#${EDITOR_DEBUGGER_SOURCES}
-			${EDITOR_DECL_SOURCES}
-			#${EDITOR_GUIED_SOURCES}
-			#${EDITOR_MATERIALEDITOR_SOURCES}
-			${EDITOR_PARTICLE_SOURCES}
-			${EDITOR_PDA_SOURCES}
-			${EDITOR_RADIANT_SOURCES}
-			${EDITOR_SCRIPT_SOURCES}
-			${EDITOR_SOUND_SOURCES})
-	endif()
-
 	list(APPEND TEKUUM_INCLUDES
 		${SYS_INCLUDES}
 		${WIN32_INCLUDES})
 
 	list(APPEND TEKUUM_SOURCES
 		${SYS_SOURCES}
-		${WIN32_SOURCES})
+		${WIN32_SOURCES}
+		${WIN32_NATVIS}
+		${WIN32_MANIFEST})
 
 	set_source_files_properties( ${SHADERS} PROPERTIES VS_TOOL_OVERRIDE "None" )
 	set_source_files_properties( ${SHADERS_BUILTIN} PROPERTIES VS_TOOL_OVERRIDE "None" )
@@ -599,25 +526,6 @@ if(MSVC)
 		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/jobs/ShadowShared.cpp )
 		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/RenderLog.cpp )
 
-		#list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${TOOLS_COMAFX_SOURCES} )
-		#list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${TOOLS_COMMON_SOURCES} )
-		#list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${TOOLS_COMMON_PROPTREE_SOURCES} )
-
-		# list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${EDITOR_AF_SOURCES} )
-		# list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${EDITOR_DEBUGGER_SOURCES} )
-		# list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${EDITOR_DECL_SOURCES} )
-		# list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${EDITOR_GUIED_SOURCES} )
-		# list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${EDITOR_MATERIALEDITOR_SOURCES} )
-		# list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${EDITOR_PARTICLE_SOURCES} )
-		# list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${EDITOR_PDA_SOURCES} )
-		# list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${EDITOR_RADIANT_SOURCES} )
-		# list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${EDITOR_SCRIPT_SOURCES} )
-		# list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${EDITOR_SOUND_SOURCES} )
-
-		#foreach( src_file ${TEKUUM_PRECOMPILED_SOURCES} )
-		#	message(STATUS "-include precompiled.h for ${src_file}")
-		#endforeach()
-
 		set_source_files_properties(
 			${TEKUUM_PRECOMPILED_SOURCES}
 			PROPERTIES
@@ -635,7 +543,7 @@ if(MSVC)
 
 	add_executable( ${PROJECT_NAME} WIN32 ${TEKUUM_INCLUDES} ${TEKUUM_SOURCES} ${WIN32_RESOURCES} )
 
-	add_dependencies(${PROJECT_NAME} idlib external)
+	add_dependencies(${PROJECT_NAME} idlib Game external)
 	target_link_libraries(${PROJECT_NAME}
 		idlib
 		external
@@ -643,7 +551,6 @@ if(MSVC)
 		${OPENAL_LIBRARY}
 		${FREETYPE_LIBRARY}
 		${DirectX_LIBRARIES}
-		${QT_LIBRARIES}
 		#openal32
 		opengl32
 		glu32
@@ -654,13 +561,11 @@ if(MSVC)
 		ws2_32)
 
 	# set MSVC default debug directory on executable
-	if( CMAKE_MAJOR_VERSION EQUAL 3 AND CMAKE_MINOR_VERSION GREATER_EQUAL 8 )
-		set_target_properties( ${PROJECT_NAME} PROPERTIES VS_STARTUP_PROJECT ${PROJECT_NAME} )
-		set_target_properties( ${PROJECT_NAME} PROPERTIES VS_DEBUGGER_COMMAND "${CMAKE_SOURCE_DIR}/../${PROJECT_NAME}.exe" )
-		set_target_properties( ${PROJECT_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/.." )
-		set_target_properties( ${PROJECT_NAME} PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "+set developer 1" )
-	endif()
-
+	set_target_properties( ${PROJECT_NAME} PROPERTIES VS_STARTUP_PROJECT ${PROJECT_NAME} )
+	set_target_properties( ${PROJECT_NAME} PROPERTIES VS_DEBUGGER_COMMAND "${CMAKE_SOURCE_DIR}/../${PROJECT_NAME}.exe" )
+	set_target_properties( ${PROJECT_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/.." )
+	set_target_properties( ${PROJECT_NAME} PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "+set developer 1" )
+	set_target_properties( ${PROJECT_NAME} PROPERTIES FOLDER "exes" )
 elseif( UNIX )
 
 	if( SDL2 )
@@ -779,6 +684,10 @@ endif()
 if( USE_CMDLINE_TOOLS )
 	target_link_libraries(${PROJECT_NAME}
 		cmdtools)
+endif()
+if( USE_MFC_TOOLS )
+	target_link_libraries(${PROJECT_NAME}
+		tools)
 endif()
 
 set_target_properties( ${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:>${CMAKE_SOURCE_DIR}/.. LIBRARY_OUTPUT_DIRECTORY $<1:>${CMAKE_SOURCE_DIR}/.. )

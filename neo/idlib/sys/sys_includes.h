@@ -52,24 +52,18 @@ If you have questions concerning this license or the applicable additional terms
 				#define WINVER				0x501
 			#endif
 
-			#if 0
-				// Dedicated server hits unresolved when trying to link this way now. Likely because of the 2010/Win7 transition? - TTimo
+			#ifdef ID_ALLOW_TOOLS
+				// (hopefully) suppress "warning C4996: 'MBCS_Support_Deprecated_In_MFC':
+				//   MBCS support in MFC is deprecated and may be removed in a future version of MFC."
+				#define NO_WARN_MBCS_MFC_DEPRECATION
 
-				#ifdef	ID_DEDICATED
-					// dedicated sets windows version here
-					#define	_WIN32_WINNT WINVER
-					#define	WIN32_LEAN_AND_MEAN
-				#else
-					// non-dedicated includes MFC and sets windows version here
-					#include "../tools/comafx/StdAfx.h"			// this will go away when MFC goes away
-				#endif
+				#include <afxwin.h>
 
-				// RB begin
-			#elif defined(ID_ALLOW_TOOLS)
-				// RB end
+				#include "../tools/comafx/framework.h"
+				#include "../tools/comafx/pch.h"
 
-				#include "../tools/comafx/StdAfx.h"
-
+				// scaling factor based on DPI (dpi/96.0f, so 1.0 by default); implemented in win_main.cpp
+				float Win_GetWindowScalingFactor( HWND window );
 			#endif
 
 			// RB begin
@@ -152,6 +146,11 @@ If you have questions concerning this license or the applicable additional terms
 // Yamagi: <stddef.h> for ptrdiff_t on FreeBSD
 #include <stddef.h>
 // Yamagi end
+//#define FLT_EPSILON 1.19209290E-07F
+#include <cfloat>
+#include <chrono>
+#include <thread>
+#include <algorithm>
 
 //-----------------------------------------------------
 

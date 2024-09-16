@@ -149,5 +149,3 @@ void FindDialog::SaveFindSettings()
 
 	registry.Save();
 }
-
-

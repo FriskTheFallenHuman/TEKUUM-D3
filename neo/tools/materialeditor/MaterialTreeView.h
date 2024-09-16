@@ -100,31 +100,31 @@ protected:
 
 	//Window Messages
 	afx_msg int		OnCreate( LPCREATESTRUCT lpCreateStruct );
-	afx_msg void 	OnTvnSelchanged( NMHDR* pNMHDR, LRESULT* pResult );
-	afx_msg void 	OnTvnBeginlabeledit( NMHDR* pNMHDR, LRESULT* pResult );
-	afx_msg void 	OnTvnEndlabeledit( NMHDR* pNMHDR, LRESULT* pResult );
-	afx_msg void 	OnContextMenu( CWnd* pWnd, CPoint point );
-	afx_msg void 	OnNMRclick( NMHDR* pNMHDR, LRESULT* pResult );
+	afx_msg void	OnTvnSelchanged( NMHDR* pNMHDR, LRESULT* pResult );
+	afx_msg void	OnTvnBeginlabeledit( NMHDR* pNMHDR, LRESULT* pResult );
+	afx_msg void	OnTvnEndlabeledit( NMHDR* pNMHDR, LRESULT* pResult );
+	afx_msg void	OnContextMenu( CWnd* pWnd, CPoint point );
+	afx_msg void	OnNMRclick( NMHDR* pNMHDR, LRESULT* pResult );
 	afx_msg void	OnChar( UINT nChar, UINT nRepCnt, UINT nFlags );
-	afx_msg void 	OnTvnBegindrag( NMHDR* pNMHDR, LRESULT* pResult );
-	afx_msg void 	OnMouseMove( UINT nFlags, CPoint point );
-	afx_msg void 	OnLButtonUp( UINT nFlags, CPoint point );
+	afx_msg void	OnTvnBegindrag( NMHDR* pNMHDR, LRESULT* pResult );
+	afx_msg void	OnMouseMove( UINT nFlags, CPoint point );
+	afx_msg void	OnLButtonUp( UINT nFlags, CPoint point );
 
 	//Menu Commands
-	afx_msg void 	OnApplyMaterial();
-	afx_msg void 	OnApplyFile();
-	afx_msg void 	OnApplyAll();
-	afx_msg void 	OnSaveMaterial();
-	afx_msg void 	OnSaveFile();
-	afx_msg void 	OnSaveAll();
-	afx_msg	void 	OnRenameMaterial();
-	afx_msg	void 	OnAddMaterial();
-	afx_msg	void 	OnAddFolder();
-	afx_msg	void 	OnDeleteMaterial();
-	afx_msg	void 	OnReloadFile();
-	afx_msg	void 	OnCut();
-	afx_msg	void 	OnCopy();
-	afx_msg	void 	OnPaste();
+	afx_msg void	OnApplyMaterial();
+	afx_msg void	OnApplyFile();
+	afx_msg void	OnApplyAll();
+	afx_msg void	OnSaveMaterial();
+	afx_msg void	OnSaveFile();
+	afx_msg void	OnSaveAll();
+	afx_msg	void	OnRenameMaterial();
+	afx_msg	void	OnAddMaterial();
+	afx_msg	void	OnAddFolder();
+	afx_msg	void	OnDeleteMaterial();
+	afx_msg	void	OnReloadFile();
+	afx_msg	void	OnCut();
+	afx_msg	void	OnCopy();
+	afx_msg	void	OnPaste();
 
 	//Internal Messages
 	afx_msg LRESULT OnRenameFolderComplete( WPARAM wParam, LPARAM lParam );
@@ -174,5 +174,3 @@ protected:
 
 	bool					internalChange;
 };
-
-

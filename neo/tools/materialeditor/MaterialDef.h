@@ -93,7 +93,7 @@ public:
 		MATERIAL_DEF_NUM
 	};
 
-	static void 				InitializeMaterialDefLists();
+	static void					InitializeMaterialDefLists();
 	static void					InitializeMaterialDefList( idLexer* src, const char* typeName, MaterialDefList* list );
 
 	static void					DestroyMaterialDefLists();

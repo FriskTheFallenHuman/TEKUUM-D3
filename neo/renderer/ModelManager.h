@@ -91,6 +91,7 @@ public:
 	virtual	void			WritePrecacheCommands( idFile* f ) = 0;
 
 	// called during vid_restart
+	virtual void			CreateModelVertexCaches() = 0;
 	virtual	void			FreeModelVertexCaches() = 0;
 
 	// print memory info

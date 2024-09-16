@@ -73,7 +73,7 @@ bool rvDebuggerClient::Initialize()
 	}
 
 	// Server must be running on the local host on port 28980
-	Sys_StringToNetAdr( "localhost", &mServerAdr, true );
+	Sys_StringToNetAdr( com_dbgServerAdr.GetString( ), &mServerAdr, true );
 	mServerAdr.port = 27980;
 
 	// Attempt to let the server know we are here.  The server may not be running so this
@@ -109,27 +109,28 @@ Process all incomding messages from the debugger server
 */
 bool rvDebuggerClient::ProcessMessages()
 {
-	netadr_t	adrFrom;
-	int			size;
-	idBitMsg	msg;
-	byte		msgBuf[MAX_MESSAGE_SIZE];
+	netadr_t adrFrom;
+	idBitMsg	 msg;
+	byte	 buffer[MAX_MSGLEN];
 
+	msg.SetSize( MAX_MSGLEN );
+	msg.BeginReading();
+
+	int msgSize;
 	// Check for pending udp packets on the debugger port
-	while( mPort.GetPacket( adrFrom, msgBuf, size, sizeof( msgBuf ) ) )
+	while( mPort.GetPacket( adrFrom, buffer, msgSize, MAX_MSGLEN ) )
 	{
-		msg.Init( msgBuf, sizeof( msgBuf ) );
-		msg.SetSize( size );
+		short command;
+		msg.Init( buffer, sizeof( buffer ) );
+		msg.SetSize( msgSize );
 		msg.BeginReading();
-
-		unsigned short command;
 
 		// Only accept packets from the debugger server for security reasons
 		if( !Sys_CompareNetAdrBase( adrFrom, mServerAdr ) )
 		{
 			continue;
 		}
-
-		command = ( unsigned short ) msg.ReadShort();
+		command = msg.ReadShort( );
 
 		// Is this what we are waiting for?
 		if( command == mWaitFor )
@@ -155,32 +156,55 @@ bool rvDebuggerClient::ProcessMessages()
 				break;
 
 			case DBMSG_BREAK:
-				HandleBreak( msg );
+				HandleBreak( &msg );
 				break;
 
 			// Callstack being send to the client
 			case DBMSG_INSPECTCALLSTACK:
-				HandleInspectCallstack( msg );
+				HandleInspectCallstack( &msg );
 				break;
 
 			// Thread list is being sent to the client
 			case DBMSG_INSPECTTHREADS:
-				HandleInspectThreads( msg );
+				HandleInspectThreads( &msg );
 				break;
 
 			case DBMSG_INSPECTVARIABLE:
-				HandleInspectVariable( msg );
+				HandleInspectVariable( &msg );
+				break;
+
+			case DBMSG_REMOVEBREAKPOINT:
+				HandleRemoveBreakpoint( &msg );
+				break;
+			case DBMSG_INSPECTSCRIPTS:
+				HandleInspectScripts( &msg );
 				break;
 		}
 
 		// Give the window a chance to process the message
 		msg.SetReadCount( 0 );
 		msg.SetReadBit( 0 );
-
-		gDebuggerApp->GetWindow().ProcessNetMessage( msg );
+		gDebuggerApp.GetWindow().ProcessNetMessage( &msg );
 	}
 
 	return true;
+}
+
+void rvDebuggerClient::HandleRemoveBreakpoint( idBitMsg* msg )
+{
+	long lineNumber;
+	char filename[MAX_PATH];
+
+	// Read the breakpoint info
+
+	lineNumber = msg->ReadInt();
+	msg->ReadString( filename, MAX_PATH );
+
+	rvDebuggerBreakpoint* bp = FindBreakpoint( filename, lineNumber );
+	if( bp )
+	{
+		RemoveBreakpoint( bp->GetID() );
+	}
 }
 
 /*
@@ -191,18 +215,21 @@ Handle the DBMSG_BREAK message send from the server.  This message is handled
 by caching the file and linenumber where the break occured.
 ================
 */
-void rvDebuggerClient::HandleBreak( idBitMsg& msg )
+void rvDebuggerClient::HandleBreak( idBitMsg* msg )
 {
 	char filename[MAX_PATH];
 
 	mBreak = true;
 
 	// Line number
-	mBreakLineNumber = msg.ReadLong();
+	mBreakLineNumber = msg->ReadInt( );
 
 	// Filename
-	msg.ReadString( filename, MAX_PATH );
+	msg->ReadString( filename, MAX_PATH );
 	mBreakFilename   = filename;
+
+	//int64_t ptr64b = msg->ReadInt64();
+	//mBreakProgram = (idProgram*)ptr64b;
 
 	// Clear the variables
 	mVariables.Clear( );
@@ -214,6 +241,26 @@ void rvDebuggerClient::HandleBreak( idBitMsg& msg )
 	SendMessage( DBMSG_INSPECTTHREADS );
 	WaitFor( DBMSG_INSPECTTHREADS, 2000 );
 }
+
+
+/*
+================
+rvDebuggerClient::InspectScripts
+
+Instructs the client to inspect the loaded scripts
+================
+*/
+void rvDebuggerClient::InspectScripts()
+{
+	idBitMsg	msg;
+	byte		buffer[MAX_MSGLEN];
+
+	msg.Init( buffer, sizeof( buffer ) );
+	msg.BeginWriting();
+	msg.WriteShort( ( short )DBMSG_INSPECTSCRIPTS );
+	SendPacket( msg.GetData(), msg.GetSize() );
+}
+
 
 /*
 ================
@@ -227,14 +274,40 @@ will in turn respond back to the client with the variable value
 void rvDebuggerClient::InspectVariable( const char* name, int callstackDepth )
 {
 	idBitMsg	msg;
-	byte		msgBuf[MAX_MESSAGE_SIZE];
+	byte		buffer[MAX_MSGLEN];
 
-	msg.Init( msgBuf, sizeof( msgBuf ) );
-	msg.WriteShort( ( int )DBMSG_INSPECTVARIABLE );
+	msg.Init( buffer, sizeof( buffer ) );
+	msg.BeginWriting();
+	msg.WriteShort( ( short )DBMSG_INSPECTVARIABLE );
 	msg.WriteShort( ( short )( mCallstack.Num() - callstackDepth ) );
 	msg.WriteString( name );
 
 	SendPacket( msg.GetData(), msg.GetSize() );
+}
+
+/*
+================
+rvDebuggerClient::HandleInspectScripts
+
+Handle the message DBMSG_INSPECTSCRIPTS being sent from the server.  This message
+is handled by adding the script entries to a list for later lookup.
+================
+*/
+void rvDebuggerClient::HandleInspectScripts( idBitMsg* msg )
+{
+	int totalScripts;
+
+	mServerScripts.Clear();
+
+	// Read all of the callstack entries specfied in the message
+	for( totalScripts = msg->ReadInt(); totalScripts > 0; totalScripts-- )
+	{
+		char temp[1024];
+
+		// Script Name
+		msg->ReadString( temp, 1024 );
+		mServerScripts.Append( temp );
+	}
 }
 
 /*
@@ -245,29 +318,29 @@ Handle the message DBMSG_INSPECTCALLSTACK being sent from the server.  This mess
 is handled by adding the callstack entries to a list for later lookup.
 ================
 */
-void rvDebuggerClient::HandleInspectCallstack( idBitMsg& msg )
+void rvDebuggerClient::HandleInspectCallstack( idBitMsg* msg )
 {
 	int depth;
 
 	ClearCallstack( );
 
 	// Read all of the callstack entries specfied in the message
-	for( depth = ( short )msg.ReadShort() ; depth > 0; depth -- )
+	for( depth = ( short )msg->ReadShort( ) ; depth > 0; depth -- )
 	{
 		rvDebuggerCallstack* entry = new rvDebuggerCallstack;
 
 		char temp[1024];
 
 		// Function name
-		msg.ReadString( temp, 1024 );
-		entry->mFunction = temp;
+		msg->ReadString( temp, 1024 );
+		entry->mFunction = idStr( temp );
 
 		// Filename
-		msg.ReadString( temp, 1024 );
-		entry->mFilename = temp;
+		msg->ReadString( temp, 1024 );
+		entry->mFilename = idStr( temp );
 
 		// Line Number
-		entry->mLineNumber = msg.ReadLong();
+		entry->mLineNumber = msg->ReadInt( );
 
 		// Add to list
 		mCallstack.Append( entry );
@@ -282,31 +355,31 @@ Handle the message DBMSG_INSPECTTHREADS being sent from the server.  This messag
 is handled by adding the list of threads to a list for later lookup.
 ================
 */
-void rvDebuggerClient::HandleInspectThreads( idBitMsg& msg )
+void rvDebuggerClient::HandleInspectThreads( idBitMsg* msg )
 {
 	int	count;
 
 	ClearThreads( );
 
 	// Loop over the number of threads in the message
-	for( count = ( short )msg.ReadShort() ; count > 0; count -- )
+	for( count = ( short )msg->ReadShort( ) ; count > 0; count -- )
 	{
 		rvDebuggerThread* entry = new rvDebuggerThread;
 
 		char temp[1024];
 
 		// Thread name
-		msg.ReadString( temp, 1024 );
+		msg->ReadString( temp, 1024 );
 		entry->mName = temp;
 
 		// Thread ID
-		entry->mID = msg.ReadLong();
+		entry->mID = msg->ReadInt( );
 
 		// Thread state
-		entry->mCurrent = msg.ReadBits( 1 ) ? true : false;
-		entry->mDoneProcessing = msg.ReadBits( 1 ) ? true : false;
-		entry->mWaiting = msg.ReadBits( 1 ) ? true : false;
-		entry->mDying = msg.ReadBits( 1 ) ? true : false;
+		entry->mCurrent = msg->ReadBits( 1 ) ? true : false;
+		entry->mDoneProcessing = msg->ReadBits( 1 ) ? true : false;
+		entry->mWaiting = msg->ReadBits( 1 ) ? true : false;
+		entry->mDying = msg->ReadBits( 1 ) ? true : false;
 
 		// Add thread to list
 		mThreads.Append( entry );
@@ -321,15 +394,15 @@ Handle the message DBMSG_INSPECTVARIABLE being sent from the server.  This messa
 is handled by adding the inspected variable to a dictionary for later lookup
 ================
 */
-void rvDebuggerClient::HandleInspectVariable( idBitMsg& msg )
+void rvDebuggerClient::HandleInspectVariable( idBitMsg* msg )
 {
 	char	var[1024];
 	char	value[1024];
 	int		callDepth;
 
-	callDepth = ( short )msg.ReadShort();
-	msg.ReadString( var, 1024 );
-	msg.ReadString( value, 1024 );
+	callDepth = ( short )msg->ReadShort( );
+	msg->ReadString( var, 1024 );
+	msg->ReadString( value, 1024 );
 
 	mVariables.Set( va( "%d:%s", mCallstack.Num() - callDepth, var ), value );
 }
@@ -426,7 +499,7 @@ Adds a breakpoint to the client and server with the give nfilename and linenumbe
 */
 int rvDebuggerClient::AddBreakpoint( const char* filename, int lineNumber, bool onceOnly )
 {
-	int index = mBreakpoints.Append( new rvDebuggerBreakpoint( filename, lineNumber ) );
+	int index = mBreakpoints.Append( new rvDebuggerBreakpoint( filename, lineNumber, -1, onceOnly ) );
 
 	SendAddBreakpoint( *mBreakpoints[index] );
 
@@ -467,11 +540,12 @@ Send a message with no data to the debugger server
 */
 void rvDebuggerClient::SendMessage( EDebuggerMessage dbmsg )
 {
-	idBitMsg	msg;
-	byte		msgBuf[MAX_MESSAGE_SIZE];
+	idBitMsg	 msg;
+	byte	 buffer[MAX_MSGLEN];
 
-	msg.Init( msgBuf, sizeof( msgBuf ) );
-	msg.WriteShort( ( int )dbmsg );
+	msg.Init( buffer, sizeof( buffer ) );
+	msg.BeginWriting( );
+	msg.WriteShort( ( short )dbmsg );
 
 	SendPacket( msg.GetData(), msg.GetSize() );
 }
@@ -506,23 +580,23 @@ rvDebuggerClient::SendAddBreakpoint
 Send an individual breakpoint over to the debugger server
 ================
 */
-void rvDebuggerClient::SendAddBreakpoint( rvDebuggerBreakpoint& bp, bool onceOnly )
+void rvDebuggerClient::SendAddBreakpoint( rvDebuggerBreakpoint& bp )
 {
-	idBitMsg	msg;
-	byte		msgBuf[MAX_MESSAGE_SIZE];
+	idBitMsg msg;
+	byte	 buffer[MAX_MSGLEN];
 
 	if( !mConnected )
 	{
 		return;
 	}
 
-	msg.Init( msgBuf, sizeof( msgBuf ) );
-
-	msg.WriteShort( ( int )DBMSG_ADDBREAKPOINT );
-	msg.WriteBits( onceOnly ? 1 : 0, 1 );
-	msg.WriteLong( ( unsigned long ) bp.GetLineNumber( ) );
-	msg.WriteLong( bp.GetID( ) );
-	msg.WriteString( bp.GetFilename() );
+	msg.Init( buffer, sizeof( buffer ) );
+	msg.BeginWriting();
+	msg.WriteShort( ( short )DBMSG_ADDBREAKPOINT );
+	msg.WriteBits( bp.GetOnceOnly() ? 1 : 0, 1 );
+	msg.WriteInt( ( unsigned long ) bp.GetLineNumber( ) );
+	msg.WriteInt( bp.GetID( ) );
+	msg.WriteString( bp.GetFilename() );  // FIXME: this implies make7bit ?!
 
 	SendPacket( msg.GetData(), msg.GetSize() );
 }
@@ -536,18 +610,18 @@ Sends a remove breakpoint message to the debugger server
 */
 void rvDebuggerClient::SendRemoveBreakpoint( rvDebuggerBreakpoint& bp )
 {
-	idBitMsg	msg;
-	byte		msgBuf[MAX_MESSAGE_SIZE];
+	idBitMsg	 msg;
+	byte	 buffer[MAX_MSGLEN];
 
 	if( !mConnected )
 	{
 		return;
 	}
 
-	msg.Init( msgBuf, sizeof( msgBuf ) );
-
-	msg.WriteShort( ( int )DBMSG_REMOVEBREAKPOINT );
-	msg.WriteLong( bp.GetID() );
+	msg.Init( buffer, sizeof( buffer ) );
+	msg.BeginWriting( );
+	msg.WriteShort( ( short )DBMSG_REMOVEBREAKPOINT );
+	msg.WriteInt( bp.GetID() );
 
 	SendPacket( msg.GetData(), msg.GetSize() );
 }
@@ -588,5 +662,27 @@ void rvDebuggerClient::ClearThreads()
 	}
 
 	mThreads.Clear( );
+}
+/*
+================
+rvDebuggerClient::SendCommand
+================
+*/
+void rvDebuggerClient::SendCommand( const char* cmdStr )
+{
+	idBitMsg msg;
+	byte	 buffer[MAX_MSGLEN];
+
+	if( !mConnected )
+	{
+		return;
+	}
+
+	msg.Init( buffer, sizeof( buffer ) );
+	msg.BeginWriting( );
+	msg.WriteShort( ( short ) DBMSG_EXECCOMMAND );
+	msg.WriteString( cmdStr ); // FIXME: this implies make7bit ?!
+
+	SendPacket( msg.GetData( ), msg.GetSize( ) );
 }
 

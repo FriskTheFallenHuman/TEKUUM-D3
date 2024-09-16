@@ -29,15 +29,16 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/rc/guied_resource.h"
-#include "../../renderer/tr_local.h"
+
+#include "../../sys/win32/rc/resource.h"
+#include "../../renderer/RenderCommon.h"
 #include "../../sys/win32/win_local.h"
-#include "../../ui/DeviceContext.h"
 #include "../../ui/EditWindow.h"
 #include "../../ui/ListWindow.h"
 #include "../../ui/BindWindow.h"
 #include "../../ui/RenderWindow.h"
 #include "../../ui/ChoiceWindow.h"
+#include "../../ui/UserInterfaceLocal.h"
 
 #include "GEApp.h"
 #include "GEItemPropsDlg.h"
@@ -53,6 +54,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "GEHideModifier.h"
 #include "GEDeleteModifier.h"
 
+extern idCVar gui_edit;
+
 static float g_ZoomScales[rvGEWorkspace::ZOOM_MAX] = { 0, 0.25f, 0.33f, 0.50f, 0.66f, 1.0f, 1.5f, 2.0f, 3.0f };
 
 static const int ID_GUIED_SELECT_FIRST = 9800;
@@ -62,18 +65,17 @@ idList<rvGEClipboardItem*> rvGEWorkspace::mClipboard;
 
 rvGEWorkspace::rvGEWorkspace( rvGEApp* app ) : mApplication( app )
 {
-	mWnd	    		= 0;
-	mInterface  		= 0;
-	mZoom	    		= ZOOM_100;
-	mScrollHorz 		= false;
-	mScrollVert 		= false;
-	mModified   		= false;
+	mWnd				= 0;
+	mInterface			= 0;
+	mZoom				= ZOOM_100;
+	mScrollHorz			= false;
+	mScrollVert			= false;
+	mModified			= false;
 	mNew				= false;
-	mDragScroll 		= false;
-	mSourceControlState = SCS_CHECKEDOUT;
-	mFilename   		= "guis/Untitled.gui";
+	mDragScroll			= false;
+	mFilename			= "guis/Untitled.gui";
 	mDragType			= rvGESelectionMgr::HT_NONE;
-	mHandCursor 		= LoadCursor( app->GetInstance(), MAKEINTRESOURCE( IDC_GUIED_HAND ) );
+	mHandCursor			= LoadCursor( app->GetInstance(), MAKEINTRESOURCE( IDC_GUIED_HAND ) );
 	mDontAdd			= false;
 
 	mSelections.SetWorkspace( this );
@@ -144,7 +146,7 @@ bool rvGEWorkspace::Attach( HWND wnd )
 
 	// Jam the workspace pointer into the userdata window long so
 	// we can retrieve the workspace from the window later
-	SetWindowLong( mWnd, GWL_USERDATA, ( LONG ) this );
+	SetWindowLongPtr( mWnd, GWLP_USERDATA, ( LONG_PTR ) this );
 
 	UpdateTitle( );
 
@@ -162,7 +164,7 @@ void rvGEWorkspace::Detach()
 {
 	assert( mWnd );
 
-	SetWindowLong( mWnd, GWL_USERDATA, 0 );
+	SetWindowLongPtr( mWnd, GWLP_USERDATA, 0 );
 	mWnd = NULL;
 }
 
@@ -264,8 +266,6 @@ Renders the workspace to the given DC
 */
 void rvGEWorkspace::Render( HDC hdc )
 {
-	int		front;
-	int		back;
 	float	scale;
 
 	scale = g_ZoomScales[mZoom];
@@ -274,12 +274,12 @@ void rvGEWorkspace::Render( HDC hdc )
 	if( !wglMakeCurrent( hdc, win32.hGLRC ) )
 	{
 		common->Printf( "ERROR: wglMakeCurrent failed.. Error:%i\n", glGetError() );
-		common->Printf( "Please restart Q3Radiant if the Map view is not working\n" );
+		common->Printf( "Please restart " EDITOR_WINDOWTEXT " if the Map view is not working\n" );
 		return;
 	}
 
 	// Prepare the view and clear it
-	GL_State( GLS_DEFAULT );
+	tr.backend.GL_State( GLS_DEFAULT );
 	glViewport( 0, 0, mWindowWidth, mWindowHeight );
 	glScissor( 0, 0, mWindowWidth, mWindowHeight );
 	glClearColor( 0.75f, 0.75f, 0.75f, 0 );
@@ -304,33 +304,47 @@ void rvGEWorkspace::Render( HDC hdc )
 	glEnd( );
 
 	// Prepare the renderSystem view to draw the GUI in
+	int oldNativeScreenWidth = glConfig.nativeScreenWidth;
+	int oldNativeScreenHeight = glConfig.nativeScreenHeight;
+
+	glConfig.nativeScreenWidth = mRect.w;
+	glConfig.nativeScreenHeight = mRect.h;
+
 	viewDef_t viewDef;
 	memset( &viewDef, 0, sizeof( viewDef ) );
 	tr.viewDef = &viewDef;
-	tr.viewDef->renderView.x = mRect.x;
-	tr.viewDef->renderView.y = mWindowHeight - mRect.y - mRect.h;
-	tr.viewDef->renderView.width = mRect.w;
-	tr.viewDef->renderView.height = mRect.h;
+	//tr.viewDef->renderView.x = mRect.x;
+	//tr.viewDef->renderView.y = mWindowHeight - mRect.y - mRect.h;
+	//tr.viewDef->renderView.width = mRect.w;
+	//tr.viewDef->renderView.height = mRect.h;
 	tr.viewDef->scissor.x1 = 0;
 	tr.viewDef->scissor.y1 = 0;
 	tr.viewDef->scissor.x2 = mRect.w;
 	tr.viewDef->scissor.y2 = mRect.h;
 	tr.viewDef->isEditor = true;
-	renderSystem->BeginFrame( mWindowWidth, mWindowHeight );
+
+	// force gui_edit/debug draw.
+	idWindow::SetDebugDraw();
 
 	// Draw the gui
-	mInterface->Redraw( 0 );  // eventLoop->Milliseconds() );
+	mInterface->Redraw( 0, false );  // eventLoop->Milliseconds() );
+
+	// disable debug draw
+	idWindow::DisableDebugDraw();
 
 	// We are done using the renderSystem now
-	renderSystem->EndFrame( &front, &back );
+	const emptyCommand_t* cmd = renderSystem->SwapCommandBuffers( NULL, NULL, NULL, NULL, NULL, NULL );
+	renderSystem->RenderCommandBuffers( cmd );
 
-	if( mApplication->GetActiveWorkspace( ) == this )
+	/*
+	if ( mApplication->GetActiveWorkspace ( ) == this )
 	{
-		mApplication->GetStatusBar().SetTriangles( backEnd.pc.c_drawIndexes / 3 );
+		mApplication->GetStatusBar().SetTriangles ( backEnd.pc.c_drawIndexes/3 );
 	}
+	*/
 
 	// Prepare the viewport for drawing selections, etc.
-	GL_State( GLS_DEFAULT );
+	tr.backend.GL_State( GLS_DEFAULT );
 	glDisable( GL_TEXTURE_CUBE_MAP_EXT );
 //	glDisable(GL_BLEND);
 	glDisable( GL_CULL_FACE );
@@ -586,31 +600,31 @@ void rvGEWorkspace::UpdateCursor( rvGESelectionMgr::EHitTest type )
 	switch( type )
 	{
 		case rvGESelectionMgr::HT_SELECT:
-			SetCursor( LoadCursor( NULL, MAKEINTRESOURCE( IDC_ARROW ) ) );
+			SetCursor( LoadCursor( NULL, IDC_ARROW ) );
 			break;
 
 		case rvGESelectionMgr::HT_MOVE:
-			SetCursor( LoadCursor( NULL, MAKEINTRESOURCE( IDC_SIZEALL ) ) );
+			SetCursor( LoadCursor( NULL, IDC_SIZEALL ) );
 			break;
 
 		case rvGESelectionMgr::HT_SIZE_LEFT:
 		case rvGESelectionMgr::HT_SIZE_RIGHT:
-			SetCursor( LoadCursor( NULL, MAKEINTRESOURCE( IDC_SIZEWE ) ) );
+			SetCursor( LoadCursor( NULL, IDC_SIZEWE ) );
 			break;
 
 		case rvGESelectionMgr::HT_SIZE_TOP:
 		case rvGESelectionMgr::HT_SIZE_BOTTOM:
-			SetCursor( LoadCursor( NULL, MAKEINTRESOURCE( IDC_SIZENS ) ) );
+			SetCursor( LoadCursor( NULL, IDC_SIZENS ) );
 			break;
 
 		case rvGESelectionMgr::HT_SIZE_TOPRIGHT:
 		case rvGESelectionMgr::HT_SIZE_BOTTOMLEFT:
-			SetCursor( LoadCursor( NULL, MAKEINTRESOURCE( IDC_SIZENESW ) ) );
+			SetCursor( LoadCursor( NULL, IDC_SIZENESW ) );
 			break;
 
 		case rvGESelectionMgr::HT_SIZE_BOTTOMRIGHT:
 		case rvGESelectionMgr::HT_SIZE_TOPLEFT:
-			SetCursor( LoadCursor( NULL, MAKEINTRESOURCE( IDC_SIZENWSE ) ) );
+			SetCursor( LoadCursor( NULL, IDC_SIZENWSE ) );
 			break;
 	}
 }
@@ -633,7 +647,7 @@ void rvGEWorkspace::UpdateCursor( float x, float y )
 	}
 	else
 	{
-		SetCursor( LoadCursor( NULL, MAKEINTRESOURCE( IDC_ARROW ) ) );
+		SetCursor( LoadCursor( NULL, IDC_ARROW ) );
 	}
 }
 
@@ -669,19 +683,11 @@ void rvGEWorkspace::HandleMessage( UINT msg, WPARAM wParam, LPARAM lParam )
 	{
 		case WM_CLOSE:
 		{
-
-			if( IsModified( ) )
-			{
-				if( IDYES == gApp.MessageBox( va( "Save changes to the document \"%s\" before closing?", GetFilename() ), MB_YESNO | MB_ICONQUESTION ) )
-				{
-					SendMessage( mApplication->GetMDIFrame(), WM_COMMAND, MAKELONG( ID_GUIED_FILE_SAVE, 0 ), 0 );
-				}
-			}
-
-
 			GetApplication( )->GetNavigator().SetWorkspace( NULL );
 			GetApplication( )->GetTransformer().SetWorkspace( NULL );
 			GetApplication( )->GetProperties().SetWorkspace( NULL );
+			GetApplication( )->GetItemProperties().SetWorkspace( NULL );
+			GEItemScriptsDlg_Clear( GetApplication()->GetScriptWindow() );
 			break;
 		}
 
@@ -893,7 +899,7 @@ int	rvGEWorkspace::HandleRButtonDown( WPARAM wParam, LPARAM lParam )
 		AppendMenu( popup, MF_STRING | MF_ENABLED | ( wrapper->IsSelected() ? MF_CHECKED : 0 ), ID_GUIED_SELECT_FIRST + i, mSelectMenu[i]->GetName() );
 	}
 
-	InsertMenu( menu, 1, MF_POPUP | MF_BYPOSITION, ( LONG ) popup, "Select" );
+	InsertMenu( menu, 1, MF_POPUP | MF_BYPOSITION, ( UINT_PTR ) popup, "Select" );
 
 	// Bring up the popup menu
 	ClientToScreen( mWnd, &point );
@@ -1087,6 +1093,8 @@ int	rvGEWorkspace::HandleMouseMove( WPARAM wParam, LPARAM lParam )
 		return 0;
 	}
 
+	bool bLockAspect = mApplication->GetTransformer().GetLockAspect();
+
 	switch( mDragType )
 	{
 		case rvGESelectionMgr::HT_MOVE:
@@ -1094,36 +1102,105 @@ int	rvGEWorkspace::HandleMouseMove( WPARAM wParam, LPARAM lParam )
 			break;
 
 		case rvGESelectionMgr::HT_SIZE_BOTTOM:
-			AddModifierSize( "Size", 0, 0, 0, cursor.y - mDragPoint.y, mApplication->GetOptions().GetGridSnap( ) );
+		{
+			if( bLockAspect )
+			{
+				AddModifierSize( "Size", 0, 0, cursor.y - mDragPoint.y, cursor.y - mDragPoint.y, mApplication->GetOptions().GetGridSnap() );
+			}
+			else
+			{
+				AddModifierSize( "Size", 0, 0, 0, cursor.y - mDragPoint.y, mApplication->GetOptions().GetGridSnap() );
+			}
 			break;
-
+		}
 		case rvGESelectionMgr::HT_SIZE_TOP:
-			AddModifierSize( "Size", 0, cursor.y - mDragPoint.y, 0, 0, mApplication->GetOptions().GetGridSnap( ) );
+		{
+			if( bLockAspect )
+			{
+				AddModifierSize( "Size", 0, cursor.y - mDragPoint.y, mDragPoint.y - cursor.y, 0, mApplication->GetOptions().GetGridSnap() );
+			}
+			else
+			{
+				AddModifierSize( "Size", 0, cursor.y - mDragPoint.y, 0, 0, mApplication->GetOptions().GetGridSnap() );
+			}
 			break;
-
+		}
 		case rvGESelectionMgr::HT_SIZE_RIGHT:
-			AddModifierSize( "Size", 0, 0, cursor.x - mDragPoint.x, 0, mApplication->GetOptions().GetGridSnap( ) );
+		{
+			if( bLockAspect )
+			{
+				AddModifierSize( "Size", 0, 0, cursor.x - mDragPoint.x, cursor.x - mDragPoint.x, mApplication->GetOptions().GetGridSnap() );
+			}
+			else
+			{
+				AddModifierSize( "Size", 0, 0, cursor.x - mDragPoint.x, 0, mApplication->GetOptions().GetGridSnap() );
+			}
 			break;
-
+		}
 		case rvGESelectionMgr::HT_SIZE_LEFT:
-			AddModifierSize( "Size", cursor.x - mDragPoint.x, 0, 0, 0, mApplication->GetOptions().GetGridSnap( ) );
+		{
+			if( bLockAspect )
+			{
+				AddModifierSize( "Size", cursor.x - mDragPoint.x, 0, 0, mDragPoint.x - cursor.x, mApplication->GetOptions().GetGridSnap() );
+			}
+			else
+			{
+				AddModifierSize( "Size", cursor.x - mDragPoint.x, 0, 0, 0, mApplication->GetOptions().GetGridSnap() );
+			}
 			break;
-
+		}
 		case rvGESelectionMgr::HT_SIZE_TOPLEFT:
-			AddModifierSize( "Size", cursor.x - mDragPoint.x, cursor.y - mDragPoint.y, 0, 0, mApplication->GetOptions().GetGridSnap( ) );
+		{
+			if( bLockAspect )
+			{
+				int bigger = abs( cursor.x - mDragPoint.x ) > abs( cursor.y - mDragPoint.y ) ? cursor.x - mDragPoint.x : cursor.y - mDragPoint.y;
+				AddModifierSize( "Size", bigger, bigger, 0, 0, mApplication->GetOptions().GetGridSnap() );
+			}
+			else
+			{
+				AddModifierSize( "Size", cursor.x - mDragPoint.x, cursor.y - mDragPoint.y, 0, 0, mApplication->GetOptions().GetGridSnap() );
+			}
 			break;
-
+		}
 		case rvGESelectionMgr::HT_SIZE_TOPRIGHT:
-			AddModifierSize( "Size", 0, cursor.y - mDragPoint.y, cursor.x - mDragPoint.x, 0, mApplication->GetOptions().GetGridSnap( ) );
+		{
+			if( bLockAspect )
+			{
+				int bigger = cursor.x - mDragPoint.x;
+				AddModifierSize( "Size", 0, -bigger, bigger, 0, mApplication->GetOptions().GetGridSnap() );
+			}
+			else
+			{
+				AddModifierSize( "Size", 0, cursor.y - mDragPoint.y, cursor.x - mDragPoint.x, 0, mApplication->GetOptions().GetGridSnap() );
+			}
 			break;
-
+		}
 		case rvGESelectionMgr::HT_SIZE_BOTTOMLEFT:
-			AddModifierSize( "Size", cursor.x - mDragPoint.x, 0, 0, cursor.y - mDragPoint.y, mApplication->GetOptions().GetGridSnap( ) );
+		{
+			if( bLockAspect )
+			{
+				int bigger = cursor.x - mDragPoint.x;
+				AddModifierSize( "Size", bigger, 0, 0, -bigger, mApplication->GetOptions().GetGridSnap() );
+			}
+			else
+			{
+				AddModifierSize( "Size", cursor.x - mDragPoint.x, 0, 0, cursor.y - mDragPoint.y, mApplication->GetOptions().GetGridSnap() );
+			}
 			break;
-
+		}
 		case rvGESelectionMgr::HT_SIZE_BOTTOMRIGHT:
-			AddModifierSize( "Size", 0, 0, cursor.x - mDragPoint.x, cursor.y - mDragPoint.y, mApplication->GetOptions().GetGridSnap( ) );
+		{
+			if( bLockAspect )
+			{
+				int bigger = abs( cursor.x - mDragPoint.x ) > abs( cursor.y - mDragPoint.y ) ? cursor.x - mDragPoint.x : cursor.y - mDragPoint.y;
+				AddModifierSize( "Size", 0, 0, bigger, bigger, mApplication->GetOptions().GetGridSnap() );
+			}
+			else
+			{
+				AddModifierSize( "Size", 0, 0, cursor.x - mDragPoint.x, cursor.y - mDragPoint.y, mApplication->GetOptions().GetGridSnap() );
+			}
 			break;
+		}
 	}
 
 	UpdateCursor( mDragType );
@@ -1203,6 +1280,7 @@ int	rvGEWorkspace::HandleKeyDown( WPARAM wParam, LPARAM lParam )
 		case VK_ESCAPE:
 			mSelections.Clear( );
 			mApplication->GetNavigator().Update( );
+			mApplication->GetItemProperties().Update();
 			break;
 	}
 
@@ -1472,6 +1550,7 @@ void rvGEWorkspace::DeleteSelected()
 	AddModifiers( MOD_DELETE );
 	mSelections.Clear( );
 	mApplication->GetNavigator().Update( );
+	mApplication->GetItemProperties().Update();
 }
 
 /*
@@ -1483,7 +1562,7 @@ Create a new window
 */
 idWindow* rvGEWorkspace::NewWindow( idDict* state, rvGEWindowWrapper::EWindowType type )
 {
-	idWindow*			window = new idWindow( mInterface->GetDesktop()->GetDC(), mInterface );
+	idWindow*			window = new idWindow( mInterface );
 	rvGEWindowWrapper*	wrapper;
 	int					count;
 	idStr				baseName;
@@ -1491,25 +1570,28 @@ idWindow* rvGEWorkspace::NewWindow( idDict* state, rvGEWindowWrapper::EWindowTyp
 	switch( type )
 	{
 		case rvGEWindowWrapper::WT_NORMAL:
-			window = new idWindow( mInterface->GetDesktop()->GetDC(), mInterface );
+			window = new idWindow( mInterface );
 			break;
 
 		case rvGEWindowWrapper::WT_BIND:
-			window = new idBindWindow( mInterface->GetDesktop()->GetDC(), mInterface );
+			window = new idBindWindow( mInterface );
 			break;
 
 		case rvGEWindowWrapper::WT_RENDER:
-			window = new idRenderWindow( mInterface->GetDesktop()->GetDC(), mInterface );
+			window = new idRenderWindow( mInterface );
 			break;
 
 		case rvGEWindowWrapper::WT_CHOICE:
-			window = new idChoiceWindow( mInterface->GetDesktop()->GetDC(), mInterface );
+			window = new idChoiceWindow( mInterface );
 			break;
 
 		case rvGEWindowWrapper::WT_EDIT:
-			window = new idEditWindow( mInterface->GetDesktop()->GetDC(), mInterface );
+			window = new idEditWindow( mInterface );
 			break;
 
+		case rvGEWindowWrapper::WT_LIST:
+			window = new idListWindow( mInterface );
+			break;
 		default:
 			assert( false );
 			return NULL;
@@ -1527,7 +1609,11 @@ idWindow* rvGEWorkspace::NewWindow( idDict* state, rvGEWindowWrapper::EWindowTyp
 			drawWin_t* dw = mInterface->GetDesktop()->FindChildByName( va( "%s%d", baseName.c_str(), count ) );
 			if( !dw )
 			{
-				break;
+				dw = mInterface->GetDesktop()->FindChildByName( va( "%s_%d", baseName.c_str(), count ) );
+				if( !dw )
+				{
+					break;
+				}
 			}
 			assert( dw->win );
 			wrapper = rvGEWindowWrapper::GetWrapper( dw->win );
@@ -1544,7 +1630,7 @@ idWindow* rvGEWorkspace::NewWindow( idDict* state, rvGEWindowWrapper::EWindowTyp
 
 	if( count )
 	{
-		winName = va( "%s%d", baseName.c_str(), count );
+		winName = va( "%s_%d", baseName.c_str(), count );
 	}
 	else
 	{
@@ -1588,6 +1674,8 @@ idWindow* rvGEWorkspace::AddWindow( rvGEWindowWrapper::EWindowType type )
 	mApplication->GetNavigator().Update( );
 	mApplication->GetTransformer().Update( );
 	mApplication->GetProperties().Update( );
+	mApplication->GetItemProperties().Update( );
+	GEItescriptsDlg_Init( mApplication->GetScriptWindow() );
 
 	return window;
 }
@@ -1599,27 +1687,19 @@ bool rvGEWorkspace::EditSelectedProperties()
 		return false;
 	}
 
-	idDict dict;
-	if( GEItemPropsDlg_DoModal( mWnd, mSelections[0], dict ) )
-	{
-		mModifiers.Append( new rvGEStateModifier( "Item Properties", mSelections[0], dict ) );
-		SetModified( true );
-	}
-
-	mApplication->GetNavigator().Update( );
-	mApplication->GetTransformer().Update( );
-	mApplication->GetProperties().Update( );
+	SendMessage( gApp.GetMDIFrame(), WM_COMMAND, MAKELONG( ID_GUIED_WINDOW_SHOWITEMPROPERTIES, 0 ), 0 );
 
 	return true;
 }
 
 bool rvGEWorkspace::EditSelectedScripts()
 {
-	if( GEItemScriptsDlg_DoModal( mWnd, mSelections[0] ) )
+	if( !mSelections.Num() || mSelections.Num() > 1 )
 	{
-		gApp.GetNavigator().Refresh( );
-		SetModified( true );
+		return false;
 	}
+
+	SendMessage( gApp.GetMDIFrame(), WM_COMMAND, MAKELONG( ID_GUIED_WINDOW_SHOWSCRIPTS, 0 ), 0 );
 
 	return true;
 }
@@ -1993,7 +2073,99 @@ void rvGEWorkspace::Copy()
 	}
 }
 
-void rvGEWorkspace::Paste()
+rvGEClipboardItem*	rvGEWorkspace::CreateClipboardItem( idWindow* window )
+{
+	rvGEWindowWrapper* wrapper = rvGEWindowWrapper::GetWrapper( window );
+
+	if( wrapper )
+	{
+		rvGEClipboardItem* item = new rvGEClipboardItem;
+		item->mStateDict = wrapper->GetStateDict();
+		item->mScriptDict = wrapper->GetScriptDict();
+		item->mVarDict = wrapper->GetVariableDict();
+
+		item->mStateDict.Set( "windowType", rvGEWindowWrapper::WindowTypeToString( wrapper->GetWindowType() ) );
+
+		for( int i = 0; i < window->GetChildCount(); ++i )
+		{
+			rvGEClipboardItem* childItem = CreateClipboardItem( window->GetChild( i ) );
+			if( childItem != 0 )
+			{
+				item->mChildren.Append( childItem );
+			}
+		}
+
+		return item;
+	}
+
+	return 0;
+}
+
+void rvGEWorkspace::Duplicate( void )
+{
+	int i;
+
+	// Clear the current clipboard
+	for( i = 0; i < mClipboard.Num(); i++ )
+	{
+		delete mClipboard[i];
+	}
+
+	mClipboard.Clear();
+
+	idList<int> insertIndices;
+	for( i = 0; i < mSelections.Num(); i++ )
+	{
+		rvGEClipboardItem* item = CreateClipboardItem( mSelections[i] );
+		mClipboard.Append( item );
+	}
+
+	rvGEModifierGroup* group = new rvGEModifierGroup;
+
+	for( i = 0; i < mClipboard.Num(); i++ )
+	{
+		PasteClipboardItem( mClipboard[i], mSelections[i]->GetParent() == 0 ? mInterface->GetDesktop() : mSelections[i]->GetParent(), group, mSelections[i] );
+	}
+
+	//mSelections.Clear();
+
+	//mSelections.Add(group->GetWindow());
+
+	mModifiers.Append( group );
+
+	mApplication->GetNavigator().Update();
+
+	SetModified( true );
+}
+
+void rvGEWorkspace::PasteClipboardItem( rvGEClipboardItem* item, idWindow* parent, rvGEModifierGroup* group, idWindow* before )
+{
+	idDict							state;
+	rvGEWindowWrapper::EWindowType	type;
+
+	state.Copy( item->mStateDict );
+	type = rvGEWindowWrapper::StringToWindowType( state.GetString( "windowType", "windowDef" ) );
+	state.Delete( "windowType" );
+
+	idWindow* window = NewWindow( &state, type );
+	group->Append( new rvGEInsertModifier( "Paste", window, parent, before ) );
+
+	if( before != 0 )
+	{
+		mSelections.Remove( mSelections[0] );
+		mSelections.Add( window );
+	}
+
+	rvGEWindowWrapper::GetWrapper( window )->GetScriptDict() = item->mScriptDict;
+	rvGEWindowWrapper::GetWrapper( window )->GetVariableDict() = item->mVarDict;
+
+	for( int i = 0; i < item->mChildren.Num(); ++i )
+	{
+		PasteClipboardItem( item->mChildren[i], window, group );
+	}
+}
+
+void rvGEWorkspace::Paste( void )
 {
 	int i;
 

@@ -29,7 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/common_resource.h"
+#if 0
+#include "../sys/win32/rc/resource.h"
 
 idCVar rbfg_DefaultWidth( "rbfg_DefaultWidth", "0", 0, "" );
 idCVar rbfg_DefaultHeight( "rbfg_DefaultHeight", "0", 0, "" );
@@ -51,7 +52,10 @@ static bool CheckPow2( int Num )
 	return true;
 }
 
-extern void Com_WriteConfigToFile( const char* filename );
+static void Com_WriteConfigToFile( const char* filename )
+{
+	common->Warning( "Some renderbump code called Com_WriteConfigTiFile(\"%s\") which is not implemented!\n", filename );
+}
 
 static BOOL CALLBACK RBFProc( HWND hwndDlg, UINT message, WPARAM wParam, LPARAM lParam )
 {
@@ -108,3 +112,4 @@ void DoRBFDialog( const char* FileName )
 
 	Sys_GrabMouseCursor( true );
 }
+#endif

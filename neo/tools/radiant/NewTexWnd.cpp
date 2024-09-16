@@ -34,12 +34,10 @@ If you have questions concerning this license or the applicable additional terms
 #include "NewTexWnd.h"
 #include "io.h"
 
-#include "../../renderer/tr_local.h"
+#include "../../renderer/RenderCommon.h"
 
 #ifdef _DEBUG
 	#define new DEBUG_NEW
-	#undef THIS_FILE
-	static char THIS_FILE[] = __FILE__;
 #endif
 
 /*
@@ -114,7 +112,7 @@ BOOL CNewTexWnd::PreCreateWindow( CREATESTRUCT& cs )
 		wc.lpfnWndProc = ::DefWindowProc;
 		if( AfxRegisterClass( &wc ) == FALSE )
 		{
-			Error( "CNewTexWnd RegisterClass: failed" );
+			idLib::Error( "CNewTexWnd RegisterClass: failed" );
 		}
 	}
 
@@ -139,7 +137,7 @@ int CNewTexWnd::OnCreate( LPCREATESTRUCT lpCreateStruct )
 		return -1;
 	}
 
-	ShowScrollBar( SB_VERT, g_PrefsDlg.m_bTextureScrollbar );
+	ShowScrollBar( SB_VERT, true );
 	m_bNeedRange = true;
 
 	hdcTexture = GetDC();
@@ -177,7 +175,7 @@ void CNewTexWnd::OnParentNotify( UINT message, LPARAM lParam )
  */
 void CNewTexWnd::UpdatePrefs()
 {
-	ShowScrollBar( SB_VERT, g_PrefsDlg.m_bTextureScrollbar );
+	ShowScrollBar( SB_VERT, true );
 	m_bNeedRange = true;
 	Invalidate();
 	UpdateWindow();
@@ -281,9 +279,7 @@ void CNewTexWnd::OnPaint()
 	}
 	else
 	{
-		// RB: go back to fixed function pipeline
 		renderProgManager.Unbind();
-		// RB end
 
 		const char*	name;
 		glClearColor
@@ -303,7 +299,6 @@ void CNewTexWnd::OnPaint()
 		glOrtho( 0, rectClient.Width(), origin.y - rectClient.Height(), origin.y, -100, 100 );
 		glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 
-		// RB: shaders require uniforms
 		float	modelViewMatrix[16];
 		float	projectionMatrix[16];
 
@@ -320,7 +315,6 @@ void CNewTexWnd::OnPaint()
 		idRenderMatrix::Multiply( projectionRenderMatrix, modelViewRenderMatrix, mvp );
 
 		RB_SetMVP( mvp );
-		// RB end
 
 		// init stuff
 		current.x = 8;
@@ -343,11 +337,8 @@ void CNewTexWnd::OnPaint()
 			{
 				// if in use, draw a background
 				glLineWidth( 1 );
-
 				glColor3f( 1, 1, 1 );
-				GL_Color( 1, 1, 1 );
-
-				globalImages->BindNull();
+				tr.backend.GL_Color( 1, 1, 1 );
 				glBegin( GL_LINE_LOOP );
 				glVertex2f( draw.x - 1, draw.y + 1 - FONT_HEIGHT );
 				glVertex2f( draw.x - 1, draw.y - height - 1 - FONT_HEIGHT );
@@ -358,23 +349,11 @@ void CNewTexWnd::OnPaint()
 				// Draw the texture
 				float	fScale = ( g_PrefsDlg.m_bHiColorTextures == TRUE ) ? ( ( float )g_PrefsDlg.m_nTextureScale / 100 ) : 1.0;
 
-				// RB begin
-				const idImageOpts& opts = mat->GetEditorImage()->GetOpts();
-				if( opts.colorFormat == CFM_YCOCG_DXT5 )
-				{
-					renderProgManager.BindShader_TextureYCoCG();
-				}
-				else
-				{
-					renderProgManager.BindShader_Texture();
-				}
+				renderProgManager.BindShader_Texture();
+				renderProgManager.CommitUniforms( 0 );
 
-				renderProgManager.CommitUniforms();
-				// RB end
-
-				GL_SelectTexture( 0 );
+				tr.backend.GL_SelectTexture( 0 );
 				mat->GetEditorImage()->Bind();
-
 				QE_CheckOpenGLForErrors();
 				glColor3f( 1, 1, 1 );
 				glBegin( GL_QUADS );
@@ -388,16 +367,13 @@ void CNewTexWnd::OnPaint()
 				glVertex2f( draw.x, draw.y - FONT_HEIGHT - height );
 				glEnd();
 
-				// RB begin
 				renderProgManager.Unbind();
-				// RB end
 
 				// draw the selection border
 				if( !idStr::Icmp( g_qeglobals.d_texturewin.texdef.name, mat->GetName() ) )
 				{
 					glLineWidth( 3 );
 					glColor3f( 1, 0, 0 );
-					globalImages->BindNull();
 
 					glBegin( GL_LINE_LOOP );
 					glVertex2f( draw.x - 4, draw.y - FONT_HEIGHT + 4 );
@@ -410,7 +386,6 @@ void CNewTexWnd::OnPaint()
 				}
 
 				// draw the texture name
-				globalImages->BindNull();
 				glColor3f( 1, 1, 1 );
 				glRasterPos2f( draw.x, draw.y - FONT_HEIGHT + 2 );
 
@@ -436,19 +411,14 @@ void CNewTexWnd::OnPaint()
 		g_qeglobals.d_texturewin.m_nTotalHeight = abs( draw.y ) + 100;
 
 		// reset the current texture
-		globalImages->BindNull();
-
-		// RB: go back to fixed function pipeline
 		renderProgManager.Unbind();
-		// RB end
 
 		glFinish();
-
 		SwapBuffers( dc.GetSafeHdc() );
 		TRACE( "Texture Paint\n" );
 	}
 
-	if( g_PrefsDlg.m_bTextureScrollbar && ( m_bNeedRange || g_qeglobals.d_texturewin.m_nTotalHeight != nOld ) )
+	if( m_bNeedRange || g_qeglobals.d_texturewin.m_nTotalHeight != nOld )
 	{
 		m_bNeedRange = false;
 		SetScrollRange( SB_VERT, 0, g_qeglobals.d_texturewin.m_nTotalHeight, TRUE );
@@ -650,8 +620,6 @@ void CNewTexWnd::OnRButtonUp( UINT nFlags, CPoint point )
 	CWnd::OnRButtonUp( nFlags, point );
 }
 
-extern float	fDiff( float f1, float f2 );
-
 /*
  =======================================================================================================================
  =======================================================================================================================
@@ -675,7 +643,7 @@ void CNewTexWnd::OnMouseMove( UINT nFlags, CPoint point )
 				long*	px = &point.x;
 				long*	px2 = &cursor.x;
 
-				if( fDiff( point.y, cursor.y ) > fDiff( point.x, cursor.x ) )
+				if( idMath::Diff( point.y, cursor.y ) > idMath::Diff( point.x, cursor.x ) )
 				{
 					px = &point.y;
 					px2 = &cursor.y;
@@ -720,10 +688,7 @@ void CNewTexWnd::OnMouseMove( UINT nFlags, CPoint point )
 				CPoint screen = cursor;
 				ClientToScreen( &screen );
 				SetCursorPos( screen.x, screen.y );
-				if( g_PrefsDlg.m_bTextureScrollbar )
-				{
-					SetScrollPos( SB_VERT, abs( origin.y ) );
-				}
+				SetScrollPos( SB_VERT, abs( origin.y ) );
 
 				InvalidateRect( NULL, false );
 				UpdateWindow();
@@ -738,11 +703,6 @@ void CNewTexWnd::OnMouseMove( UINT nFlags, CPoint point )
  =======================================================================================================================
  =======================================================================================================================
  */
-void CNewTexWnd::LoadMaterials()
-{
-}
-
-
 void Texture_SetTexture( texdef_t* texdef, brushprimit_texdef_t*	brushprimit_texdef, bool bFitScale, bool bSetSelection )
 {
 
@@ -758,10 +718,7 @@ void Texture_SetTexture( texdef_t* texdef, brushprimit_texdef_t*	brushprimit_tex
 	// store the texture coordinates for new brush primitive mode be sure that all the
 	// callers are using the default 2x2 texture
 	//
-	if( g_qeglobals.m_bBrushPrimitMode )
-	{
-		g_qeglobals.d_texturewin.brushprimit_texdef = *brushprimit_texdef;
-	}
+	g_qeglobals.d_texturewin.brushprimit_texdef = *brushprimit_texdef;
 
 	g_dlgFind.updateTextures( texdef->name );
 
@@ -778,28 +735,18 @@ void Texture_SetTexture( texdef_t* texdef, brushprimit_texdef_t*	brushprimit_tex
 	}
 
 	g_qeglobals.d_texturewin.texdef = *texdef;
+
 	// store the texture coordinates for new brush primitive mode be sure that all the
 	// callers are using the default 2x2 texture
 	//
-	if( g_qeglobals.m_bBrushPrimitMode )
-	{
-		g_qeglobals.d_texturewin.brushprimit_texdef = *brushprimit_texdef;
-	}
-
+	g_qeglobals.d_texturewin.brushprimit_texdef = *brushprimit_texdef;
 
 	Sys_UpdateWindows( W_TEXTURE );
-
-
 }
 
 const idMaterial* Texture_LoadLight( const char* name )
 {
 	return declManager->FindMaterial( name );
-}
-
-
-void Texture_ClearInuse()
-{
 }
 
 void Texture_ShowAll()
@@ -850,7 +797,7 @@ void Texture_ShowInuse()
 {
 	Texture_HideAll();
 
-	brush_t* b;
+	idEditorBrush* b;
 	for( b = active_brushes.next; b != NULL && b != &active_brushes; b = b->next )
 	{
 		if( b->pPatch )
@@ -886,17 +833,11 @@ void Texture_ShowInuse()
 	g_Inspectors->SetWindowText( "Textures (in use)" );
 }
 
-void Texture_Cleanup( CStringList* pList )
-{
-}
-
-int				texture_mode = GL_LINEAR_MIPMAP_LINEAR;
 bool texture_showinuse = true;
-
 
 /*
  =======================================================================================================================
-    Texture_SetMode
+	Texture_SetMode
  =======================================================================================================================
  */
 void Texture_SetMode( int iMenu )
@@ -952,7 +893,6 @@ void Texture_SetMode( int iMenu )
 	CheckMenuItem( hMenu, iMenu, MF_BYCOMMAND | MF_CHECKED );
 
 	g_qeglobals.d_savedinfo.iTexMenu = iMenu;
-	texture_mode = iMode;
 
 	if( !texturing && iMenu == ID_TEXTURES_WIREFRAME )
 	{
@@ -1041,7 +981,7 @@ BOOL CNewTexWnd::OnToolTipNotify( UINT id, NMHDR* pNMHDR, LRESULT* pResult )
 	return( FALSE );
 }
 
-int CNewTexWnd::OnToolHitTest( CPoint point, TOOLINFO* pTI )
+INT_PTR CNewTexWnd::OnToolHitTest( CPoint point, TOOLINFO* pTI )
 {
 	const idMaterial* mat = getMaterialAtPoint( point );
 	if( mat )

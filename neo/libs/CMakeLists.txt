@@ -34,4 +34,5 @@ source_group("MiniZip" FILES ${MINIZIP_INCLUDES})
 source_group("MiniZip" FILES ${MINIZIP_SOURCES})
 
 add_library(${PROJECT_NAME} ${EXTERNAL_INCLUDES_ALL} ${EXTERNAL_SOURCES_ALL})
+set_target_properties( ${PROJECT_NAME} PROPERTIES FOLDER "libs" )
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/idlib ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/glew/include ${CMAKE_CURRENT_SOURCE_DIR}/miniz ${CMAKE_CURRENT_SOURCE_DIR}/minizip )

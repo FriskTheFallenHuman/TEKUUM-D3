@@ -235,11 +235,27 @@ void idCommonLocal::VPrintf( const char* fmt, va_list args )
 	// remove any color codes
 	idStr::RemoveColors( msg );
 
-	// echo to dedicated console and early console
-	Sys_Printf( "%s", msg );
-
-	// print to script debugger server
-	// DebuggerServerPrint( msg );
+#ifdef ID_ALLOW_TOOLS
+	if( com_enableDebuggerServer.GetBool( ) )
+	{
+		// print to script debugger server
+		if( com_editors & EDITOR_DEBUGGER )
+		{
+			DebuggerServerPrint( msg );
+		}
+		else
+			// only echo to dedicated console and early console when debugger is not running so no
+			// deadlocks occur if engine functions called from the debuggerthread trace stuff..
+		{
+			Sys_Printf( "%s", msg );
+		}
+	}
+	else
+#endif
+	{
+		// echo to dedicated console and early console
+		Sys_Printf( "%s", msg );
+	}
 
 #if 0	// !@#
 #if defined(_DEBUG) && defined(WIN32)

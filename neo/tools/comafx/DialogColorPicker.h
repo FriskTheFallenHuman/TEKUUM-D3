@@ -124,8 +124,7 @@ protected:
 	afx_msg void	OnChangeEditSat();
 	afx_msg void	OnChangeEditVal();
 	afx_msg void	OnChangeEditOverbright();
-	afx_msg void	OnTimer( UINT nIDEvent );
-	afx_msg void	OnBtnColor();
+	afx_msg void	OnTimer( UINT_PTR nIDEvent );
 	//}}AFX_MSG
 	DECLARE_MESSAGE_MAP()
 
@@ -200,6 +199,6 @@ protected:
 	float			overBright;
 };
 
-bool DoNewColor( int* i1, int* i2, int* i3, float* overBright, void ( *Update )( float, float, float, float ) = NULL );
+bool DoColor( int* i1, int* i2, int* i3, float* overBright, void ( *Update )( float, float, float, float ) = NULL );
 
 #endif /* !__DIALOGCOLORPICKER__ */

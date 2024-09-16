@@ -45,8 +45,11 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 #include "win_local.h"
-#include "rc/AFEditor_resource.h"
-#include "rc/doom_resource.h"
+#ifdef ID_ALLOW_TOOLS
+	#include "rc/resource.h"
+#else
+	#include "rc/rbdoom3_resource.h"
+#endif
 #include "../../renderer/RenderCommon.h"
 
 

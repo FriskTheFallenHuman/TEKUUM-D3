@@ -57,6 +57,7 @@ public:
 	virtual void				ActivateTool( bool active );
 	virtual void				WriteConfigToFile( const char* filename );
 	virtual void				WriteFlaggedCVarsToFile( const char* filename, int flags, const char* setCmd );
+	virtual void				DebuggerCheckBreakpoint( idInterpreter* interpreter, idProgram* program, int instructionPointer );
 	virtual void				BeginRedirect( char* buffer, int buffersize, void ( *flush )( const char* ) );
 	virtual void				EndRedirect();
 	virtual void				SetRefreshOnPrint( bool set );

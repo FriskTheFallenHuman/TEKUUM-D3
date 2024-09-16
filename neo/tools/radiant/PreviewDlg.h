@@ -39,12 +39,14 @@ struct CommentedItem
 	idStr Comments;
 };
 
-class CPreviewDlg : public CDialog
+class CPreviewDlg : public CDialogEx
 {
 public:
-	enum {MODELS, GUIS, SOUNDS, MATERIALS, SCRIPTS, SOUNDPARENT, WAVES, PARTICLES, MODELPARENT, GUIPARENT, COMMENTED, SKINS};
-	CPreviewDlg( CWnd* pParent = NULL ); // standard constructor
+	enum { MODELS, GUIS, SOUNDS, MATERIALS, SCRIPTS, SOUNDPARENT, WAVES, PARTICLES, MODELPARENT, GUIPARENT, COMMENTED, SKINS };
+
+	CPreviewDlg( CWnd* pParent = NULL );   // standard constructor
 	virtual ~CPreviewDlg();
+	void SetOnlyFilter( bool gOnly, idStr filter );
 	void SetMode( int mode, const char* preSelect = NULL );
 	void RebuildTree( const char* data );
 	void SetDisablePreview( bool b )
@@ -57,7 +59,7 @@ public:
 
 	bool Waiting();
 	void SetModal();
-// Dialog Data
+
 	enum { IDD = IDD_DIALOG_PREVIEW };
 private:
 	DECLARE_DYNAMIC( CPreviewDlg )
@@ -66,6 +68,7 @@ private:
 	CEdit editInfo;
 	HTREEITEM commentItem;
 	CImageList m_image;
+	CBitmap m_bitmap;
 	idGLDrawable m_testDrawable;
 	idGLDrawableMaterial m_drawMaterial;
 	idGLDrawableModel m_drawModel;
@@ -77,9 +80,11 @@ private:
 	void AddCommentedItems();
 	idStr data;
 	bool disablePreview;
+	bool onlyFilter;
+	idStr strOnlyFilter;
 
 protected:
-	virtual void DoDataExchange( CDataExchange* pDX );  // DDX/DDV support
+	virtual void DoDataExchange( CDataExchange* pDX );    // DDX/DDV support
 	void BuildTree();
 	void AddStrList( const char* root, const idStrList& list, int type );
 	void AddSounds( bool rootItems );
@@ -100,4 +105,5 @@ public:
 	afx_msg void OnBnClickedButtonReload();
 	afx_msg void OnBnClickedButtonAdd();
 	afx_msg void OnBnClickedButtonPlay();
+	afx_msg void OnBnClickedPreviewGui();
 };

@@ -47,6 +47,8 @@ rvGEOptions::rvGEOptions()
 	mIgnoreDesktopSelect = true;
 	mStatusBarVisible = true;
 	mPropertiesVisible = true;
+	mItemPropertiesVisible = true;
+	mScriptsVisible = true;
 
 	mWorkspaceColor.Set( 0.0f, 0.0f, 0.0f, 1.0f );
 	mSelectionColor.Set( 0.5f, 0.5f, 1.0f, 1.0f );
@@ -85,9 +87,11 @@ bool rvGEOptions::Save()
 
 	// Tool window states
 	mRegistry.SetBool( "navigatorVisible", mNavigatorVisible );
+	mRegistry.SetBool( "ItemPropertiesVisible", mItemPropertiesVisible );
 	mRegistry.SetBool( "PropertiesVisible", mPropertiesVisible );
 	mRegistry.SetBool( "transformerVisible", mTransformerVisible );
 	mRegistry.SetBool( "statusBarVisible", mStatusBarVisible );
+	mRegistry.SetBool( "scriptsVisible", mScriptsVisible );
 
 	// General stuff
 	mRegistry.SetVec4( "selectionColor", mSelectionColor );
@@ -130,6 +134,7 @@ bool rvGEOptions::Load()
 	// Tool window states
 	mNavigatorVisible = mRegistry.GetBool( "navigatorVisible" );
 	mPropertiesVisible = mRegistry.GetBool( "PropertiesVisible" );
+	mItemPropertiesVisible = mRegistry.GetBool( "ItemPropertiesVisible" );
 	mTransformerVisible = mRegistry.GetBool( "transformerVisible" );
 	mStatusBarVisible = mRegistry.GetBool( "statusBarVisible" );
 
@@ -188,5 +193,3 @@ void rvGEOptions::SnapRectToGrid( idRectangle& rect, bool snapLeft, bool snapTop
 		rect.h += offset;
 	}
 }
-
-

@@ -41,8 +41,12 @@ public:
 	void		SetWorkspace( rvGEWorkspace* workspace );
 	void		Update();
 
+	bool		GetLockAspect();
 	HWND		GetWindow();
-
+	rvGEWorkspace* 	GetWorkspace()
+	{
+		return mWorkspace;
+	}
 protected:
 
 	HWND			mWnd;

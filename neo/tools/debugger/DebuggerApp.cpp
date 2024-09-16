@@ -29,7 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/rc/debugger_resource.h"
+
+#include "../../sys/win32/rc/resource.h"
 #include "DebuggerApp.h"
 
 /*
@@ -37,10 +38,9 @@ If you have questions concerning this license or the applicable additional terms
 rvDebuggerApp::rvDebuggerApp
 ================
 */
-rvDebuggerApp::rvDebuggerApp( )
+rvDebuggerApp::rvDebuggerApp( )  //:
+//mOptions ( "Software\\id Software\\DOOM3\\Tools\\Debugger" )
 {
-	mOptions.Init( "Software\\id Software\\DOOM3\\Tools\\Debugger" );
-
 	mInstance		= NULL;
 	mDebuggerWindow = NULL;
 	mAccelerators   = NULL;
@@ -164,4 +164,3 @@ int rvDebuggerApp::Run()
 
 	return 1;
 }
-

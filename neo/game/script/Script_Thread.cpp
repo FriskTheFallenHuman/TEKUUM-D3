@@ -2071,3 +2071,89 @@ void idThread::Event_InfluenceActive()
 		idThread::ReturnInt( false );
 	}
 }
+
+/*
+================
+idGameEdit::ThreadGetNum
+================
+*/
+int idGameEdit::ThreadGetNum( const idThread* thread ) const
+{
+	return const_cast<idThread*>( thread )->GetThreadNum();
+}
+
+/*
+================
+idGameEdit::ThreadGetName
+================
+*/
+const char* idGameEdit::ThreadGetName( const idThread* thread ) const
+{
+	return const_cast<idThread*>( thread )->GetThreadName();
+}
+
+/*
+================
+idGameEdit::GetTotalScriptThreads
+================
+*/
+int	idGameEdit::GetTotalScriptThreads() const
+{
+	return idThread::GetThreads().Num();
+}
+
+/*
+================
+idGameEdit::GetThreadByIndex
+================
+*/
+const idThread* idGameEdit::GetThreadByIndex( int index ) const
+{
+	return idThread::GetThreads()[index];
+}
+
+/*
+================
+idGameEdit::ThreadIsDoneProcessing
+================
+*/
+bool idGameEdit::ThreadIsDoneProcessing( const idThread* thread ) const
+{
+	return const_cast<idThread*>( thread )->IsDoneProcessing();
+}
+
+/*
+================
+idGameEdit::ThreadIsWaiting
+================
+*/
+bool idGameEdit::ThreadIsWaiting( const idThread* thread ) const
+{
+	return const_cast<idThread*>( thread )->IsWaiting();
+}
+
+/*
+================
+idGameEdit::ThreadIsDying
+================
+*/
+bool idGameEdit::ThreadIsDying( const idThread* thread ) const
+{
+	return const_cast<idThread*>( thread )->IsDying();
+}
+
+/*
+================
+idGameEdit::MSG_WriteThreadInfo
+================
+*/
+void idGameEdit::MSG_WriteThreadInfo( idBitMsg* msg, const idThread* thread, const idInterpreter* interpreter )
+{
+	msg->WriteString( const_cast<idThread*>( thread )->GetThreadName() );
+	msg->WriteInt( const_cast<idThread*>( thread )->GetThreadNum() );
+
+	msg->WriteBits( ( int )( thread == interpreter->GetThread() ), 1 );
+	msg->WriteBits( ( int )const_cast<idThread*>( thread )->IsDoneProcessing(), 1 );
+	msg->WriteBits( ( int )const_cast<idThread*>( thread )->IsWaiting(), 1 );
+	msg->WriteBits( ( int )const_cast<idThread*>( thread )->IsDying(), 1 );
+}

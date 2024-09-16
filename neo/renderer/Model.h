@@ -219,6 +219,7 @@ public:
 	virtual void				TouchData() = 0;
 
 	// dump any ambient caches on the model surfaces
+	virtual void				CreateVertexCache() = 0;
 	virtual void				FreeVertexCache() = 0;
 
 	// returns the name of the model

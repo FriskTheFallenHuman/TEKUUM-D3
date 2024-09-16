@@ -172,8 +172,8 @@ COLORREF CVectorCtl::CalcLight( double dx, double dy, double dz )
 {
 	double NL = dx * m_dVec[0] + dy * m_dVec[1] + dz * m_dVec[2],
 		   RV = 2.0 * NL,
-		   rx = m_dVec[0] - ( dx * RV ),
-		   ry = m_dVec[1] - ( dy * RV ),
+		   //rx = m_dVec[0] - (dx * RV),
+		   //ry = m_dVec[1] - (dy * RV),
 		   rz = m_dVec[2] - ( dz * RV );
 
 	if( NL < 0.0 )  // Diffuse coefficient
@@ -181,7 +181,7 @@ COLORREF CVectorCtl::CalcLight( double dx, double dy, double dz )
 		NL = 0.0;
 	}
 
-	RV = max( 0.0, -rz );
+	RV = Max( 0.0, -rz );
 	RV = double( pow( RV, m_dSpecularExponent ) );
 
 	int  r = int ( double( GetRValue( m_clrDiffuse ) ) * NL + // Diffuse
@@ -196,9 +196,9 @@ COLORREF CVectorCtl::CalcLight( double dx, double dy, double dz )
 						   double( GetBValue( m_clrLight ) ) * RV + // Specular
 						   double( GetBValue( m_clrAmbient ) ) );  // Ambient
 
-	r = min( 255, r );  // Cutoff highlight
-	g = min( 255, g );
-	b = min( 255, b );
+	r = Min( 255, r );  // Cutoff highlight
+	g = Min( 255, g );
+	b = Min( 255, b );
 	return RGB( BYTE( r ), BYTE( g ), BYTE( b ) );
 }
 
@@ -212,7 +212,7 @@ void CVectorCtl::InitBitmap( LPDRAWITEMSTRUCT lpDrawItemStruct, CDC* pDC )
 	m_bBmpCreated = TRUE;
 	m_dcMem.CreateCompatibleDC( pDC );
 	m_pOldBitmap = m_dcMem.SelectObject( &m_bmpBuffer );
-	SetRadius( max( min( m_iWidth, m_iHeight ) - 2, 0 ) / 2 );
+	SetRadius( Max( Min( m_iWidth, m_iHeight ) - 2, 0 ) / 2 );
 	SetCenter( m_iWidth / 2, m_iHeight / 2 );
 	CreateBackground();
 }
@@ -359,9 +359,9 @@ void CVectorCtl::CreateBackground()
 		double r = GetRValue( m_clrBackgroundStart ),
 			   g = GetGValue( m_clrBackgroundStart ),
 			   b = GetBValue( m_clrBackgroundStart ),
-			   rd = double( GetRValue( m_clrBackgroundEnd ) - r ) / double( m_iHeight ),
-			   gd = double( GetGValue( m_clrBackgroundEnd ) - g ) / double( m_iHeight ),
-			   bd = double( GetBValue( m_clrBackgroundEnd ) - b ) / double( m_iHeight );
+			   rd = double ( GetRValue( m_clrBackgroundEnd ) - r ) / double ( m_iHeight ),
+			   gd = double ( GetGValue( m_clrBackgroundEnd ) - g ) / double ( m_iHeight ),
+			   bd = double ( GetBValue( m_clrBackgroundEnd ) - b ) / double ( m_iHeight );
 		for( int j = 0; j < m_iHeight; j++ )
 		{
 			for( int i = 0; i < m_iWidth; i++ )
@@ -472,5 +472,3 @@ void CVectorCtl::OnLButtonUp( UINT nFlags, CPoint point )
 {
 	ReleaseCapture();
 }
-
-

@@ -30,7 +30,6 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 #include "Session_local.h"
-#include "../ui/Rectangle.h"
 #include "../renderer/RenderCommon.h"
 
 

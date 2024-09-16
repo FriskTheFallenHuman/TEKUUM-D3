@@ -123,6 +123,8 @@ return
 	"builtin/texture_color_skinned.vs.hlsl",
 	"builtin/texture_color_texgen.ps.hlsl",
 	"builtin/texture_color_texgen.vs.hlsl",
+	"builtin/texture_ycocg.ps.hlsl",
+	"builtin/texture_ycocg.vs.hlsl",
 	
 	"builtin/vertex_color.ps.hlsl",
 	"builtin/vertex_color.vs.hlsl",

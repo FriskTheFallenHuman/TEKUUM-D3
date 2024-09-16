@@ -60,8 +60,8 @@ public:
 	AttributeMaterialModifier( MaterialDocManager* manager, const char* materialName, int stage, const char* key );
 	virtual ~AttributeMaterialModifier() {};
 
-	virtual void 			Undo() = 0;
-	virtual void 			Redo() = 0;
+	virtual void			Undo() = 0;
+	virtual void			Redo() = 0;
 
 protected:
 	int						stage;
@@ -78,8 +78,8 @@ public:
 	AttributeMaterialModifierString( MaterialDocManager* manager, const char* materialName, int stage, const char* key, const char* value, const char* oldValue );
 	virtual ~AttributeMaterialModifierString() {};
 
-	virtual void 			Undo();
-	virtual void 			Redo();
+	virtual void			Undo();
+	virtual void			Redo();
 
 protected:
 	idStr					value;
@@ -97,8 +97,8 @@ public:
 	AttributeMaterialModifierBool( MaterialDocManager* manager, const char* materialName, int stage, const char* key, bool value, bool oldValue );
 	virtual ~AttributeMaterialModifierBool() {};
 
-	virtual void 			Undo();
-	virtual void 			Redo();
+	virtual void			Undo();
+	virtual void			Redo();
 
 protected:
 	bool					value;
@@ -116,8 +116,8 @@ public:
 	StageMoveModifier( MaterialDocManager* manager, const char* materialName, int from, int to );
 	virtual ~StageMoveModifier() {};
 
-	virtual void 			Undo();
-	virtual void 			Redo();
+	virtual void			Undo();
+	virtual void			Redo();
 
 protected:
 	int						from;
@@ -133,8 +133,8 @@ public:
 	StageDeleteModifier( MaterialDocManager* manager, const char* materialName, int stageNum, idDict stageData );
 	virtual ~StageDeleteModifier() {};
 
-	virtual void 			Undo();
-	virtual void 			Redo();
+	virtual void			Undo();
+	virtual void			Redo();
 
 protected:
 	int						stageNum;
@@ -279,4 +279,3 @@ protected:
 	HTREEITEM				item;
 	HTREEITEM				parent;
 };
-

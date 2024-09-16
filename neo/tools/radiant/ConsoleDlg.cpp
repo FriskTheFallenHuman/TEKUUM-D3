@@ -37,8 +37,8 @@ If you have questions concerning this license or the applicable additional terms
 // CConsoleDlg dialog
 
 IMPLEMENT_DYNCREATE( CConsoleDlg, CDialog )
-CConsoleDlg::CConsoleDlg( CWnd* pParent /*=NULL*/ )
-	: CDialog( CConsoleDlg::IDD )
+CConsoleDlg::CConsoleDlg( CWnd* pParent )
+	: CDialogEx( CConsoleDlg::IDD )
 {
 	currentHistoryPosition = -1;
 	currentCommand = "";
@@ -51,7 +51,7 @@ CConsoleDlg::~CConsoleDlg()
 
 void CConsoleDlg::DoDataExchange( CDataExchange* pDX )
 {
-	CDialog::DoDataExchange( pDX );
+	CDialogEx::DoDataExchange( pDX );
 	DDX_Control( pDX, IDC_EDIT_CONSOLE, editConsole );
 	DDX_Control( pDX, IDC_EDIT_INPUT, editInput );
 }
@@ -76,8 +76,7 @@ void CConsoleDlg::AddText( const char* msg )
 	editConsole.ReplaceSel( work );
 }
 
-
-BEGIN_MESSAGE_MAP( CConsoleDlg, CDialog )
+BEGIN_MESSAGE_MAP( CConsoleDlg, CDialogEx )
 	ON_WM_SIZE()
 	ON_WM_SETFOCUS()
 	ON_WM_ACTIVATE()
@@ -88,7 +87,7 @@ END_MESSAGE_MAP()
 
 void CConsoleDlg::OnSize( UINT nType, int cx, int cy )
 {
-	CDialog::OnSize( nType, cx, cy );
+	CDialogEx::OnSize( nType, cx, cy );
 
 	if( editInput.GetSafeHwnd() == NULL )
 	{
@@ -105,7 +104,6 @@ void CConsoleDlg::OnSize( UINT nType, int cx, int cy )
 
 BOOL CConsoleDlg::PreTranslateMessage( MSG* pMsg )
 {
-
 	if( pMsg->hwnd == editInput.GetSafeHwnd() )
 	{
 		if( pMsg->message == WM_KEYDOWN && pMsg->wParam == VK_ESCAPE )
@@ -210,12 +208,12 @@ BOOL CConsoleDlg::PreTranslateMessage( MSG* pMsg )
 		}
 	}
 
-	return CDialog::PreTranslateMessage( pMsg );
+	return CDialogEx::PreTranslateMessage( pMsg );
 }
 
 void CConsoleDlg::OnSetFocus( CWnd* pOldWnd )
 {
-	CDialog::OnSetFocus( pOldWnd );
+	CDialogEx::OnSetFocus( pOldWnd );
 	editInput.SetFocus();
 }
 
@@ -284,7 +282,7 @@ void CConsoleDlg::ExecuteCommand( const idStr& cmd )
 
 void CConsoleDlg::OnActivate( UINT nState, CWnd* pWndOther, BOOL bMinimized )
 {
-	CDialog::OnActivate( nState, pWndOther, bMinimized );
+	CDialogEx::OnActivate( nState, pWndOther, bMinimized );
 
 	if( nState == WA_ACTIVE || nState == WA_CLICKACTIVE )
 	{

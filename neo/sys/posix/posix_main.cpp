@@ -190,7 +190,7 @@ unsigned int sys_timeBase = 0;
 // RB end
 /* current time in ms, using sys_timeBase as origin
    NOTE: sys_timeBase*1000 + curtime -> ms since the Epoch
-     0x7fffffff ms - ~24 days
+	 0x7fffffff ms - ~24 days
 		 or is it 48 days? the specs say int, but maybe it's casted from unsigned int?
 */
 int Sys_Milliseconds()
@@ -288,6 +288,42 @@ Sys_Mkdir
 void Sys_Mkdir( const char* path )
 {
 	mkdir( path, 0777 );
+}
+
+/*
+==========
+Sys_IsFile
+==========
+*/
+bool Sys_IsFile( const char* path )
+{
+	assert( path );
+
+	struct stat st;
+	if( stat( path, &st ) != -1 && S_ISREG( st.st_mode ) )
+	{
+		return true;
+	}
+
+	return false;
+}
+
+/*
+===============
+Sys_IsDirectory
+===============
+*/
+bool Sys_IsDirectory( const char* path )
+{
+	assert( path );
+
+	struct stat st;
+	if( stat( path, &st ) != -1 && S_ISDIR( st.st_mode ) )
+	{
+		return true;
+	}
+
+	return false;
 }
 
 /*
@@ -752,10 +788,10 @@ void Posix_InitConsoleInput()
 		/*
 		  ECHO: don't echo input characters
 		  ICANON: enable canonical mode.  This  enables  the  special
-		  	characters  EOF,  EOL,  EOL2, ERASE, KILL, REPRINT,
-		  	STATUS, and WERASE, and buffers by lines.
+			characters  EOF,  EOL,  EOL2, ERASE, KILL, REPRINT,
+			STATUS, and WERASE, and buffers by lines.
 		  ISIG: when any of the characters  INTR,  QUIT,  SUSP,  or
-		  	DSUSP are received, generate the corresponding signal
+			DSUSP are received, generate the corresponding signal
 		*/
 		tc.c_lflag &= ~( ECHO | ICANON );
 		/*

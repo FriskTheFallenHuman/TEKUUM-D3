@@ -29,8 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/rc/Common_resource.h"
-#include "../../sys/win32/rc/ScriptEditor_resource.h"
+
+#include "../../sys/win32/rc/resource.h"
 
 #include "../comafx/DialogGoToLine.h"
 #include "DialogScriptEditor.h"
@@ -148,13 +148,7 @@ void DialogScriptEditor::InitScriptEvents()
 	idStr whiteSpace;
 	scriptEventInfo_t info;
 
-	// RB begin
-#if defined(STANDALONE)
-	if( !src.LoadFile( "script/tekuum_events.script" ) )
-#else
 	if( !src.LoadFile( "script/doom_events.script" ) )
-#endif
-		// RB end
 	{
 		return;
 	}

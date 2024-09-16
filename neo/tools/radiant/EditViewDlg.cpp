@@ -33,14 +33,16 @@ If you have questions concerning this license or the applicable additional terms
 #include "Radiant.h"
 #include "EditViewDlg.h"
 
+#ifdef _DEBUG
+	#define new DEBUG_NEW
+#endif
 
-// CEditViewDlg dialog
+IMPLEMENT_DYNAMIC( CEditViewDlg, CDialogEx )
 
-IMPLEMENT_DYNAMIC( CEditViewDlg, CDialog )
-CEditViewDlg::CEditViewDlg( CWnd* pParent /*=NULL*/ )
-	: CDialog( CEditViewDlg::IDD, pParent )
+CEditViewDlg::CEditViewDlg( CWnd* pParent )
+	: CDialogEx( CEditViewDlg::IDD, pParent ),
+	  findDlg( nullptr )
 {
-	findDlg = NULL;
 }
 
 CEditViewDlg::~CEditViewDlg()
@@ -53,17 +55,16 @@ void CEditViewDlg::DoDataExchange( CDataExchange* pDX )
 	DDX_Control( pDX, IDC_EDIT_INFO, editInfo );
 }
 
-
 static UINT FindDialogMessage = ::RegisterWindowMessage( FINDMSGSTRING );
 
-BEGIN_MESSAGE_MAP( CEditViewDlg, CDialog )
+BEGIN_MESSAGE_MAP( CEditViewDlg, CDialogEx )
 	ON_WM_SIZE()
-	ON_BN_CLICKED( IDC_BUTTON_OPEN, OnBnClickedButtonOpen )
-	ON_BN_CLICKED( IDC_BUTTON_SAVE, OnBnClickedButtonSave )
+	ON_BN_CLICKED( IDC_BUTTON_OPEN, &CEditViewDlg::OnBnClickedButtonOpen )
+	ON_BN_CLICKED( IDC_BUTTON_SAVE, &CEditViewDlg::OnBnClickedButtonSave )
 	ON_WM_DESTROY()
 	ON_WM_TIMER()
-	ON_BN_CLICKED( IDC_BUTTON_GOTO, OnBnClickedButtonGoto )
-	ON_REGISTERED_MESSAGE( FindDialogMessage, OnFindDialogMessage )
+	ON_BN_CLICKED( IDC_BUTTON_GOTO, &CEditViewDlg::OnBnClickedButtonGoto )
+	ON_REGISTERED_MESSAGE( FindDialogMessage, &CEditViewDlg::OnFindDialogMessage )
 END_MESSAGE_MAP()
 
 
@@ -71,11 +72,21 @@ END_MESSAGE_MAP()
 
 void CEditViewDlg::OnSize( UINT nType, int cx, int cy )
 {
-	CDialog::OnSize( nType, cx, cy );
+	CDialogEx::OnSize( nType, cx, cy );
+
 	if( GetSafeHwnd() == NULL )
 	{
 		return;
 	}
+
+	float scaling_factor = Win_GetWindowScalingFactor( GetSafeHwnd() );
+	int s2 = int( 2 * scaling_factor );
+	int s8 = int( 8 * scaling_factor );
+	int s4 = int( 4 * scaling_factor );
+	int s6 = int( 6 * scaling_factor );
+	int s12 = int( 12 * scaling_factor );
+	int s16 = int( 16 * scaling_factor );
+
 	CRect rect, crect;
 	GetClientRect( rect );
 	CWnd* wnd = GetDlgItem( IDC_BUTTON_OPEN );
@@ -109,7 +120,6 @@ void CEditViewDlg::ShowFindDlg()
 	}
 	findDlg = new CFindReplaceDialog();
 	findDlg->Create( TRUE, findStr, NULL, FR_DOWN, this );
-
 }
 
 void CEditViewDlg::OnBnClickedButtonOpen()
@@ -166,14 +176,14 @@ void CEditViewDlg::UpdateEditPreview()
 
 BOOL CEditViewDlg::OnInitDialog()
 {
-	CDialog::OnInitDialog();
+	CDialogEx::OnInitDialog();
 
 	mediaPreview.Create( IDD_DIALOG_EDITPREVIEW, this );
 	mediaPreview.ShowWindow( SW_SHOW );
 
 	CRect rct;
 	LONG lSize = sizeof( rct );
-	if( LoadRegistryInfo( "Radiant::EditViewWindow", &rct, &lSize ) )
+	if( LoadRegistryInfo( "radiant_editviewwindow", &rct, &lSize ) )
 	{
 		SetWindowPos( NULL, rct.left, rct.top, rct.Width(), rct.Height(), SWP_SHOWWINDOW );
 	}
@@ -195,10 +205,10 @@ void CEditViewDlg::OnDestroy()
 	{
 		CRect rct;
 		GetWindowRect( rct );
-		SaveRegistryInfo( "Radiant::EditViewWindow", &rct, sizeof( rct ) );
+		SaveRegistryInfo( "radiant_editviewwindow", &rct, sizeof( rct ) );
 	}
 
-	CDialog::OnDestroy();
+	CDialogEx::OnDestroy();
 }
 
 void CEditViewDlg::SetMaterialInfo( const char* name, const char* file, int _line )
@@ -219,7 +229,7 @@ void CEditViewDlg::SetMaterialInfo( const char* name, const char* file, int _lin
 		{
 			line = 0;
 		}
-		editText = ( char* )buf;
+		editText = static_cast<char*>( buf );
 		fileSystem->FreeFile( buf );
 	}
 	UpdateEditPreview();
@@ -227,6 +237,7 @@ void CEditViewDlg::SetMaterialInfo( const char* name, const char* file, int _lin
 
 void CEditViewDlg::SetGuiInfo( const char* name )
 {
+
 	fileName = "";
 	line = 0;
 	void* buf;
@@ -234,15 +245,15 @@ void CEditViewDlg::SetGuiInfo( const char* name )
 	if( size > 0 )
 	{
 		fileName = name;
-		editText = ( char* )buf;
+		editText = static_cast<char*>( buf );
 		fileSystem->FreeFile( buf );
 	}
 	UpdateEditPreview();
 }
 
-void CEditViewDlg::OnTimer( UINT nIDEvent )
+void CEditViewDlg::OnTimer( UINT_PTR nIDEvent )
 {
-	CDialog::OnTimer( nIDEvent );
+	CDialogEx::OnTimer( nIDEvent );
 	CWnd* wnd = GetDlgItem( IDC_EDIT_LINE );
 	if( wnd )
 	{
@@ -250,7 +261,6 @@ void CEditViewDlg::OnTimer( UINT nIDEvent )
 		editInfo.GetSel( start, end );
 		wnd->SetWindowText( va( "%i", editInfo.LineFromChar( start ) ) );
 	}
-
 }
 
 void CEditViewDlg::OnBnClickedButtonGoto()
@@ -276,7 +286,6 @@ void CEditViewDlg::OnBnClickedButtonGoto()
 
 BOOL CEditViewDlg::PreTranslateMessage( MSG* pMsg )
 {
-
 	if( pMsg->message == WM_KEYDOWN && ( pMsg->wParam == 's' || pMsg->wParam == 'S' ) && GetAsyncKeyState( VK_CONTROL ) & 0x8000 )
 	{
 		OnBnClickedButtonSave();
@@ -306,7 +315,7 @@ BOOL CEditViewDlg::PreTranslateMessage( MSG* pMsg )
 		return TRUE;
 	}
 
-	return CDialog::PreTranslateMessage( pMsg );
+	return CDialogEx::PreTranslateMessage( pMsg );
 }
 
 LRESULT CEditViewDlg::OnFindDialogMessage( WPARAM wParam, LPARAM lParam )
@@ -327,7 +336,7 @@ LRESULT CEditViewDlg::OnFindDialogMessage( WPARAM wParam, LPARAM lParam )
 	// to search for the requested string.
 	if( findDlg->FindNext() )
 	{
-		//read data from dialog
+		// read data from dialog
 		findStr = findDlg->GetFindString().GetBuffer( 0 );
 		CString str;
 		editInfo.GetWindowText( str );

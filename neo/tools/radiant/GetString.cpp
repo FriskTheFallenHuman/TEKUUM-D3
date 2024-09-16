@@ -36,9 +36,8 @@ If you have questions concerning this license or the applicable additional terms
 
 // CGetString dialog
 
-
-CGetString::CGetString( LPCSTR pPrompt, CString* pFeedback, CWnd* pParent /*=NULL*/ )
-	: CDialog( CGetString::IDD, pParent )
+CGetString::CGetString( LPCSTR pPrompt, CString* pFeedback, CWnd* pParent )
+	: CDialogEx( CGetString::IDD, pParent )
 {
 	m_strEditBox = _T( "" );
 
@@ -52,25 +51,20 @@ CGetString::~CGetString()
 
 void CGetString::DoDataExchange( CDataExchange* pDX )
 {
-	CDialog::DoDataExchange( pDX );
+	CDialogEx::DoDataExchange( pDX );
 	DDX_Text( pDX, IDC_EDIT1, m_strEditBox );
 }
 
 BOOL CGetString::OnInitDialog()
 {
-	CDialog::OnInitDialog();
+	CDialogEx::OnInitDialog();
 
 	GetDlgItem( IDC_PROMPT )->SetWindowText( m_pPrompt );
-	return TRUE;  // return TRUE unless you set the focus to a control
-	// EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;
 }
 
-BEGIN_MESSAGE_MAP( CGetString, CDialog )
-	//{{AFX_MSG_MAP(CGetString)
-	//}}AFX_MSG_MAP
+BEGIN_MESSAGE_MAP( CGetString, CDialogEx )
 END_MESSAGE_MAP()
-
-
 
 void CGetString::OnOK()
 {
@@ -78,12 +72,10 @@ void CGetString::OnOK()
 
 	*m_pFeedback = m_strEditBox;
 
-	CDialog::OnOK();
+	CDialogEx::OnOK();
 }
 
-
 // returns NULL if CANCEL, else input string
-//
 LPCSTR GetString( LPCSTR psPrompt )
 {
 	static CString strReturn;
@@ -103,7 +95,7 @@ LPCSTR GetString( LPCSTR psPrompt )
 
 bool GetYesNo( const char* psQuery )
 {
-	if( MessageBox( g_pParentWnd->GetSafeHwnd(), psQuery, "Query", MB_YESNO | MB_ICONWARNING ) == IDYES )
+	if( MessageBoxA( g_pParentWnd->GetSafeHwnd(), psQuery, "Query", MB_YESNO | MB_ICONWARNING ) == IDYES )
 	{
 		return true;
 	}
@@ -122,16 +114,15 @@ void ErrorBox( const char* sString )
 			PlaySound( "k:\\util\\overlay.bin", NULL, SND_FILENAME | SND_ASYNC );
 		}
 	}
-	MessageBox( g_pParentWnd->GetSafeHwnd(), sString, "Error",		MB_OK | MB_ICONERROR | MB_TASKMODAL );
+	MessageBoxA( g_pParentWnd->GetSafeHwnd(), sString, "Error",		MB_OK | MB_ICONERROR | MB_TASKMODAL );
 }
+
 void InfoBox( const char* sString )
 {
-	MessageBox( g_pParentWnd->GetSafeHwnd(), sString, "Info",		MB_OK | MB_ICONINFORMATION | MB_TASKMODAL );
+	MessageBoxA( g_pParentWnd->GetSafeHwnd(), sString, "Info",		MB_OK | MB_ICONINFORMATION | MB_TASKMODAL );
 }
+
 void WarningBox( const char* sString )
 {
-	MessageBox( g_pParentWnd->GetSafeHwnd(), sString, "Warning",	MB_OK | MB_ICONWARNING | MB_TASKMODAL );
+	MessageBoxA( g_pParentWnd->GetSafeHwnd(), sString, "Warning",	MB_OK | MB_ICONWARNING | MB_TASKMODAL );
 }
-
-
-

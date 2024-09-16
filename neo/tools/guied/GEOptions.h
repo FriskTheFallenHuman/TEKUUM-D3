@@ -60,6 +60,8 @@ public:
 	void			SetGridVisible( bool vis );
 	void			SetGridSnap( bool snap );
 	void			SetLastOptionsPage( int page );
+	void			SetItemPropertiesVisible( bool vis );
+	void			SetScriptsVisible( bool vis );
 	void			SetNavigatorVisible( bool vis );
 	void			SetPropertiesVisible( bool vis );
 	void			SetTransformerVisible( bool vis );
@@ -80,6 +82,8 @@ public:
 	bool			GetNavigatorVisible();
 	bool			GetTransformerVisible();
 	bool			GetPropertiesVisible();
+	bool			GetItemPropertiesVisible();
+	bool			GetScriptsVisible();
 	idVec4&			GetSelectionColor();
 	COLORREF*		GetCustomColors();
 	bool			GetIgnoreDesktopSelect();
@@ -108,8 +112,10 @@ protected:
 	idVec4				mSelectionColor;
 
 	bool				mNavigatorVisible;
+	bool				mItemPropertiesVisible;
 	bool				mPropertiesVisible;
 	bool				mTransformerVisible;
+	bool				mScriptsVisible;
 	bool				mStatusBarVisible;
 	bool				mIgnoreDesktopSelect;
 
@@ -193,6 +199,18 @@ ID_INLINE void rvGEOptions::SetNavigatorVisible( bool vis )
 	SetModified( true );
 }
 
+ID_INLINE void rvGEOptions::SetScriptsVisible( bool vis )
+{
+	mScriptsVisible = vis;
+	SetModified( true );
+}
+
+ID_INLINE void rvGEOptions::SetItemPropertiesVisible( bool vis )
+{
+	mItemPropertiesVisible = vis;
+	SetModified( true );
+}
+
 ID_INLINE void rvGEOptions::SetPropertiesVisible( bool vis )
 {
 	mPropertiesVisible = vis;
@@ -255,6 +273,16 @@ ID_INLINE bool rvGEOptions::GetPropertiesVisible()
 	return mPropertiesVisible;
 }
 
+ID_INLINE bool rvGEOptions::GetScriptsVisible()
+{
+	return mScriptsVisible;
+}
+
+ID_INLINE bool rvGEOptions::GetItemPropertiesVisible()
+{
+	return mItemPropertiesVisible;
+}
+
 ID_INLINE bool rvGEOptions::GetTransformerVisible()
 {
 	return mTransformerVisible;
@@ -311,4 +339,3 @@ ID_INLINE const char* rvGEOptions::GetRecentFile( int index )
 }
 
 #endif // _GEOPTIONS_H_
-

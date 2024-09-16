@@ -29,12 +29,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../game/game.h"
 #include "../../sys/win32/win_local.h"
-#include "../../sys/win32/rc/common_resource.h"
-#include "../../sys/win32/rc/SoundEditor_resource.h"
+#include "../../sys/win32/rc/resource.h"
 #include "../comafx/DialogName.h"
-#include "../../sys/win32/rc/DeclEditor_resource.h"
 #include "../decl/DialogDeclEditor.h"
 
 #include "DialogSound.h"
@@ -525,10 +522,7 @@ void CDialogSound::AddSounds( bool rootItems )
 		const idSoundShader* poo = declManager->SoundByIndex( i, false );
 		list.AddUnique( poo->GetFileName() );
 	}
-
-	// RB: BFG sort
 	list.SortWithTemplate( idSort_PathStr() );
-	// RB end
 
 	for( i = 0; i < list.Num(); i++ )
 	{
@@ -544,11 +538,7 @@ void CDialogSound::AddSounds( bool rootItems )
 				list2.Append( poo->GetName() );
 			}
 		}
-
-		// RB: BFG sort
 		list2.SortWithTemplate( idSort_PathStr() );
-		// RB end
-
 		for( j = 0; j < list2.Num(); j++ )
 		{
 			HTREEITEM child2 = treeSounds.InsertItem( list2[j], child );
@@ -602,11 +592,7 @@ void CDialogSound::AddInUseSounds()
 			}
 		}
 	}
-
-	// RB: BFG sort
 	list2.SortWithTemplate( idSort_PathStr() );
-	// RB end
-
 	count = list2.Num();
 	for( i = 0; i < count; i++ )
 	{
@@ -720,7 +706,6 @@ void CDialogSound::SetWaveSize( const char* p )
 
 void CDialogSound::OnSelchangedTreeSounds( NMHDR* pNMHDR, LRESULT* pResult )
 {
-	NM_TREEVIEW* pNMTreeView = ( NM_TREEVIEW* )pNMHDR;
 	HTREEITEM	item = treeSounds.GetSelectedItem();
 	SetWaveSize();
 	if( item )

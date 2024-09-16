@@ -1147,6 +1147,23 @@ bool idInterpreter::Execute()
 		// next statement
 		st = &gameLocal.program.GetStatement( instructionPointer );
 
+		if( gameLocal.editors & EDITOR_DEBUGGER )
+		{
+			common->DebuggerCheckBreakpoint( this, &gameLocal.program, instructionPointer );
+		}
+		else if( g_debugScript.GetBool( ) )
+		{
+			static int lastLineNumber = -1;
+			if( lastLineNumber != gameLocal.program.GetStatement( instructionPointer ).linenumber )
+			{
+				gameLocal.Printf( "%s (%d)\n",
+								  gameLocal.program.GetFilename( gameLocal.program.GetStatement( instructionPointer ).file ),
+								  gameLocal.program.GetStatement( instructionPointer ).linenumber
+								);
+				lastLineNumber = gameLocal.program.GetStatement( instructionPointer ).linenumber;
+			}
+		}
+
 		switch( st->op )
 		{
 			case OP_RETURN:
@@ -2092,4 +2109,144 @@ bool idInterpreter::Execute()
 	}
 
 	return threadDying;
+}
+
+/*
+====================
+idGameEdit::CheckForBreakPointHit
+====================
+*/
+bool idGameEdit::CheckForBreakPointHit( const idInterpreter* interpreter, const function_t* function1, const function_t* function2, int depth ) const
+{
+	return ( ( interpreter->GetCurrentFunction( ) == function1 ||
+			   interpreter->GetCurrentFunction( ) == function2 ) &&
+			 ( interpreter->GetCallstackDepth( )  <= depth ) );
+}
+
+/*
+====================
+idGameEdit::ReturnedFromFunction
+====================
+*/
+bool idGameEdit::ReturnedFromFunction( const idProgram* program, const idInterpreter* interpreter, int index ) const
+{
+
+	return ( const_cast<idProgram*>( program )->GetStatement( index ).op == OP_RETURN && interpreter->GetCallstackDepth( ) <= 1 );
+}
+
+/*
+====================
+idGameEdit::GetRegisterValue
+====================
+*/
+bool idGameEdit::GetRegisterValue( const idInterpreter* interpreter, const char* name, idStr& out, int scopeDepth ) const
+{
+	return const_cast<idInterpreter*>( interpreter )->GetRegisterValue( name, out, scopeDepth );
+}
+
+/*
+====================
+idGameEdit::GetThread
+====================
+*/
+const idThread* idGameEdit::GetThread( const idInterpreter* interpreter ) const
+{
+	return interpreter->GetThread();
+}
+
+/*
+====================
+idGameEdit::MSG_WriteCallstackFunc
+====================
+*/
+void idGameEdit::MSG_WriteCallstackFunc( idBitMsg* msg, const prstack_t* stack, const idProgram* program, int instructionPtr )
+{
+	const statement_t*	st;
+	const function_t*	func;
+
+	func  = stack->f;
+
+	// If the function is unknown then just fill in with default data.
+	if( !func )
+	{
+		msg->WriteString( "<UNKNOWN>" );
+		msg->WriteString( "<UNKNOWN>" );
+		msg->WriteInt( 0 );
+		return;
+	}
+	else
+	{
+		msg->WriteString( va( "%s(  )", func->Name() ) );
+	}
+
+	if( stack->s == -1 ) //this is a fake stack created by debugger, use intruction pointer for retrieval.
+	{
+		st = &const_cast<idProgram*>( program )->GetStatement( instructionPtr );
+	}
+	else // Use the calling statement as the filename and linenumber where the call was made from
+	{
+		st = &const_cast<idProgram*>( program )->GetStatement( stack->s );
+	}
+
+	if( st )
+	{
+		idStr qpath = const_cast<idProgram*>( program )->GetFilename( st->file );
+		if( idStr::FindChar( qpath, ':' ) != -1 )
+		{
+			qpath = fileSystem->OSPathToRelativePath( qpath.c_str() );
+		}
+		qpath.BackSlashesToSlashes( );
+		msg->WriteString( qpath );
+		msg->WriteInt( st->linenumber );
+	}
+	else
+	{
+		msg->WriteString( "<UNKNOWN>" );
+		msg->WriteInt( 0 );
+	}
+}
+
+/*
+====================
+idGameEdit::MSG_WriteInterpreterInfo
+====================
+*/
+void idGameEdit::MSG_WriteInterpreterInfo( idBitMsg* msg, const idInterpreter* interpreter, const idProgram* program, int instructionPtr )
+{
+	int			i;
+	prstack_s	temp;
+
+	msg->WriteShort( ( int )interpreter->GetCallstackDepth( ) );
+
+	// write out the current function
+	temp.f = interpreter->GetCurrentFunction( );
+	temp.s = -1;
+	temp.stackbase = 0;
+	MSG_WriteCallstackFunc( msg, &temp, program, instructionPtr );
+
+	// Run through all of the callstack and write each to the msg
+	for( i = interpreter->GetCallstackDepth() - 1; i > 0; i-- )
+	{
+		MSG_WriteCallstackFunc( msg, interpreter->GetCallstack( ) + i, program, instructionPtr );
+	}
+}
+
+/*
+====================
+idGameEdit::GetInterpreterCallStackDepth
+====================
+*/
+int idGameEdit::GetInterpreterCallStackDepth( const idInterpreter* interpreter )
+{
+	return interpreter->GetCallstackDepth();
+}
+
+/*
+====================
+idGameEdit::GetInterpreterCallStackFunction
+====================
+*/
+const function_t* idGameEdit::GetInterpreterCallStackFunction( const idInterpreter* interpreter, int stackDepth/* = -1*/ )
+{
+	return interpreter->GetCallstack( )[ stackDepth > -1 ? stackDepth : interpreter->GetCallstackDepth( ) ].f;
 }

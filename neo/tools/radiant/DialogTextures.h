@@ -25,39 +25,33 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
-#ifndef __DIALOGTEXTURES_H
-#define __DIALOGTEXTURES_H
 
-// DialogTextures.h : header file
-//
+#pragma once
 
-#include <afxtempl.h>
-#include "GLWidget.h"
+#include "../common/GLWidget.h"
 
-/////////////////////////////////////////////////////////////////////////////
 // CDialogTextures dialog
 
-class CDialogTextures : public CDialog
+class CDialogTextures : public CDialogEx
 {
 // Construction
 public:
 	enum { NONE, TEXTURES, MATERIALS, MODELS, SCRIPTS, SOUNDS, SOUNDPARENT, GUIS, PARTICLES, FX, NUMIDS };
 	static const char* TypeNames[NUMIDS];
-	CDialogTextures( CWnd* pParent = NULL ); // standard constructor
+	CDialogTextures( CWnd* pParent = NULL );   // standard constructor
 	void OnCancel();
 	void CollapseEditor();
 	void SelectCurrentItem( bool collapse, const char* name, int id );
-// Dialog Data
-	//{{AFX_DATA(CDialogTextures)
+
 	enum { IDD = IDD_DIALOG_TEXTURELIST };
 	CButton	m_chkHideRoot;
 	CButton	m_btnRefresh;
 	CButton	m_btnLoad;
 	idGLWidget m_wndPreview;
+	CImageList m_treeimageList;
+	CBitmap m_treebitmap;
 	CTreeCtrl	m_treeTextures;
-	//}}AFX_DATA
 
-	CImageList m_image;
 	idGLDrawable m_testDrawable;
 	idGLDrawableMaterial m_drawMaterial;
 	idGLDrawableModel m_drawModel;
@@ -69,15 +63,10 @@ public:
 	bool ignoreCollapse;
 	int mode;
 
-// Overrides
-	// ClassWizard generated virtual function overrides
-	//{{AFX_VIRTUAL(CDialogTextures)
 protected:
-	virtual void DoDataExchange( CDataExchange* pDX );  // DDX/DDV support
+	virtual void DoDataExchange( CDataExchange* pDX );    // DDX/DDV support
 	virtual BOOL PreCreateWindow( CREATESTRUCT& cs );
-	//}}AFX_VIRTUAL
 
-// Implementation
 protected:
 	void addStrList( const char* root, const idStrList& list, int id );
 	void addScripts( bool rootItems );
@@ -85,14 +74,14 @@ protected:
 	void addMaterials( bool rootItems );
 	void addSounds( bool rootItems );
 	void addGuis( bool rootItems );
+	void addFXs( bool rootItems );
 	void addParticles( bool rootItems );
 	void BuildTree();
 	void CollapseChildren( HTREEITEM parent );
 	const char* buildItemName( HTREEITEM item, const char* rootName );
 	bool loadTree( HTREEITEM item, const idStr& name, CWaitDlg* dlg );
 	HTREEITEM findItem( const char* name, HTREEITEM item, HTREEITEM* foundItem );
-	// Generated message map functions
-	//{{AFX_MSG(CDialogTextures)
+
 	virtual void OnOK();
 	virtual BOOL OnInitDialog();
 	afx_msg void OnLoad();
@@ -106,7 +95,7 @@ protected:
 	afx_msg int OnCreate( LPCREATESTRUCT lpCreateStruct );
 	afx_msg void OnSize( UINT nType, int cx, int cy );
 	afx_msg void OnCheckHideroot();
-	//}}AFX_MSG
+
 	DECLARE_MESSAGE_MAP()
 
 	idHashTable<HTREEITEM>	quickTree;
@@ -117,8 +106,3 @@ public:
 	afx_msg void OnSetFocus( CWnd* pOldWnd );
 	afx_msg void OnNMRclickTreeTextures( NMHDR* pNMHDR, LRESULT* pResult );
 };
-
-//{{AFX_INSERT_LOCATION}}
-// Microsoft Developer Studio will insert additional declarations immediately before the previous line.
-
-#endif // !defined(AFX_DIALOGTEXTURES_H__F3F3F984_E47E_11D1_B61B_00AA00A410FC__INCLUDED_)

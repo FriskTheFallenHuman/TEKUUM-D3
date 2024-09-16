@@ -29,8 +29,9 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/rc/guied_resource.h"
-#include "../../renderer/tr_local.h"
+
+#include "../../sys/win32/rc/resource.h"
+#include "../../renderer/RenderCommon.h"
 
 #include "GEApp.h"
 #include "GEViewer.h"
@@ -125,7 +126,8 @@ bool rvGEViewer::OpenFile( const char* filename )
 	tempfile.StripPath();
 	tempfile.StripFileExtension( );
 	tempfile = va( "guis/temp.guied", tempfile.c_str() );
-	ospath = fileSystem->RelativePathToOSPath( tempfile, "fs_basepath" );
+	//ospath = fileSystem->RelativePathToOSPath ( tempfile, "fs_basepath" ); DG: change from SteelStorm2
+	ospath = fileSystem->RelativePathToOSPath( tempfile, "fs_savepath" );
 
 	// Make sure the gui directory exists
 	idStr createDir = ospath;
@@ -183,7 +185,7 @@ static int MapKey( int key )
 		is_extended = false;
 	}
 
-	const unsigned char* scanToKey = Sys_GetScanTable();
+	const unsigned char* scanToKey = Win_GetScanTable();
 	result = scanToKey[modified];
 
 	// common->Printf( "Key: 0x%08x Modified: 0x%02x Extended: %s Result: 0x%02x\n", key, modified, (is_extended?"Y":"N"), result);
@@ -193,7 +195,7 @@ static int MapKey( int key )
 		switch( result )
 		{
 			case K_PAUSE:
-				return K_KP_NUMLOCK;
+				return K_NUMLOCK;
 			case 0x0D:
 				return K_KP_ENTER;
 			case 0x2F:
@@ -207,25 +209,25 @@ static int MapKey( int key )
 		switch( result )
 		{
 			case K_HOME:
-				return K_KP_HOME;
+				return K_KP_7;
 			case K_UPARROW:
-				return K_KP_UPARROW;
+				return K_KP_8;
 			case K_PGUP:
-				return K_KP_PGUP;
+				return K_KP_9;
 			case K_LEFTARROW:
-				return K_KP_LEFTARROW;
+				return K_KP_4;
 			case K_RIGHTARROW:
-				return K_KP_RIGHTARROW;
+				return K_KP_6;
 			case K_END:
-				return K_KP_END;
+				return K_KP_1;
 			case K_DOWNARROW:
-				return K_KP_DOWNARROW;
+				return K_KP_2;
 			case K_PGDN:
-				return K_KP_PGDN;
+				return K_KP_3;
 			case K_INS:
-				return K_KP_INS;
+				return K_KP_0;
 			case K_DEL:
-				return K_KP_DEL;
+				return K_KP_DOT;
 		}
 	}
 
@@ -234,7 +236,7 @@ static int MapKey( int key )
 
 LRESULT CALLBACK rvGEViewer::WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam )
 {
-	rvGEViewer* viewer = ( rvGEViewer* ) GetWindowLong( hwnd, GWL_USERDATA );
+	rvGEViewer* viewer = ( rvGEViewer* ) GetWindowLongPtr( hwnd, GWLP_USERDATA );
 
 	switch( msg )
 	{
@@ -370,7 +372,7 @@ LRESULT CALLBACK rvGEViewer::WndProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM
 		case WM_CREATE:
 		{
 			CREATESTRUCT* cs = ( CREATESTRUCT* ) lParam;
-			SetWindowLong( hwnd, GWL_USERDATA, ( LONG )cs->lpCreateParams );
+			SetWindowLongPtr( hwnd, GWLP_USERDATA, ( LONG_PTR )cs->lpCreateParams );
 
 			viewer = ( rvGEViewer* )cs->lpCreateParams;
 			viewer->mWnd = hwnd;
@@ -478,14 +480,11 @@ bool rvGEViewer::SetupPixelFormat()
 
 void rvGEViewer::Render( HDC dc )
 {
-	int	frontEnd;
-	int	backEnd;
-
 	// Switch GL contexts to our dc
 	if( !wglMakeCurrent( dc, win32.hGLRC ) )
 	{
 		common->Printf( "ERROR: wglMakeCurrent failed.. Error:%i\n", glGetError() );
-		common->Printf( "Please restart Q3Radiant if the Map view is not working\n" );
+		common->Printf( "Please restart " EDITOR_WINDOWTEXT " if the Map view is not working\n" );
 		return;
 	}
 
@@ -519,13 +518,19 @@ void rvGEViewer::Render( HDC dc )
 
 	if( mInterface )
 	{
+		int oldNativeScreenWidth = glConfig.nativeScreenWidth;
+		int oldNativeScreenHeight = glConfig.nativeScreenHeight;
+
+		glConfig.nativeScreenWidth = mWindowWidth;
+		glConfig.nativeScreenHeight = mWindowHeight - mToolbarHeight;
+
 		viewDef_t viewDef;
 		memset( &viewDef, 0, sizeof( viewDef ) );
 		tr.viewDef = &viewDef;
-		viewDef.renderView.x = 0;
-		viewDef.renderView.y = mToolbarHeight;
-		viewDef.renderView.width = mWindowWidth;
-		viewDef.renderView.height = mWindowHeight - mToolbarHeight;
+		//viewDef.renderView.x = 0;
+		//viewDef.renderView.y = mToolbarHeight;
+		//viewDef.renderView.width = mWindowWidth;
+		//viewDef.renderView.height = mWindowHeight - mToolbarHeight;
 		viewDef.scissor.x1 = 0;
 		viewDef.scissor.y1 = 0; // (rToolbar.bottom-rToolbar.top);
 		viewDef.scissor.x2 = mWindowWidth;
@@ -533,13 +538,14 @@ void rvGEViewer::Render( HDC dc )
 		viewDef.isEditor = true;
 
 		// Prepare the renderSystem view to draw the GUI in
-		renderSystem->BeginFrame( mWindowWidth, mWindowHeight );
+		//renderSystem->BeginFrame( mWindowWidth, mWindowHeight );
 
 		// Draw the gui
-		mInterface->Redraw( mTime );
+		mInterface->Redraw( mTime, false );
 
 		// We are done using the renderSystem now
-		renderSystem->EndFrame( &frontEnd, &backEnd );
+		const emptyCommand_t* cmd = renderSystem->SwapCommandBuffers( NULL, NULL, NULL, NULL, NULL, NULL );
+		renderSystem->RenderCommandBuffers( cmd );
 	}
 
 	glFinish( );

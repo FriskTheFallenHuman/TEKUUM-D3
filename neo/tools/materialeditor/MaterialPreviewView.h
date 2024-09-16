@@ -28,7 +28,7 @@ If you have questions concerning this license or the applicable additional terms
 #pragma once
 
 #include "MaterialView.h"
-#include "../radiant/GLWidget.h"
+#include "../common/GLWidget.h"
 
 
 class idGLDrawableView : public idGLDrawable
@@ -148,4 +148,3 @@ public:
 	afx_msg int OnCreate( LPCREATESTRUCT lpCreateStruct );
 	afx_msg void OnSize( UINT nType, int cx, int cy );
 };
-

@@ -25,53 +25,34 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
-#if !defined(NEWTEXWND_H)
-#define NEWTEXWND_H
 
-#if _MSC_VER >= 1000
-	#pragma once
-#endif // _MSC_VER >= 1000
-// TexWnd.h : header file
-//
-#include "../../renderer/tr_local.h"
-//#include "texwnd.h"
+#pragma once
 
-/////////////////////////////////////////////////////////////////////////////
+#include "../../renderer/RenderCommon.h"
+
 // CTexWnd window
 
 class CNewTexWnd : public CWnd
 {
 	DECLARE_DYNCREATE( CNewTexWnd );
-// Construction
+
 public:
 	CNewTexWnd();
 	void UpdateFilter( const char* pFilter );
 	void UpdatePrefs();
 	void FocusEdit();
 
-// Attributes
-public:
-
-// Operations
-public:
-
-// Overrides
-	// ClassWizard generated virtual function overrides
-	//{{AFX_VIRTUAL(CNewTexWnd)
 public:
 	virtual BOOL DestroyWindow();
 	virtual BOOL Create( LPCTSTR lpszClassName, LPCTSTR lpszWindowName, DWORD dwStyle, const RECT& rect, CWnd* pParentWnd, UINT nID, CCreateContext* pContext = NULL );
 protected:
 	virtual BOOL PreCreateWindow( CREATESTRUCT& cs );
-	//}}AFX_VIRTUAL
 
-// Implementation
 public:
 	void EnsureTextureIsVisible( const char* name );
-	void LoadMaterials();
 	virtual ~CNewTexWnd();
 	BOOL OnToolTipNotify( UINT id, NMHDR* pNMHDR, LRESULT* pResult );
-	int CNewTexWnd::OnToolHitTest( CPoint point, TOOLINFO* pTI );
+	INT_PTR CNewTexWnd::OnToolHitTest( CPoint point, TOOLINFO* pTI );
 	virtual BOOL PreTranslateMessage( MSG* pMsg );
 
 protected:
@@ -95,7 +76,7 @@ protected:
 	const idMaterial* NextPos();
 	const idMaterial* getMaterialAtPoint( CPoint point );
 	void InitPos();
-	//{{AFX_MSG(CNewTexWnd)
+
 	afx_msg int OnCreate( LPCREATESTRUCT lpCreateStruct );
 	afx_msg void OnSize( UINT nType, int cx, int cy );
 	afx_msg void OnParentNotify( UINT message, LPARAM lParam );
@@ -111,16 +92,9 @@ protected:
 	afx_msg void OnRButtonUp( UINT nFlags, CPoint point );
 	afx_msg void OnMouseMove( UINT nFlags, CPoint point );
 	afx_msg BOOL OnMouseWheel( UINT nFlags, short zDelta, CPoint pt );
-	//}}AFX_MSG
 	afx_msg void OnShaderClick();
+
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnSetFocus( CWnd* pOldWnd );
 };
-
-/////////////////////////////////////////////////////////////////////////////
-
-//{{AFX_INSERT_LOCATION}}
-// Microsoft Developer Studio will insert additional declarations immediately before the previous line.
-
-#endif // !defined(NEWTEXWND_H)

@@ -62,23 +62,10 @@ idCVar com_purgeAll( "com_purgeAll", "0", CVAR_BOOL | CVAR_ARCHIVE | CVAR_SYSTEM
 idCVar com_memoryMarker( "com_memoryMarker", "-1", CVAR_INTEGER | CVAR_SYSTEM | CVAR_INIT, "used as a marker for memory stats" );
 idCVar com_preciseTic( "com_preciseTic", "1", CVAR_BOOL | CVAR_SYSTEM, "run one game tick every async thread update" );
 idCVar com_asyncInput( "com_asyncInput", "0", CVAR_BOOL | CVAR_SYSTEM, "sample input from the async thread" );
-#define ASYNCSOUND_INFO "0: mix sound inline, 1: memory mapped async mix, 2: callback mixing, 3: write async mix"
-#if defined( MACOS_X )
-	idCVar com_asyncSound( "com_asyncSound", "2", CVAR_INTEGER | CVAR_SYSTEM | CVAR_ROM, ASYNCSOUND_INFO );
-#elif defined(__ANDROID__)
-	idCVar com_asyncSound( "com_asyncSound", "3", CVAR_INTEGER | CVAR_SYSTEM | CVAR_ROM, ASYNCSOUND_INFO );
-#elif defined( __linux__ )
-	idCVar com_asyncSound( "com_asyncSound", "3", CVAR_INTEGER | CVAR_SYSTEM | CVAR_ROM, ASYNCSOUND_INFO );
-#else
-	idCVar com_asyncSound( "com_asyncSound", "1", CVAR_INTEGER | CVAR_SYSTEM, ASYNCSOUND_INFO, 0, 1 );
-#endif
+#define ASYNCSOUND_INFO "0: mix sound inline, 1 or 3: async update every 16ms 2: async update about every 100ms (original behavior)"
+idCVar com_asyncSound( "com_asyncSound", "1", CVAR_INTEGER | CVAR_SYSTEM, ASYNCSOUND_INFO, 0, 3 );
 idCVar com_forceGenericSIMD( "com_forceGenericSIMD", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "force generic platform independent SIMD" );
-#if defined(__ANDROID__)
-	idCVar com_developer( "developer", "1", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "developer mode" );
-#else
-	idCVar com_developer( "developer", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "developer mode" );
-#endif
-
+idCVar com_developer( "developer", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "developer mode" );
 idCVar com_allowConsole( "com_allowConsole", "1", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "allow toggling console with the tilde key" );
 idCVar com_speeds( "com_speeds", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "show engine timings" );
 idCVar com_showFPS( "com_showFPS", "0", CVAR_INTEGER | CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_NOCHEAT, "show frames rendered per second. 0: off 1: default bfg values, 2: only show FPS (classic view)" );
@@ -88,7 +75,9 @@ idCVar com_showSoundDecoders( "com_showSoundDecoders", "0", CVAR_BOOL | CVAR_SYS
 idCVar com_timescale( "timescale", "1", CVAR_SYSTEM | CVAR_FLOAT, "scales the time", 0.1f, 10.0f );
 idCVar com_makingBuild( "com_makingBuild", "0", CVAR_BOOL | CVAR_SYSTEM, "1 when making a build" );
 idCVar com_updateLoadSize( "com_updateLoadSize", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "update the load size after loading a map" );
-
+idCVar com_enableDebuggerServer( "com_enableDebuggerServer", "0", CVAR_BOOL | CVAR_SYSTEM, "toggle debugger server and try to connect to com_dbgClientAdr" );
+idCVar com_dbgClientAdr( "com_dbgClientAdr", "localhost", CVAR_SYSTEM | CVAR_ARCHIVE, "debuggerApp client address" );
+idCVar com_dbgServerAdr( "com_dbgServerAdr", "localhost", CVAR_SYSTEM | CVAR_ARCHIVE, "debugger server address" );
 idCVar com_productionMode( "com_productionMode", "0", CVAR_SYSTEM | CVAR_BOOL, "0 - no special behavior, 1 - building a production build, 2 - running a production build" );
 
 // com_speeds times
@@ -598,13 +587,7 @@ static void Com_ScriptDebugger_f( const idCmdArgs& args )
 	// Make sure it wasnt on the command line
 	if( !( com_editors & EDITOR_DEBUGGER ) )
 	{
-// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
 		DebuggerClientLaunch();
-#else
-		common->Printf( "Script debugger is currently disabled\n" );
-#endif
-// RB end
 	}
 }
 
@@ -1288,12 +1271,12 @@ void idCommonLocal::InitCommands()
 	cmdSystem->AddCommand( "editAFs", Com_EditAFs_f, CMD_FL_TOOL, "launches the in-game Articulated Figure Editor" );
 	cmdSystem->AddCommand( "editParticles", Com_EditParticles_f, CMD_FL_TOOL, "launches the in-game Particle Editor" );
 	cmdSystem->AddCommand( "editScripts", Com_EditScripts_f, CMD_FL_TOOL, "launches the in-game Script Editor" );
-	//cmdSystem->AddCommand( "editGUIs", Com_EditGUIs_f, CMD_FL_TOOL, "launches the GUI Editor" );
+	cmdSystem->AddCommand( "editGUIs", Com_EditGUIs_f, CMD_FL_TOOL, "launches the GUI Editor" );
 	cmdSystem->AddCommand( "editPDAs", Com_EditPDAs_f, CMD_FL_TOOL, "launches the in-game PDA Editor" );
 	cmdSystem->AddCommand( "debugger", Com_ScriptDebugger_f, CMD_FL_TOOL, "launches the Script Debugger" );
 
 	//BSM Nerve: Add support for the material editor
-	//cmdSystem->AddCommand( "materialEditor", Com_MaterialEditor_f, CMD_FL_TOOL, "launches the Material Editor" );
+	cmdSystem->AddCommand( "materialEditor", Com_MaterialEditor_f, CMD_FL_TOOL, "launches the Material Editor" );
 #endif
 
 	cmdSystem->AddCommand( "generateMaterialTables", Com_GenerateSinCosTables_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "generates tables required by the engine to run" );
@@ -1423,6 +1406,20 @@ void idCommonLocal::Frame()
 		{
 			InitSIMD();
 		}
+
+#ifdef ID_ALLOW_TOOLS
+		if( com_enableDebuggerServer.IsModified() )
+		{
+			if( com_enableDebuggerServer.GetBool() )
+			{
+				DebuggerServerInit();
+			}
+			else
+			{
+				DebuggerServerShutdown();
+			}
+		}
+#endif
 
 		eventLoop->RunEventLoop();
 
@@ -2089,17 +2086,18 @@ void idCommonLocal::InitGame()
 	// initialize the user interfaces
 	uiManager->Init();
 
-	// startup the script debugger
-	// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
-	DebuggerServerInit();
-#endif
-	// RB end
-
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04350" ) );
 
 	// load the game dll
 	LoadGameDLL();
+
+#ifdef ID_ALLOW_TOOLS
+	// startup the script debugger
+	if( com_enableDebuggerServer.GetBool() )
+	{
+		DebuggerServerInit();
+	}
+#endif
 
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04351" ) );
 
@@ -2140,12 +2138,13 @@ void idCommonLocal::ShutdownGame( bool reloading )
 		sw->StopAllSounds();
 	}
 
-	// shutdown the script debugger
-	// RB begin
-#if 0 //defined(USE_MFC_TOOLS)
-	DebuggerServerShutdown();
+#ifdef ID_ALLOW_TOOLS
+	// startup the script debugger
+	if( com_enableDebuggerServer.GetBool() )
+	{
+		DebuggerServerInit();
+	}
 #endif
-	// RB end
 
 	idAsyncNetwork::client.Shutdown();
 
@@ -2189,4 +2188,19 @@ void idCommonLocal::ShutdownGame( bool reloading )
 
 	// shut down the file system
 	fileSystem->Shutdown( reloading );
+}
+
+/*
+=================
+idCommonLocal::DebuggerCheckBreakpoint
+=================
+*/
+void idCommonLocal::DebuggerCheckBreakpoint( idInterpreter* interpreter, idProgram* program, int instructionPointer )
+{
+#ifdef ID_ALLOW_TOOLS
+	if( com_enableDebuggerServer.GetBool() )
+	{
+		DebuggerServerCheckBreakpoint( interpreter, program, instructionPointer );
+	}
+#endif
 }

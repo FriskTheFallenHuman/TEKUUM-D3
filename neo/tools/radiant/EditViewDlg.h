@@ -31,13 +31,14 @@ If you have questions concerning this license or the applicable additional terms
 
 // CEditViewDlg dialog
 
-class CEditViewDlg : public CDialog
+class CEditViewDlg : public CDialogEx
 {
+
 	DECLARE_DYNAMIC( CEditViewDlg )
 
 public:
-	enum {MATERIALS, GUIS};
-	CEditViewDlg( CWnd* pParent = NULL ); // standard constructor
+	enum { MATERIALS, GUIS };
+	CEditViewDlg( CWnd* pParent = nullptr );   // standard constructor
 	virtual ~CEditViewDlg();
 
 	void SetMode( int _mode )
@@ -49,8 +50,7 @@ public:
 	void SetGuiInfo( const char* name );
 	void UpdateEditPreview();
 
-	void OpenMedia( const char* name );
-// Dialog Data
+	// Dialog Data
 	enum { IDD = IDD_DIALOG_EDITVIEW };
 
 protected:
@@ -66,18 +66,18 @@ protected:
 
 	void ShowFindDlg();
 
-	virtual void DoDataExchange( CDataExchange* pDX );  // DDX/DDV support
+	virtual void DoDataExchange( CDataExchange* pDX ) override;    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
+
 public:
 	afx_msg void OnSize( UINT nType, int cx, int cy );
 	afx_msg void OnBnClickedButtonOpen();
 	afx_msg void OnBnClickedButtonSave();
-	virtual BOOL OnInitDialog();
+	virtual BOOL OnInitDialog() override;
 	afx_msg void OnDestroy();
-	afx_msg void OnTimer( UINT nIDEvent );
+	afx_msg void OnTimer( UINT_PTR nIDEvent );
 	afx_msg void OnBnClickedButtonGoto();
-	virtual BOOL PreTranslateMessage( MSG* pMsg );
+	virtual BOOL PreTranslateMessage( MSG* pMsg ) override;
 	afx_msg LRESULT OnFindDialogMessage( WPARAM wParam, LPARAM lParam );
-
 };

@@ -198,7 +198,6 @@ void MaterialPreviewView::OnShowLightsChange( bool showLights )
  */
 
 extern bool		Sys_KeyDown( int key );
-extern float	fDiff( float f1, float f2 );
 
 idGLDrawableView::idGLDrawableView()
 {
@@ -550,8 +549,8 @@ void idGLDrawableView::drawLights( renderView_t* refdef )
 		lColor.w = 1.f;
 
 		idSphere sphere( vLight->renderLight.origin, 4 );
-		session->rw->DebugSphere( lColor, sphere, 0, true );
-		session->rw->DrawText( va( "%d", i + 1 ), vLight->renderLight.origin + idVec3( 0, 0, 5 ), 0.25f, idVec4( 1, 1, 0, 1 ), refdef->viewaxis, 1, 0, true );
+		session->RW()->DebugSphere( lColor, sphere, 0, true );
+		session->RW()->DrawText( va( "%d", i + 1 ), vLight->renderLight.origin + idVec3( 0, 0, 5 ), 0.25f, idVec4( 1, 1, 0, 1 ), refdef->viewaxis, 1, 0, true );
 	}
 }
 
@@ -572,8 +571,11 @@ void idGLDrawableView::draw( int x, int y, int w, int h )
 
 		UpdateLights();
 
-		// render it
-		renderSystem->BeginFrame( w, h );
+		int oldNativeScreenWidth = glConfig.nativeScreenWidth;
+		int oldNativeScreenHeight = glConfig.nativeScreenHeight;
+
+		glConfig.nativeScreenWidth = w;
+		glConfig.nativeScreenHeight = h;
 
 		memset( &refdef, 0, sizeof( refdef ) );
 
@@ -585,12 +587,14 @@ void idGLDrawableView::draw( int x, int y, int w, int h )
 			refdef.shaderParms[ i ] = globalParms[ i ];
 		}
 
-		refdef.width = SCREEN_WIDTH;
-		refdef.height = SCREEN_HEIGHT;
+		//refdef.width = SCREEN_WIDTH;
+		//refdef.height = SCREEN_HEIGHT;
 		refdef.fov_x = 90;
 		refdef.fov_y = 2 * atan( ( float )h / w ) * idMath::M_RAD2DEG;
 
-		refdef.time = eventLoop->Milliseconds();
+		refdef.time[0] = eventLoop->Milliseconds();
+
+		world->GenerateAllInteractions();
 
 		world->RenderScene( &refdef );
 
@@ -599,9 +603,13 @@ void idGLDrawableView::draw( int x, int y, int w, int h )
 			drawLights( &refdef );
 		}
 
-		renderSystem->EndFrame( NULL, NULL );
+		const emptyCommand_t* cmd = renderSystem->SwapCommandBuffers( NULL, NULL, NULL, NULL, NULL, NULL );
+		renderSystem->RenderCommandBuffers( cmd );
 
-		world->DebugClearLines( refdef.time );
+		glConfig.nativeScreenWidth = oldNativeScreenWidth;
+		glConfig.nativeScreenHeight = oldNativeScreenHeight;
+
+		world->DebugClearLines( refdef.time[0] );
 
 		glMatrixMode( GL_MODELVIEW );
 		glLoadIdentity();
@@ -750,4 +758,3 @@ void idGLDrawableView::setShowLights( bool _showLights )
 {
 	showLights = _showLights;
 }
-

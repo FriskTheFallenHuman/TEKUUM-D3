@@ -29,8 +29,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-#include "../../sys/win32/rc/Common_resource.h"
-#include "../../sys/win32/rc/DeclEditor_resource.h"
+#if 0 // TODO: FIX this. - DG: from SteelStorm2
+#include "../../sys/win32/rc/resource.h"
 
 #include "../comafx/CPathTreeCtrl.h"
 #include "DialogDeclBrowser.h"
@@ -964,3 +964,5 @@ void DialogEntityDefEditor::OnBnClickedDelete()
 		MessageBox( "Cannot delete an inherited value" );
 	}
 }
+#endif
+

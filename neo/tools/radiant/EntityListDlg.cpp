@@ -35,12 +35,10 @@ If you have questions concerning this license or the applicable additional terms
 
 #ifdef _DEBUG
 	#define new DEBUG_NEW
-	#undef THIS_FILE
-	static char THIS_FILE[] = __FILE__;
 #endif
 
 CEntityListDlg g_EntityListDlg;
-/////////////////////////////////////////////////////////////////////////////
+
 // CEntityListDlg dialog
 
 void CEntityListDlg::ShowDialog()
@@ -54,34 +52,27 @@ void CEntityListDlg::ShowDialog()
 
 }
 
-CEntityListDlg::CEntityListDlg( CWnd* pParent /*=NULL*/ )
-	: CDialog( CEntityListDlg::IDD, pParent )
+CEntityListDlg::CEntityListDlg( CWnd* pParent )
+	: CDialogEx( CEntityListDlg::IDD, pParent )
 {
-	//{{AFX_DATA_INIT(CEntityListDlg)
-	//}}AFX_DATA_INIT
 }
 
 
 void CEntityListDlg::DoDataExchange( CDataExchange* pDX )
 {
-	CDialog::DoDataExchange( pDX );
-	//{{AFX_DATA_MAP(CEntityListDlg)
+	CDialogEx::DoDataExchange( pDX );
 	DDX_Control( pDX, IDC_LIST_ENTITY, m_lstEntity );
-	//}}AFX_DATA_MAP
 	DDX_Control( pDX, IDC_LIST_ENTITIES, listEntities );
 }
 
-BEGIN_MESSAGE_MAP( CEntityListDlg, CDialog )
-	//{{AFX_MSG_MAP(CEntityListDlg)
+BEGIN_MESSAGE_MAP( CEntityListDlg, CDialogEx )
 	ON_BN_CLICKED( IDC_SELECT, OnSelect )
 	ON_WM_CLOSE()
 	ON_WM_DESTROY()
-	//}}AFX_MSG_MAP
 	ON_LBN_SELCHANGE( IDC_LIST_ENTITIES, OnLbnSelchangeListEntities )
 	ON_LBN_DBLCLK( IDC_LIST_ENTITIES, OnLbnDblclkListEntities )
 END_MESSAGE_MAP()
 
-/////////////////////////////////////////////////////////////////////////////
 // CEntityListDlg message handlers
 
 void CEntityListDlg::OnSelect()
@@ -89,7 +80,7 @@ void CEntityListDlg::OnSelect()
 	int index = listEntities.GetCurSel();
 	if( index != LB_ERR )
 	{
-		entity_t* ent = reinterpret_cast<entity_t*>( listEntities.GetItemDataPtr( index ) );
+		idEditorEntity* ent = reinterpret_cast<idEditorEntity*>( listEntities.GetItemDataPtr( index ) );
 		if( ent )
 		{
 			Select_Deselect();
@@ -102,7 +93,7 @@ void CEntityListDlg::OnSelect()
 void CEntityListDlg::UpdateList()
 {
 	listEntities.ResetContent();
-	for( entity_t* pEntity = entities.next ; pEntity != &entities ; pEntity = pEntity->next )
+	for( idEditorEntity* pEntity = entities.next ; pEntity != &entities ; pEntity = pEntity->next )
 	{
 		int index = listEntities.AddString( pEntity->epairs.GetString( "name" ) );
 		if( index != LB_ERR )
@@ -127,7 +118,7 @@ void CEntityListDlg::OnCancel()
 
 BOOL CEntityListDlg::OnInitDialog()
 {
-	CDialog::OnInitDialog();
+	CDialogEx::OnInitDialog();
 
 	UpdateList();
 
@@ -138,8 +129,7 @@ BOOL CEntityListDlg::OnInitDialog()
 	m_lstEntity.DeleteColumn( 2 );
 	UpdateData( FALSE );
 
-	return TRUE;  // return TRUE unless you set the focus to a control
-	// EXCEPTION: OCX Property Pages should return FALSE
+	return TRUE;
 }
 
 void CEntityListDlg::OnClose()
@@ -153,14 +143,14 @@ void CEntityListDlg::OnLbnSelchangeListEntities()
 	if( index != LB_ERR )
 	{
 		m_lstEntity.DeleteAllItems();
-		entity_t* pEntity = reinterpret_cast<entity_t*>( listEntities.GetItemDataPtr( index ) );
+		idEditorEntity* pEntity = reinterpret_cast<idEditorEntity*>( listEntities.GetItemDataPtr( index ) );
 		if( pEntity )
 		{
 			int count = pEntity->epairs.GetNumKeyVals();
 			for( int i = 0; i < count; i++ )
 			{
 				int nParent = m_lstEntity.InsertItem( 0, pEntity->epairs.GetKeyVal( i )->GetKey() );
-				m_lstEntity.SetItem( nParent, 1, LVIF_TEXT, pEntity->epairs.GetKeyVal( i )->GetValue(), 0, 0, 0, reinterpret_cast<DWORD>( pEntity ) );
+				m_lstEntity.SetItem( nParent, 1, LVIF_TEXT, pEntity->epairs.GetKeyVal( i )->GetValue(), 0, 0, 0, ( LPARAM )( pEntity ) );
 			}
 		}
 	}

@@ -33,6 +33,36 @@ If you have questions concerning this license or the applicable additional terms
 #include "DialogInfo.h"
 #include "CapDialog.h"
 
+namespace
+{
+const int MIN_PATCH_WIDTH = 3;
+const int MIN_PATCH_HEIGHT = 3;
+
+const int MAX_PATCH_WIDTH = 64;
+const int MAX_PATCH_HEIGHT = 64;
+
+// patch type info
+// type in lower 16 bits, flags in upper
+// endcaps directly follow this patch in the list
+
+// types
+const int PATCH_GENERIC = 0x00000000;    // generic flat patch
+const int PATCH_CYLINDER = 0x00000001;    // cylinder
+const int PATCH_BEVEL = 0x00000002;    // bevel
+const int PATCH_ENDCAP = 0x00000004;    // endcap
+const int PATCH_HEMISPHERE = 0x00000008;    // hemisphere
+const int PATCH_CONE = 0x00000010;    // cone
+const int PATCH_TRIANGLE = 0x00000020;    // simple tri, assumes 3x3 patch
+
+// behaviour styles
+const int PATCH_CAP = 0x00001000;    // flat patch applied as a cap
+const int PATCH_SEAM = 0x00002000;    // flat patch applied as a seam
+const int PATCH_THICK = 0x00004000;    // patch applied as a thick portion
+
+const int PATCH_TYPEMASK = 0x00000fff;    //
+const int PATCH_STYLEMASK = 0xffff0000;    //
+}
+
 // externs
 extern void MemFile_fprintf( CMemFile* pMemFile, const char* pText, ... );
 extern face_t* Face_Alloc();
@@ -61,9 +91,6 @@ patchMesh_t* MakeNewPatch( int width, int height )
 void Patch_AdjustSize( patchMesh_t* p, int wadj, int hadj )
 {
 	idDrawVert*	newverts	= reinterpret_cast< idDrawVert*>( Mem_ClearedAlloc( sizeof( idDrawVert ) * ( p->width + wadj ) * ( p->height + hadj ) ) );
-	int			copyWidth	= ( wadj < 0 ) ? p->width + wadj : p->width;
-	int			copyHeight	= ( hadj < 0 ) ? p->height + hadj : p->height;
-	int			copysize	= copyWidth * copyHeight * sizeof( idDrawVert );
 
 	for( int i = 0; i < p->width; i++ )
 	{
@@ -139,9 +166,7 @@ bool Patch_Intersect( patchMesh_t* pm, idVec3 origin, idVec3 direction, float& s
 		for( j = 0; j < pm->height; j++ )
 		{
 			( cp )[j * cp.GetWidth() + i].xyz = pm->ctrl( i, j ).xyz;
-			// RB begin
 			( cp )[j * cp.GetWidth() + i].SetTexCoord( pm->ctrl( i, j ).GetTexCoord() );
-			// RB end
 		}
 	}
 
@@ -958,10 +983,8 @@ void Patch_MeshNormals( patchMesh_t* in )
 				count = 1;
 				//continue;
 			}
-			// RB begin
 			sum.Normalize();
 			dv->SetNormal( sum );
-			// RB end
 		}
 	}
 }
@@ -1011,7 +1034,7 @@ void Patch_CalcBounds( patchMesh_t* p, idVec3& vMin, idVec3& vMax )
 Brush_RebuildBrush
 ==================
 */
-void Brush_RebuildBrush( brush_t* b, idVec3 vMins, idVec3 vMaxs, bool patch )
+void Brush_RebuildBrush( idEditorBrush* b, idVec3 vMins, idVec3 vMaxs, bool patch )
 {
 	//
 	// Total hack job
@@ -1050,7 +1073,7 @@ void Brush_RebuildBrush( brush_t* b, idVec3 vMins, idVec3 vMaxs, bool patch )
 	{
 		if( vMaxs[i] < vMins[i] )
 		{
-			Error( "Brush_RebuildBrush: backwards" );
+			idLib::Error( "Brush_RebuildBrush: backwards" );
 		}
 	}
 
@@ -1122,7 +1145,7 @@ AddBrushForPatch
 ==================
  adds a patch brush and ties it to this patch id
 */
-brush_t* AddBrushForPatch( patchMesh_t* pm, bool bLinkToWorld )
+idEditorBrush* AddBrushForPatch( patchMesh_t* pm, bool bLinkToWorld )
 {
 	// find the farthest points in x,y,z
 	idVec3	vMin, vMax;
@@ -1139,8 +1162,8 @@ brush_t* AddBrushForPatch( patchMesh_t* pm, bool bLinkToWorld )
 
 	texdef_t	td;
 	//td.SetName(pm->d_texture->getName());
-	brush_t*		b	= Brush_Create( vMin, vMax, &td );
-	//brush_t *b = Brush_Create(vMin, vMax, &g_qeglobals.d_texturewin.texdef);
+	idEditorBrush*		b	= Brush_Create( vMin, vMax, &td );
+	//idEditorBrush *b = Brush_Create(vMin, vMax, &g_qeglobals.d_texturewin.texdef);
 
 	// FIXME: this entire type of linkage needs to be fixed
 	b->pPatch = pm;
@@ -1286,12 +1309,8 @@ void Patch_Naturalize( patchMesh_t* p, bool horz, bool vert, bool alt )
 		{
 			int	r	= ( ( alt ) ? j : i );
 			int	c	= ( ( alt ) ? i : j );
-
-			// RB: BFG idDrawVert
 			p->ctrl( r, c ).SetTexCoord(	( fPWidth / nWidth ) * xAccum / fPWidth,
 											( fPHeight / nHeight ) * yAccum / fPHeight	);
-			// RB end
-
 			if( alt )
 			{
 				yAccum = Patch_WidthDistanceTo( p, j + 1 );
@@ -1364,7 +1383,7 @@ face_t* Patch_GetAxisFace( patchMesh_t* p )
 {
 	face_t*	f	= NULL;
 	idVec3	vTemp;
-	brush_t*	b	= p->pSymbiot;
+	idEditorBrush*	b	= p->pSymbiot;
 
 	for( f = b->brush_faces ; f ; f = f->next )
 	{
@@ -1398,7 +1417,7 @@ int	g_nFaceCycle	= 0;
 
 face_t* nextFace( patchMesh_t* p )
 {
-	brush_t*	b	= p->pSymbiot;
+	idEditorBrush*	b	= p->pSymbiot;
 	face_t*	f	= NULL;
 	int		n	= 0;
 	for( f = b->brush_faces ; f && n <= g_nFaceCycle; f = f->next )
@@ -1443,19 +1462,14 @@ void Patch_CapTexture( patchMesh_t* p, bool bFaceCycle = false, bool alt = false
 		{
 			if( !bFaceCycle )
 			{
-				// RB: BFG idDrawVert
 				VectorCopy( p->ctrl( i, j ).GetNormal(), f->plane );
-				// RB end
 			}
 			idVec5	temp;
 			temp.x = p->ctrl( i, j ).xyz.x;
 			temp.y = p->ctrl( i, j ).xyz.y;
 			temp.z = p->ctrl( i, j ).xyz.z;
 			EmitTextureCoordinates( temp, f->d_texture, f, true );
-
-			// RB: BFG idDrawVert
 			p->ctrl( i, j ).SetTexCoord( temp.s, temp.t );
-			// RB end
 		}
 	}
 
@@ -1480,9 +1494,9 @@ void FillPatch( patchMesh_t* p, idVec3 v )
 	}
 }
 
-brush_t* Cap( patchMesh_t* pParent, bool bByColumn, bool bFirst )
+idEditorBrush* Cap( patchMesh_t* pParent, bool bByColumn, bool bFirst )
 {
-	brush_t*		b;
+	idEditorBrush*		b;
 	patchMesh_t*	p;
 	idVec3		vMin, vMax;
 	int			i, j;
@@ -1595,9 +1609,9 @@ brush_t* Cap( patchMesh_t* pParent, bool bByColumn, bool bFirst )
 	return p->pSymbiot;
 }
 
-brush_t* CapSpecial( patchMesh_t* pParent, int nType, bool bFirst )
+idEditorBrush* CapSpecial( patchMesh_t* pParent, int nType, bool bFirst )
 {
-	brush_t*		b;
+	idEditorBrush*		b;
 	patchMesh_t*	p;
 	idVec3		vMin, vMax, vTemp;
 	int			i, j;
@@ -1623,7 +1637,6 @@ brush_t* CapSpecial( patchMesh_t* pParent, int nType, bool bFirst )
 	vMin[0] = vMin[1] = vMin[2] = 99999;
 	vMax[0] = vMax[1] = vMax[2] = -99999;
 
-	int	nSize	= pParent->width;
 	int	nIndex	= ( bFirst ) ? 0 : pParent->height - 1;
 
 	// parent bounds are used for some things
@@ -1741,8 +1754,8 @@ brush_t* CapSpecial( patchMesh_t* pParent, int nType, bool bFirst )
 void Patch_CapCurrent( bool bInvertedBevel, bool bInvertedEndcap )
 {
 	patchMesh_t*	pParent	= NULL;
-	brush_t*		b[4];
-	brush_t*		pCap		= NULL;
+	idEditorBrush*		b[4];
+	idEditorBrush*		pCap		= NULL;
 	b[0] = b[1] = b[2] = b[3] = NULL;
 	int	nIndex	= 0;
 
@@ -1753,7 +1766,7 @@ void Patch_CapCurrent( bool bInvertedBevel, bool bInvertedEndcap )
 	}
 
 
-	for( brush_t* pb = selected_brushes.next ; pb != NULL && pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != NULL && pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -1823,8 +1836,8 @@ void Patch_CapCurrent( bool bInvertedBevel, bool bInvertedEndcap )
 			eclass_t* pecNew	= Eclass_ForName( "func_static", false );
 			if( pecNew )
 			{
-				entity_t* e	= Entity_Create( pecNew );
-				SetKeyValue( e, "type", "patchCapped" );
+				idEditorEntity* e	= Entity_Create( pecNew );
+				e->SetKeyValue( "type", "patchCapped" );
 			}
 		}
 	}
@@ -1833,10 +1846,10 @@ void Patch_CapCurrent( bool bInvertedBevel, bool bInvertedEndcap )
 
 //FIXME: Table drive all this crap
 //
-void GenerateEndCaps( brush_t* brushParent, bool bBevel, bool bEndcap, bool bInverted )
+void GenerateEndCaps( idEditorBrush* brushParent, bool bBevel, bool bEndcap, bool bInverted )
 {
-	brush_t*		b, *b2;
-	patchMesh_t*	p, *p2, *pParent;
+	idEditorBrush*		b;
+	patchMesh_t*	p, *pParent;
 	idVec3		vTemp, vMin, vMax;
 	int			i, j;
 
@@ -1889,6 +1902,7 @@ void GenerateEndCaps( brush_t* brushParent, bool bBevel, bool bEndcap, bool bInv
 	Select_Brush( p->pSymbiot );
 	return;
 
+#if 0
 	bool	bCreated	= false;
 
 	if( bInverted )
@@ -2073,7 +2087,7 @@ void GenerateEndCaps( brush_t* brushParent, bool bBevel, bool bEndcap, bool bInv
 		Select_Delete();
 	}
 	//Select_Brush(brushParent);
-
+#endif
 }
 
 
@@ -2084,7 +2098,7 @@ BrushToPatchMesh
 */
 void Patch_BrushToMesh( bool bCone, bool bBevel, bool bEndcap, bool bSquare, int nHeight )
 {
-	brush_t*		b;
+	idEditorBrush*		b;
 	patchMesh_t*	p;
 	int			i, j;
 
@@ -2294,7 +2308,7 @@ patchMesh_t* Patch_GenerateGeneric( int width, int height, int orientation, cons
 Patch_GenericMesh
 ==================
 */
-brush_t* Patch_GenericMesh( int width, int height, int orientation, bool bDeleteSource, bool bOverride, patchMesh_t* parent )
+idEditorBrush* Patch_GenericMesh( int width, int height, int orientation, bool bDeleteSource, bool bOverride, patchMesh_t* parent )
 {
 	if( height < 3 || height > 15 || width < 3 || width > 15 )
 	{
@@ -2308,7 +2322,7 @@ brush_t* Patch_GenericMesh( int width, int height, int orientation, bool bDelete
 		return NULL;
 	}
 
-	brush_t*		b	= selected_brushes.next;
+	idEditorBrush*		b	= selected_brushes.next;
 
 	patchMesh_t*	p	= Patch_GenerateGeneric( width, height, orientation, b->mins, b->maxs );
 
@@ -2409,8 +2423,8 @@ AddPoint
 */
 static void AddPoint( patchMesh_t* p, idVec3* v, bool bWeldOrDrill = true )
 {
-	int	nDim1	= ( g_pParentWnd->ActiveXY()->GetViewType() == YZ ) ? 1 : 0;
-	int	nDim2	= ( g_pParentWnd->ActiveXY()->GetViewType() == XY ) ? 1 : 2;
+	int	nDim1	= ( g_pParentWnd->ActiveXY()->GetViewType() == ViewType::YZ ) ? 1 : 0;
+	int	nDim2	= ( g_pParentWnd->ActiveXY()->GetViewType() == ViewType::XY ) ? 1 : 2;
 	g_qeglobals.d_move_points[g_qeglobals.d_num_move_points++] = v;
 	if( ( g_bPatchWeld || g_bPatchDrillDown ) && bWeldOrDrill )
 	{
@@ -2548,7 +2562,7 @@ void AddPatchMovePoint( idVec3 v, bool bMulti, bool bFull )
 		return;
 	}
 
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -2620,7 +2634,7 @@ void Patch_UpdateSelected( idVec3 vMove )
 	}
 
 	//--patchMesh_t* p = &patchMeshes[g_nSelectedPatch];
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -2652,7 +2666,7 @@ void Patch_UpdateSelected( idVec3 vMove )
 
 void Patch_AdjustSubdivisions( float hadj, float vadj )
 {
-	brush_t*	pb;
+	idEditorBrush*	pb;
 	for( pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
@@ -2677,9 +2691,7 @@ DrawPatchMesh
 void DrawPatchMesh( patchMesh_t* pm, bool bPoints, int* list, bool bShade = false )
 {
 	int		i, j;
-
 	bool	bOverlay	= pm->bOverlay;
-	int		nDrawMode	= g_pParentWnd->GetCamera()->Camera().draw_mode;
 
 	// patches use two display lists, one for camera one for xy
 	if( *list <= 0 )
@@ -2786,7 +2798,6 @@ void DrawPatchMesh( patchMesh_t* pm, bool bPoints, int* list, bool bShade = fals
 				float	f;
 				v1 = j * width + i;
 				v2 = v1 + 1;
-				// RB begin
 				if( bShade )
 				{
 					f = ShadeForNormal( ( *cp )[v2].GetNormal() );
@@ -2801,7 +2812,6 @@ void DrawPatchMesh( patchMesh_t* pm, bool bPoints, int* list, bool bShade = fals
 				}
 				glTexCoord2fv( ( *cp )[v1].GetTexCoord().ToFloatPtr() );
 				glVertex3fv( ( *cp )[v1].xyz.ToFloatPtr() );
-				// RB end
 			}
 			glEnd();
 		}
@@ -2809,7 +2819,6 @@ void DrawPatchMesh( patchMesh_t* pm, bool bPoints, int* list, bool bShade = fals
 
 		if( list == &pm->nListSelected )
 		{
-			globalImages->BindNull();
 			glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
 			glColor3f( 1.0f, 1.0f, 1.0f );
 			for( i = 0 ; i < width - 1; i++ )
@@ -3075,7 +3084,6 @@ void Patch_DrawCam( patchMesh_t* pm, bool selected )
 	{
 		glDisable( GL_CULL_FACE );
 		glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
-		globalImages->BindNull();
 		DrawPatchMesh( pm, pm->bSelected, &pm->nListIDCam, true );
 		glEnable( GL_CULL_FACE );
 	}
@@ -3085,21 +3093,11 @@ void Patch_DrawCam( patchMesh_t* pm, bool selected )
 		glCullFace( GL_FRONT );
 		glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 
-		if( nDrawMode == cd_texture || nDrawMode == cd_light )
+		if( nDrawMode == cd_texture )
 		{
-			// RB begin
-			const idImageOpts& opts = pm->d_texture->GetEditorImage()->GetOpts();
-			if( opts.colorFormat == CFM_YCOCG_DXT5 )
-			{
-				renderProgManager.BindShader_TextureYCoCG();
-			}
-			else
-			{
-				renderProgManager.BindShader_Texture();
-			}
-			// RB end
+			renderProgManager.BindShader_Texture();
+			renderProgManager.CommitUniforms( 0 );
 
-			GL_SelectTexture( 0 );
 			pm->d_texture->GetEditorImage()->Bind();
 		}
 
@@ -3115,8 +3113,6 @@ void Patch_DrawCam( patchMesh_t* pm, bool selected )
 		{
 			glDisable( GL_BLEND );
 		}
-
-		globalImages->BindNull();
 
 		if( !selected )
 		{
@@ -3228,7 +3224,7 @@ void Patch_EditPatch()
 	g_qeglobals.d_numpoints = 0;
 	g_qeglobals.d_num_move_points = 0;
 
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -3263,7 +3259,7 @@ void Patch_Deselect()
 	//--g_nSelectedPatch = -1;
 	g_qeglobals.d_select_mode = sel_brush;
 
-	for( brush_t* b = selected_brushes.next ; b != &selected_brushes ; b = b->next )
+	for( idEditorBrush* b = selected_brushes.next ; b != &selected_brushes ; b = b->next )
 	{
 		if( b->pPatch )
 		{
@@ -3682,7 +3678,7 @@ void Patch_DisperseRows()
 	int		i, w, h;
 
 
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -3730,7 +3726,7 @@ void Patch_DisperseColumns()
 	idVec3	vTemp, vTemp2;
 	int		i, w, h;
 
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -3773,7 +3769,7 @@ Patch_AdjustSelected
 void Patch_AdjustSelected( bool bInsert, bool bColumn, bool bFlag )
 {
 	bool	bUpdate	= false;
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -3833,10 +3829,10 @@ void Parse2DMatrix( int y, int x, float* p )
 	GetToken( true ); // )
 }
 
-void Parse3DMatrix( int z, int y, int x, float* p )
+void Parse3DMatrix( int _z, int y, int x, float* p )
 {
 	GetToken( true ); // (
-	for( int i = 0; i < z; i++ )
+	for( int i = 0; i < _z; i++ )
 	{
 		Parse2DMatrix( y, x, p + i * ( x * MAX_PATCH_HEIGHT ) );
 	}
@@ -3844,7 +3840,7 @@ void Parse3DMatrix( int z, int y, int x, float* p )
 }
 
 // parses a patch
-brush_t* Patch_Parse( bool bOld )
+idEditorBrush* Patch_Parse( bool bOld )
 {
 	const idMaterial* tex = declManager->FindMaterial( NULL );
 	GetToken( true );
@@ -3856,110 +3852,87 @@ brush_t* Patch_Parse( bool bOld )
 
 	patchMesh_t*	pm	= NULL;
 
-	if( g_qeglobals.bSurfacePropertiesPlugin )
-	{
-		assert( true );
-		//GETPLUGINTEXDEF(pm)->ParsePatchTexdef();
-	}
-	else
-	{
-		// texture def
-		GetToken( true );
+	// texture def
+	GetToken( true );
 
-		// band-aid
-		if( strcmp( token, "(" ) )
+	// band-aid
+	if( strcmp( token, "(" ) )
+	{
+		if( g_qeglobals.mapVersion < 2.0f )
 		{
-			if( g_qeglobals.mapVersion < 2.0f )
-			{
-				tex = Texture_ForName( va( "textures/%s", token ) );
-			}
-			else
-			{
-				tex = Texture_ForName( token );
-			}
-			GetToken( true );
+			tex = Texture_ForName( va( "textures/%s", token ) );
 		}
 		else
 		{
-			common->Printf( "Warning: Patch read with no texture, using notexture... \n" );
+			tex = Texture_ForName( token );
 		}
-
-		if( strcmp( token, "(" ) )
-		{
-			return NULL;
-		}
-
-		// width, height, flags (currently only negative)
-		GetToken( false );
-		int	width	= atoi( token );
-
-		GetToken( false );
-		int	height	= atoi( token );
-
-		pm = MakeNewPatch( width, height );
-		pm->d_texture = tex;
-
-		if( !bOld )
-		{
-			GetToken( false );
-			pm->horzSubdivisions = atoi( token );
-			GetToken( false );
-			pm->vertSubdivisions = atoi( token );
-			pm->explicitSubdivisions = true;
-		}
-
-		GetToken( false );
-		pm->contents = atoi( token );
-
-		GetToken( false );
-		pm->flags = atoi( token );
-
-		GetToken( false );
-		pm->value = atoi( token );
-
-		//if (!bOld)
-		//{
-		//	GetToken(false);
-		//	pm->type = atoi(token);
-		//}
-
-		GetToken( false );
-		if( strcmp( token, ")" ) )
-		{
-			return NULL;
-		}
+		GetToken( true );
+	}
+	else
+	{
+		common->Printf( "Warning: Patch read with no texture, using notexture... \n" );
 	}
 
+	if( strcmp( token, "(" ) )
+	{
+		return NULL;
+	}
 
+	// width, height, flags (currently only negative)
+	GetToken( false );
+	int	width	= atoi( token );
+
+	GetToken( false );
+	int	height	= atoi( token );
+
+	pm = MakeNewPatch( width, height );
+	pm->d_texture = tex;
+
+	if( !bOld )
+	{
+		GetToken( false );
+		pm->horzSubdivisions = atoi( token );
+		GetToken( false );
+		pm->vertSubdivisions = atoi( token );
+		pm->explicitSubdivisions = true;
+	}
+
+	GetToken( false );
+	pm->contents = atoi( token );
+
+	GetToken( false );
+	pm->flags = atoi( token );
+
+	GetToken( false );
+	pm->value = atoi( token );
+
+	GetToken( false );
+	if( strcmp( token, ")" ) )
+	{
+		return NULL;
+	}
 
 	float	ctrl[MAX_PATCH_WIDTH][MAX_PATCH_HEIGHT][5];
 	Parse3DMatrix( pm->width, pm->height, 5, reinterpret_cast< float*>( &ctrl ) );
 
-	int	w, h;
-
-	for( w = 0; w < pm->width; w++ )
+	for( int w = 0; w < pm->width; w++ )
 	{
-		for( h = 0; h < pm->height; h++ )
+		for( int h = 0; h < pm->height; h++ )
 		{
 			pm->ctrl( w, h ).xyz[0] = ctrl[w][h][0];
 			pm->ctrl( w, h ).xyz[1] = ctrl[w][h][1];
 			pm->ctrl( w, h ).xyz[2] = ctrl[w][h][2];
-			// RB: BFG idDrawVert
 			pm->ctrl( w, h ).SetTexCoord( ctrl[w][h][3], ctrl[w][h][4] );
-			// RB end
 		}
 	}
 
 	GetToken( true );
 
-	if( g_qeglobals.m_bBrushPrimitMode )
+	// we are in brush primit mode, but maybe it's a classic patch that needs converting, test "}"
+	if( strcmp( token, "}" ) && strcmp( token, "(" ) )
 	{
-		// we are in brush primit mode, but maybe it's a classic patch that needs converting, test "}"
-		if( strcmp( token, "}" ) && strcmp( token, "(" ) )
-		{
-			ParseEpair( pm->epairs );
-			GetToken( true );
-		}
+		ParseEpair( pm->epairs );
+		GetToken( true );
 	}
 
 	if( strcmp( token, "}" ) )
@@ -3967,7 +3940,7 @@ brush_t* Patch_Parse( bool bOld )
 		return NULL;
 	}
 
-	brush_t*	b	= AddBrushForPatch( pm, false );
+	idEditorBrush*	b	= AddBrushForPatch( pm, false );
 
 	return b;
 }
@@ -3980,11 +3953,6 @@ Patch_Write
 */
 void Patch_Write( patchMesh_t* p, CMemFile* file )
 {
-	if( g_qeglobals.bSurfacePropertiesPlugin )
-	{
-		common->Printf( "WARNING: Patch_Write to a CMemFile and Surface Properties plugin not done\n" );
-	}
-
 	if( p->explicitSubdivisions )
 	{
 		MemFile_fprintf( file, " {\n  patchDef3\n  {\n" );
@@ -4009,24 +3977,19 @@ void Patch_Write( patchMesh_t* p, CMemFile* file )
 			ctrl[w][h][0] = p->ctrl( w, h ).xyz[0];
 			ctrl[w][h][1] = p->ctrl( w, h ).xyz[1];
 			ctrl[w][h][2] = p->ctrl( w, h ).xyz[2];
-			// RB: BFG idDrawVert
 			ctrl[w][h][3] = p->ctrl( w, h ).GetTexCoord().x;
 			ctrl[w][h][4] = p->ctrl( w, h ).GetTexCoord().y;
-			// RB end
 		}
 	}
 
 	_Write3DMatrix( file, p->width, p->height, 5, reinterpret_cast< float*>( &ctrl ) );
 
-	if( g_qeglobals.m_bBrushPrimitMode )
+	if( p->epairs )
 	{
-		if( p->epairs )
+		int	count	= p->epairs->GetNumKeyVals();
+		for( int i = 0; i < count; i++ )
 		{
-			int	count	= p->epairs->GetNumKeyVals();
-			for( int i = 0; i < count; i++ )
-			{
-				MemFile_fprintf( file, "\"%s\" \"%s\"\n", p->epairs->GetKeyVal( i )->GetKey().c_str(), p->epairs->GetKeyVal( i )->GetValue().c_str() );
-			}
+			MemFile_fprintf( file, "\"%s\" \"%s\"\n", p->epairs->GetKeyVal( i )->GetKey().c_str(), p->epairs->GetKeyVal( i )->GetValue().c_str() );
 		}
 	}
 
@@ -4058,24 +4021,19 @@ void Patch_Write( patchMesh_t* p, FILE* file )
 			ctrl[w][h][0] = p->ctrl( w, h ).xyz[0];
 			ctrl[w][h][1] = p->ctrl( w, h ).xyz[1];
 			ctrl[w][h][2] = p->ctrl( w, h ).xyz[2];
-			// RB: BFG idDrawVert
 			ctrl[w][h][3] = p->ctrl( w, h ).GetTexCoord().x;
 			ctrl[w][h][4] = p->ctrl( w, h ).GetTexCoord().y;
-			// RB end
 		}
 	}
 
 	_Write3DMatrix( file, p->width, p->height, 5, reinterpret_cast< float*>( &ctrl ) );
 
-	if( g_qeglobals.m_bBrushPrimitMode )
+	if( p->epairs )
 	{
-		if( p->epairs )
+		int	count	= p->epairs->GetNumKeyVals();
+		for( int i = 0; i < count; i++ )
 		{
-			int	count	= p->epairs->GetNumKeyVals();
-			for( int i = 0; i < count; i++ )
-			{
-				fprintf( file, "\"%s\" \"%s\"\n", p->epairs->GetKeyVal( i )->GetKey().c_str(), p->epairs->GetKeyVal( i )->GetValue().c_str() );
-			}
+			fprintf( file, "\"%s\" \"%s\"\n", p->epairs->GetKeyVal( i )->GetKey().c_str(), p->epairs->GetKeyVal( i )->GetValue().c_str() );
 		}
 	}
 
@@ -4102,12 +4060,10 @@ void Patch_RotateTexture( patchMesh_t* p, float fAngle )
 				continue;
 			}
 
-			// RB: BFG idDrawVert
 			float	x	= p->ctrl( w, h ).GetTexCoord().x;
 			float	y	= p->ctrl( w, h ).GetTexCoord().y;
 			p->ctrl( w, h ).SetTexCoord(	x * cos( DEG2RAD( fAngle ) ) - y * sin( DEG2RAD( fAngle ) ),
 											y * cos( DEG2RAD( fAngle ) ) + x * sin( DEG2RAD( fAngle ) )	);
-			// RB end
 		}
 	}
 }
@@ -4142,11 +4098,8 @@ void Patch_ScaleTexture( patchMesh_t* p, float fx, float fy, bool absolute )
 			{
 				continue;
 			}
-
-			// RB: BFG idDrawVert
 			idVec2 st = p->ctrl( w, h ).GetTexCoord() * fx;
 			p->ctrl( w, h ).SetTexCoord( st );
-			// RB end
 		}
 	}
 	Patch_MakeDirty( p );
@@ -4179,12 +4132,10 @@ void Patch_ShiftTexture( patchMesh_t* p, float fx, float fy, bool autoAdjust )
 				continue;
 			}
 
-			// RB: BFG idDrawVert
 			idVec2 st = p->ctrl( w, h ).GetTexCoord();
 			st.x += fx;
 			st.y += fx;
 			p->ctrl( w, h ).SetTexCoord( st );
-			// RB end
 		}
 	}
 	Patch_MakeDirty( p );
@@ -4214,7 +4165,7 @@ void Patch_ToggleInverted()
 {
 	bool	bUpdate	= false;
 
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -4240,11 +4191,9 @@ void Patch_FlipTexture( patchMesh_t* p, bool y )
 		{
 			for( int j = 0; j < p->width / 2; j++ )
 			{
-				// RB begin
 				temp = p->ctrl( p->width - 1 - j, i ).GetTexCoord();
 				p->ctrl( p->width - 1 - j, i ).SetTexCoord( p->ctrl( j, i ).GetTexCoord() );
 				p->ctrl( j, i ).SetTexCoord( temp );
-				// RB end
 			}
 		}
 	}
@@ -4254,11 +4203,9 @@ void Patch_FlipTexture( patchMesh_t* p, bool y )
 		{
 			for( int j = 0; j < p->height / 2; j++ )
 			{
-				// RB begin
 				temp = p->ctrl( i, p->height - 1 - j ).GetTexCoord();
 				p->ctrl( i, p->height - 1 - j ).SetTexCoord( p->ctrl( i, j ).GetTexCoord() );
 				p->ctrl( i, j ).SetTexCoord( temp );
-				// RB end
 			}
 		}
 	}
@@ -4273,7 +4220,7 @@ Patch_ToggleInverted
 void Patch_InvertTexture( bool bY )
 {
 	bool	bUpdate	= false;
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -4338,17 +4285,15 @@ void Patch_FitTexture( patchMesh_t* p, float fx, float fy )
 	{
 		for( int j = 0 ; j < p->height ; j++ )
 		{
-			// RB: BFG idDrawVert
 			p->ctrl( i, j ).SetTexCoord(	fx * ( float ) i / ( p->width - 1 ),
 											fy * ( float ) j / ( p->height - 1 )	);
-			// RB end
 		}
 	}
 }
 
 void Patch_ResetTexturing( float fx, float fy )
 {
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -4358,10 +4303,8 @@ void Patch_ResetTexturing( float fx, float fy )
 			{
 				for( int j = 0 ; j < p->height ; j++ )
 				{
-					// RB: BFG idDrawVert
 					p->ctrl( i, j ).SetTexCoord(	fx * ( float ) i / ( p->width - 1 ),
 													fy * ( float ) j / ( p->height - 1 )	);
-					// RB end
 				}
 			}
 		}
@@ -4371,7 +4314,7 @@ void Patch_ResetTexturing( float fx, float fy )
 
 void Patch_FitTexturing()
 {
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -4381,10 +4324,8 @@ void Patch_FitTexturing()
 			{
 				for( int j = 0 ; j < p->height ; j++ )
 				{
-					// RB: BFG idDrawVert
 					p->ctrl( i, j ).SetTexCoord(	1 * ( float ) i / ( p->width - 1 ),
 													1 * ( float ) j / ( p->height - 1 )	);
-					// RB end
 				}
 			}
 		}
@@ -4393,7 +4334,7 @@ void Patch_FitTexturing()
 
 void Patch_SetTextureInfo( texdef_t* pt )
 {
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -4424,7 +4365,7 @@ bool WINAPI OnlyPatchesSelected()
 	{
 		return false;
 	}
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( !pb->pPatch )
 		{
@@ -4440,7 +4381,7 @@ bool WINAPI AnyPatchesSelected()
 	{
 		return false;
 	}
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -4469,7 +4410,7 @@ void Patch_BendToggle()
 		return;
 	}
 
-	brush_t*	b	= selected_brushes.next;
+	idEditorBrush*	b	= selected_brushes.next;
 
 	if( !QE_SingleBrush() || !b->pPatch )
 	{
@@ -4492,7 +4433,7 @@ void Patch_BendHandleTAB()
 		return;
 	}
 
-	brush_t*	b	= selected_brushes.next;
+	idEditorBrush*	b	= selected_brushes.next;
 	if( !QE_SingleBrush() || !b->pPatch )
 	{
 		Patch_BendToggle();
@@ -4614,7 +4555,7 @@ void Patch_BendHandleESC()
 		return;
 	}
 	Patch_BendToggle();
-	brush_t*	b	= selected_brushes.next;
+	idEditorBrush*	b	= selected_brushes.next;
 	if( QE_SingleBrush() && b->pPatch )
 	{
 		Patch_Restore( b->pPatch );
@@ -4624,8 +4565,8 @@ void Patch_BendHandleESC()
 
 void Patch_SetBendRotateOrigin( patchMesh_t* p )
 {
-	int	nType	= g_pParentWnd->ActiveXY()->GetViewType();
-	int	nDim3	= ( nType == XY ) ? 2 : ( nType == YZ ) ? 0 : 1;
+	ViewType	nType	= g_pParentWnd->ActiveXY()->GetViewType();
+	int	nDim3	= ( nType == ViewType::XY ) ? 2 : ( nType == ViewType::YZ ) ? 0 : 1;
 	g_vBendOrigin[nDim3] = 0;
 	VectorCopy( g_vBendOrigin, g_pParentWnd->ActiveXY()->RotateOrigin() );
 	return;
@@ -4634,7 +4575,7 @@ void Patch_SetBendRotateOrigin( patchMesh_t* p )
 // also sets the rotational origin
 void Patch_SelectBendAxis()
 {
-	brush_t*	b	= selected_brushes.next;
+	idEditorBrush*	b	= selected_brushes.next;
 	if( !QE_SingleBrush() || !b->pPatch )
 	{
 		// should not ever happen
@@ -4657,7 +4598,7 @@ void Patch_SelectBendAxis()
 
 void Patch_SelectBendNormal()
 {
-	brush_t*	b	= selected_brushes.next;
+	idEditorBrush*	b	= selected_brushes.next;
 	if( !QE_SingleBrush() || !b->pPatch )
 	{
 		// should not ever happen
@@ -4717,7 +4658,7 @@ void Patch_InsDelToggle()
 		return;
 	}
 
-	brush_t*	b	= selected_brushes.next;
+	idEditorBrush*	b	= selected_brushes.next;
 
 	if( !QE_SingleBrush() || !b->pPatch )
 	{
@@ -4756,7 +4697,7 @@ void Patch_InsDelHandleTAB()
 		return;
 	}
 
-	brush_t*	b	= selected_brushes.next;
+	idEditorBrush*	b	= selected_brushes.next;
 	if( !QE_SingleBrush() || !b->pPatch )
 	{
 		Patch_BendToggle();
@@ -4821,12 +4762,12 @@ void _Write2DMatrix( FILE* f, int y, int x, float* m )
 }
 
 
-void _Write3DMatrix( FILE* f, int z, int y, int x, float* m )
+void _Write3DMatrix( FILE* f, int _z, int y, int x, float* m )
 {
 	int	i;
 
 	fprintf( f, "(\n" );
-	for( i = 0 ; i < z ; i++ )
+	for( i = 0 ; i < _z ; i++ )
 	{
 		_Write2DMatrix( f, y, x, m + i * ( x * MAX_PATCH_HEIGHT ) );
 	}
@@ -4866,12 +4807,12 @@ void _Write2DMatrix( CMemFile* f, int y, int x, float* m )
 }
 
 
-void _Write3DMatrix( CMemFile* f, int z, int y, int x, float* m )
+void _Write3DMatrix( CMemFile* f, int _z, int y, int x, float* m )
 {
 	int	i;
 
 	MemFile_fprintf( f, "(\n" );
-	for( i = 0 ; i < z ; i++ )
+	for( i = 0 ; i < _z ; i++ )
 	{
 		_Write2DMatrix( f, y, x, m + i * ( x * MAX_PATCH_HEIGHT ) );
 	}
@@ -4881,7 +4822,7 @@ void _Write3DMatrix( CMemFile* f, int z, int y, int x, float* m )
 
 void Patch_NaturalizeSelected( bool bCap, bool bCycleCap, bool alt )
 {
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -4899,7 +4840,7 @@ void Patch_NaturalizeSelected( bool bCap, bool bCycleCap, bool alt )
 
 void Patch_SubdivideSelected( bool subdivide, int horz, int vert )
 {
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -4923,8 +4864,8 @@ void Patch_SubdivideSelected( bool subdivide, int horz, int vert )
 
 bool within( idVec3 vTest, idVec3 vTL, idVec3 vBR )
 {
-	int	nDim1	= ( g_pParentWnd->ActiveXY()->GetViewType() == YZ ) ? 1 : 0;
-	int	nDim2	= ( g_pParentWnd->ActiveXY()->GetViewType() == XY ) ? 1 : 2;
+	int	nDim1	= ( g_pParentWnd->ActiveXY()->GetViewType() == ViewType::YZ ) ? 1 : 0;
+	int	nDim2	= ( g_pParentWnd->ActiveXY()->GetViewType() == ViewType::XY ) ? 1 : 2;
 	if( ( vTest[nDim1] > vTL[nDim1] && vTest[nDim1] < vBR[nDim1] ) || ( vTest[nDim1] < vTL[nDim1] && vTest[nDim1] > vBR[nDim1] ) )
 	{
 		if( ( vTest[nDim2] > vTL[nDim2] && vTest[nDim2] < vBR[nDim2] ) || ( vTest[nDim2] < vTL[nDim2] && vTest[nDim2] > vBR[nDim2] ) )
@@ -4942,7 +4883,7 @@ void Patch_SelectAreaPoints()
 	//g_qeglobals.d_num_move_points = 0;
 	g_nPatchClickedView = -1;
 
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -4963,7 +4904,7 @@ void Patch_SelectAreaPoints()
 
 const char* Patch_GetTextureName()
 {
-	brush_t*	b	= selected_brushes.next;
+	idEditorBrush*	b	= selected_brushes.next;
 	if( b->pPatch )
 	{
 		patchMesh_t*	p	= b->pPatch;
@@ -4998,7 +4939,7 @@ patchMesh_t* Patch_Duplicate( patchMesh_t* pFrom )
 void Patch_Thicken( int nAmount, bool bSeam )
 {
 	int			i, j, h, w;
-	brush_t*		b;
+	idEditorBrush*		b;
 	patchMesh_t*	pSeam;
 	idVec3		vMin, vMax;
 	CPtrArray	brushes;
@@ -5012,7 +4953,7 @@ void Patch_Thicken( int nAmount, bool bSeam )
 		return;
 	}
 
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( !pb->pPatch )
 		{
@@ -5026,9 +4967,7 @@ void Patch_Thicken( int nAmount, bool bSeam )
 		{
 			for( j = 0; j < p->height; j++ )
 			{
-				// RB: BFG idDrawVert
 				VectorMA( p->ctrl( i, j ).xyz, nAmount, p->ctrl( i, j ).GetNormal(), pNew->ctrl( i, j ).xyz );
-				// RB end
 			}
 		}
 
@@ -5123,7 +5062,7 @@ void Patch_Thicken( int nAmount, bool bSeam )
 
 	for( i = 0; i < brushes.GetSize(); i++ )
 	{
-		Select_Brush( reinterpret_cast< brush_t*>( brushes.GetAt( i ) ) );
+		Select_Brush( reinterpret_cast< idEditorBrush*>( brushes.GetAt( i ) ) );
 	}
 
 	if( brushes.GetSize() > 0 )
@@ -5131,8 +5070,8 @@ void Patch_Thicken( int nAmount, bool bSeam )
 		eclass_t* pecNew	= Eclass_ForName( "func_static", false );
 		if( pecNew )
 		{
-			entity_t* e	= Entity_Create( pecNew );
-			SetKeyValue( e, "type", "patchThick" );
+			idEditorEntity* e	= Entity_Create( pecNew );
+			e->SetKeyValue( "type", "patchThick" );
 		}
 	}
 
@@ -5161,7 +5100,7 @@ clear clipboard
 
 void Patch_SetOverlays()
 {
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -5174,7 +5113,7 @@ void Patch_SetOverlays()
 
 void Patch_ClearOverlays()
 {
-	brush_t*	pb;
+	idEditorBrush*	pb;
 	for( pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
@@ -5195,7 +5134,7 @@ void Patch_ClearOverlays()
 // freezes selected vertices
 void Patch_Freeze()
 {
-	brush_t*	pb;
+	idEditorBrush*	pb;
 	for( pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
@@ -5222,7 +5161,7 @@ void Patch_Transpose()
 {
 	int			i, j, w;
 	idDrawVert	dv;
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -5285,7 +5224,7 @@ void Patch_Transpose()
 void Select_SnapToGrid()
 {
 	int	i, j, k;
-	for( brush_t* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
+	for( idEditorBrush* pb = selected_brushes.next ; pb != &selected_brushes ; pb = pb->next )
 	{
 		if( pb->pPatch )
 		{
@@ -5312,7 +5251,7 @@ void Select_SnapToGrid()
 }
 
 
-void Patch_FindReplaceTexture( brush_t* pb, const char* pFind, const char* pReplace, bool bForce )
+void Patch_FindReplaceTexture( idEditorBrush* pb, const char* pFind, const char* pReplace, bool bForce )
 {
 	if( pb->pPatch )
 	{
@@ -5325,7 +5264,7 @@ void Patch_FindReplaceTexture( brush_t* pb, const char* pFind, const char* pRepl
 	}
 }
 
-void Patch_ReplaceQTexture( brush_t* pb, idMaterial* pOld, idMaterial* pNew )
+void Patch_ReplaceQTexture( idEditorBrush* pb, idMaterial* pOld, idMaterial* pNew )
 {
 	if( pb->pPatch )
 	{
@@ -5337,7 +5276,7 @@ void Patch_ReplaceQTexture( brush_t* pb, idMaterial* pOld, idMaterial* pNew )
 	}
 }
 
-void Patch_Clone( patchMesh_t* p, brush_t* pNewOwner )
+void Patch_Clone( patchMesh_t* p, idEditorBrush* pNewOwner )
 {
 }
 
@@ -5368,7 +5307,6 @@ void Patch_FromTriangle( idVec5 vx, idVec5 vy, idVec5 vz )
 	vMidXY.Lerp( vx, vy, 0.5 );
 	vMidYZ.Lerp( vy, vz, 0.5 );
 
-	// RB: BFG idDrawVert
 	p->ctrl( 0, 0 ).xyz = vx.ToVec3();
 	p->ctrl( 0, 1 ).xyz = vx.ToVec3();
 	p->ctrl( 0, 2 ).xyz = vx.ToVec3();
@@ -5389,11 +5327,6 @@ void Patch_FromTriangle( idVec5 vx, idVec5 vy, idVec5 vz )
 	p->ctrl( 2, 0 ).SetTexCoord( vy[3], vy[4] );
 	p->ctrl( 2, 1 ).SetTexCoord( vMidYZ[3], vMidYZ[4] );
 	p->ctrl( 2, 2 ).SetTexCoord( vz[3], vz[4] );
-	// RB end
-
-	//Patch_Naturalize(p);
-
-	brush_t*	b	= AddBrushForPatch( p );
 }
 
 
@@ -5405,14 +5338,11 @@ sets an epair for the given patch
 */
 void Patch_SetEpair( patchMesh_t* p, const char* pKey, const char* pValue )
 {
-	if( g_qeglobals.m_bBrushPrimitMode )
+	if( p->epairs == NULL )
 	{
-		if( p->epairs == NULL )
-		{
-			p->epairs = new idDict;
-		}
-		p->epairs->Set( pKey, pValue );
+		p->epairs = new idDict;
 	}
+	p->epairs->Set( pKey, pValue );
 }
 
 /*
@@ -5422,12 +5352,9 @@ Patch_GetKeyValue
 */
 const char* Patch_GetKeyValue( patchMesh_t* p, const char* pKey )
 {
-	if( g_qeglobals.m_bBrushPrimitMode )
+	if( p->epairs )
 	{
-		if( p->epairs )
-		{
-			return p->epairs->GetString( pKey );
-		}
+		return p->epairs->GetString( pKey );
 	}
 	return "";
 }
@@ -5470,6 +5397,3 @@ g:\quake3\baseq3\textures\common
 
   Feature Addition: View/Hide Hint Brushes -- This should be a specific case.
 */
-
-
-

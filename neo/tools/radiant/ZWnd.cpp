@@ -66,10 +66,8 @@ BEGIN_MESSAGE_MAP( CZWnd, CWnd )
 	ON_WM_GETMINMAXINFO()
 	ON_WM_MOUSEMOVE()
 	ON_WM_SIZE()
-// ---> sikk - Window Snapping
 	ON_WM_SIZING()
 	ON_WM_MOVING()
-// <--- sikk - Window Snapping
 	ON_WM_NCCALCSIZE()
 	ON_WM_KILLFOCUS()
 	ON_WM_SETFOCUS()
@@ -81,6 +79,7 @@ BEGIN_MESSAGE_MAP( CZWnd, CWnd )
 	ON_WM_KEYUP()
 	//}}AFX_MSG_MAP
 END_MESSAGE_MAP()
+
 
 /////////////////////////////////////////////////////////////////////////////
 // CZWnd message handlers
@@ -102,6 +101,8 @@ int CZWnd::OnCreate( LPCREATESTRUCT lpCreateStruct )
 
 void CZWnd::OnDestroy()
 {
+	SaveDialogPlacement( this, "radiant_zwindow" );
+
 	if( m_pZClip )
 	{
 		delete m_pZClip;
@@ -127,13 +128,13 @@ void CZWnd::OnLButtonDown( UINT nFlags, CPoint point )
 	SetCapture();
 	CRect rctZ;
 	GetClientRect( rctZ );
-// ---> sikk - Bring window to front
+
 	if( g_pParentWnd->GetTopWindow() != this )
 	{
 		BringWindowToTop();
 	}
-// <--- sikk - Bring window to front
-	Z_MouseDown( point.x, rctZ.Height() - 1 - point.y, nFlags );
+
+	Z_MouseDown( point.x, rctZ.Height() - 1 - point.y , nFlags );
 }
 
 void CZWnd::OnMButtonDown( UINT nFlags, CPoint point )
@@ -142,13 +143,13 @@ void CZWnd::OnMButtonDown( UINT nFlags, CPoint point )
 	SetCapture();
 	CRect rctZ;
 	GetClientRect( rctZ );
-// ---> sikk - Bring window to front
+
 	if( g_pParentWnd->GetTopWindow() != this )
 	{
 		BringWindowToTop();
 	}
-// <--- sikk - Bring window to front
-	Z_MouseDown( point.x, rctZ.Height() - 1 - point.y, nFlags );
+
+	Z_MouseDown( point.x, rctZ.Height() - 1 - point.y , nFlags );
 }
 
 void CZWnd::OnRButtonDown( UINT nFlags, CPoint point )
@@ -157,20 +158,20 @@ void CZWnd::OnRButtonDown( UINT nFlags, CPoint point )
 	SetCapture();
 	CRect rctZ;
 	GetClientRect( rctZ );
-// ---> sikk - Bring window to front
+
 	if( g_pParentWnd->GetTopWindow() != this )
 	{
 		BringWindowToTop();
 	}
-// <--- sikk - Bring window to front
-	Z_MouseDown( point.x, rctZ.Height() - 1 - point.y, nFlags );
+
+	Z_MouseDown( point.x, rctZ.Height() - 1 - point.y , nFlags );
 }
 
 void CZWnd::OnPaint()
 {
 	CPaintDC dc( this ); // device context for painting
 	//if (!wglMakeCurrent(m_dcZ, m_hglrcZ))
-	//if (!wglMakeCurrent(dc.m_hDC, m_hglrcZ))
+	//if (!qwglMakeCurrent(dc.m_hDC, m_hglrcZ))
 	if( !wglMakeCurrent( dc.m_hDC, win32.hGLRC ) )
 	{
 		common->Printf( "ERROR: wglMakeCurrent failed..\n " );
@@ -178,14 +179,11 @@ void CZWnd::OnPaint()
 	}
 	else
 	{
-		// RB: go back to fixed function pipeline
 		renderProgManager.Unbind();
-		// RB end
 
 		QE_CheckOpenGLForErrors();
 
 		Z_Draw();
-		//qwglSwapBuffers(m_dcZ);
 		SwapBuffers( dc.m_hDC );
 		TRACE( "Z Paint\n" );
 	}
@@ -226,7 +224,6 @@ void CZWnd::OnSize( UINT nType, int cx, int cy )
 	Invalidate();
 }
 
-// ---> sikk - Window Snapping
 void CZWnd::OnSizing( UINT nSide, LPRECT lpRect )
 {
 	if( TryDocking( GetSafeHwnd(), nSide, lpRect, 0 ) )
@@ -234,6 +231,7 @@ void CZWnd::OnSizing( UINT nSide, LPRECT lpRect )
 		return;
 	}
 }
+
 void CZWnd::OnMoving( UINT nSide, LPRECT lpRect )
 {
 	if( TryDocking( GetSafeHwnd(), nSide, lpRect, 0 ) )
@@ -241,7 +239,6 @@ void CZWnd::OnMoving( UINT nSide, LPRECT lpRect )
 		return;
 	}
 }
-// <--- sikk - Window Snapping
 
 void CZWnd::OnNcCalcSize( BOOL bCalcValidRects, NCCALCSIZE_PARAMS FAR* lpncsp )
 {
@@ -308,6 +305,7 @@ BOOL CZWnd::OnMouseWheel( UINT nFlags, short zDelta, CPoint pt )
 	{
 		g_pParentWnd->OnViewZzoomout();
 	}
+
 	return TRUE;
 }
 
@@ -322,10 +320,10 @@ BOOL CZWnd::PreCreateWindow( CREATESTRUCT& cs )
 		wc.style         = CS_NOCLOSE;// | CS_OWNDC;
 		wc.lpszClassName = Z_WINDOW_CLASS;
 		wc.hCursor       = LoadCursor( NULL, IDC_ARROW );
-		wc.lpfnWndProc	 = ::DefWindowProc;
+		wc.lpfnWndProc = ::DefWindowProc;
 		if( AfxRegisterClass( &wc ) == FALSE )
 		{
-			Error( "CZWnd RegisterClass: failed" );
+			idLib::Error( "CZWnd RegisterClass: failed" );
 		}
 	}
 
@@ -335,9 +333,8 @@ BOOL CZWnd::PreCreateWindow( CREATESTRUCT& cs )
 	{
 		cs.style = QE3_SPLITTER_STYLE;
 	}
-	cs.dwExStyle = WS_EX_TOOLWINDOW;	// sikk - Added - Tool window uses smaller tital bar (more screen space for editing)
+
+	cs.dwExStyle = WS_EX_TOOLWINDOW;
 
 	return CWnd::PreCreateWindow( cs );
 }
-
-

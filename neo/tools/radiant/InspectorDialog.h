@@ -25,8 +25,8 @@ If you have questions concerning this license or the applicable additional terms
 
 ===========================================================================
 */
+
 #pragma once
-#include "afxcmn.h"
 
 #include "entitydlg.h"
 #include "ConsoleDlg.h"
@@ -38,33 +38,33 @@ If you have questions concerning this license or the applicable additional terms
 class CInspectorDialog : public CTabsDlg
 {
 	//DECLARE_DYNAMIC(CInspectorDialog)
-
 public:
 	CInspectorDialog( CWnd* pParent = NULL );   // standard constructor
-	virtual			~CInspectorDialog();
+	virtual ~CInspectorDialog();
 
-// Dialog Data
 	enum { IDD = IDD_DIALOG_INSPECTORS };
 
 protected:
-	bool			initialized;
-	unsigned int	dockedTabs;
+	bool initialized;
+	unsigned int dockedTabs;
 
 	DECLARE_MESSAGE_MAP()
 public:
-	virtual BOOL	OnInitDialog();
-	void			AssignModel();
-	void			SetMode( int mode, bool updateTabs = true );
-	void			UpdateEntitySel( eclass_t* ent );
-	void			UpdateSelectedEntity();
-	void			FillClassList();
-	bool			GetSelectAllCriteria( idStr& key, idStr& val );
-	void			SetDockedTabs( bool docked, int ID );
+	virtual BOOL OnInitDialog();
+	void AssignModel();
+	void SetMode( int mode, bool updateTabs = true );
+	void UpdateEntitySel( const eclass_t* ent );
+	void UpdateSelectedEntity();
+	void FillClassList();
+	bool GetSelectAllCriteria( idStr& key, idStr& val );
+	void SetDockedTabs( bool docked, int ID );
 
-	afx_msg void	OnSize( UINT nType, int cx, int cy );
-	afx_msg void	OnDestroy();
-	afx_msg void	OnClose();
-	virtual BOOL	PreTranslateMessage( MSG* pMsg );
+	afx_msg void OnSize( UINT nType, int cx, int cy );
+	afx_msg void OnSizing( UINT nSide, LPRECT lpRect );
+	afx_msg void OnMoving( UINT nSide, LPRECT lpRect );
+	afx_msg void OnDestroy();
+	afx_msg void OnClose();
+	virtual BOOL PreTranslateMessage( MSG* pMsg );
 
 	CTabCtrl		tabInspector;
 	//idGLConsoleWidget	consoleWnd;
@@ -73,7 +73,7 @@ public:
 	CDialogTextures mediaDlg;
 	CEntityDlg		entityDlg;
 
-	int prevMode;	// sikk - Added
+	int prevMode;
 };
 
 extern CInspectorDialog* g_Inspectors;

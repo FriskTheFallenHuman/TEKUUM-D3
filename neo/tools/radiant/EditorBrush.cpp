@@ -32,20 +32,243 @@ If you have questions concerning this license or the applicable additional terms
 #include "qe3.h"
 #include <GL/glu.h>
 
-#include "../../renderer/tr_local.h"
+#include "../../renderer/RenderCommon.h"
 #include "../../renderer/model_local.h"	// for idRenderModelMD5
 
-void	Brush_UpdateLightPoints( brush_t* b, const idVec3& offset );
-void Brush_DrawCurve( brush_t* b, bool bSelected, bool cam );
+void Brush_DrawCurve( const idEditorBrush* b, bool bSelected, bool cam );
 
 // globals
-int		g_nBrushId = 0;
+static int		g_nBrushId = 0;
 bool	g_bShowLightVolumes = false;
 bool	g_bShowLightTextures = false;
 
 void GLCircle( float x, float y, float z, float r );
+void GLSphere( float r, int lats, int longs );
+static const int POINTS_PER_KNOT = 50;
 
-const int POINTS_PER_KNOT = 50;
+/*
+================
+Brush_TransformModel
+================
+*/
+int Brush_TransformModel( idEditorBrush* brush, idTriList* tris, idMatList* mats )
+{
+	int ret = 0;
+	if( brush->modelHandle > 0 )
+	{
+		idRenderModel* model = brush->modelHandle;
+		if( model )
+		{
+			float	a = brush->owner->FloatForKey( "angle" );
+			float	s, c;
+			//FIXME: support full rotation matrix
+			bool matrix = false;
+			if( a )
+			{
+				s = sin( DEG2RAD( a ) );
+				c = cos( DEG2RAD( a ) );
+			}
+			idMat3 mat;
+			if( brush->owner->GetMatrixForKey( "rotation", mat ) )
+			{
+				matrix = true;
+			}
+
+			for( int i = 0; i < model->NumSurfaces(); i++ )
+			{
+				const modelSurface_t* surf = model->Surface( i );
+				srfTriangles_t* tri = surf->geometry;
+				srfTriangles_t* tri2 = R_CopyStaticTriSurf( tri );
+				for( int j = 0; j < tri2->numVerts; j++ )
+				{
+					idVec3	v;
+					if( matrix )
+					{
+						v = tri2->verts[j].xyz * brush->owner->rotation + brush->owner->origin;
+					}
+					else
+					{
+						v = tri2->verts[j].xyz;
+						VectorAdd( v, brush->owner->origin, v );
+						float x = v[0];
+						float y = v[1];
+						if( a )
+						{
+							float	x2 = ( ( ( x - brush->owner->origin[0] ) * c ) - ( ( y - brush->owner->origin[1] ) * s ) ) + brush->owner->origin[0];
+							float	y2 = ( ( ( x - brush->owner->origin[0] ) * s ) + ( ( y - brush->owner->origin[1] ) * c ) ) + brush->owner->origin[1];
+							x = x2;
+							y = y2;
+						}
+						v[0] = x;
+						v[1] = y;
+					}
+					tri2->verts[j].xyz = v;
+				}
+				tris->Append( tri2 );
+				mats->Append( surf->shader );
+			}
+			return model->NumSurfaces();
+		}
+	}
+	return ret;
+}
+
+/*
+================
+Brush_ToTris
+================
+*/
+#define	MAX_TRI_SURFACES	16384
+
+int Brush_ToTris( idEditorBrush* brush, idTriList* tris, idMatList* mats, bool models, bool bmodel )
+{
+	int i, j;
+	srfTriangles_t*	tri;
+
+	//
+	// patches
+	//
+	if( brush->modelHandle > 0 )
+	{
+		if( !models )
+		{
+			return 0;
+		}
+		else
+		{
+			return Brush_TransformModel( brush, tris, mats );
+		}
+	}
+
+	int numSurfaces = 0;
+
+	if( brush->owner->eclass->fixedsize && !brush->entityModel )
+	{
+		return NULL;
+	}
+
+	if( brush->pPatch )
+	{
+		patchMesh_t* pm;
+		int	width, height;
+
+		pm = brush->pPatch;
+
+		// build a patch mesh
+		idSurface_Patch* cp = new idSurface_Patch( pm->width * 6, pm->height * 6 );
+		cp->SetSize( pm->width, pm->height );
+		for( i = 0; i < pm->width; i++ )
+		{
+			for( j = 0; j < pm->height; j++ )
+			{
+				( *cp )[j * cp->GetWidth() + i].xyz = pm->ctrl( i, j ).xyz;
+				( *cp )[j * cp->GetWidth() + i].SetTexCoord( pm->ctrl( i, j ).GetTexCoord() );
+			}
+		}
+
+		// subdivide it
+		if( pm->explicitSubdivisions )
+		{
+			cp->SubdivideExplicit( pm->horzSubdivisions, pm->vertSubdivisions, true );
+		}
+		else
+		{
+			cp->Subdivide( DEFAULT_CURVE_MAX_ERROR, DEFAULT_CURVE_MAX_ERROR, DEFAULT_CURVE_MAX_LENGTH, true );
+		}
+		width = cp->GetWidth();
+		height = cp->GetHeight();
+
+		// convert to srfTriangles
+		tri = R_AllocStaticTriSurf();
+		tri->numVerts = width * height;
+		tri->numIndexes = 6 * ( width - 1 ) * ( height - 1 );
+		R_AllocStaticTriSurfVerts( tri, tri->numVerts );
+		R_AllocStaticTriSurfIndexes( tri, tri->numIndexes );
+		for( i = 0; i < tri->numVerts; i++ )
+		{
+			tri->verts[i] = ( *cp )[i];
+			if( bmodel )
+			{
+				tri->verts[i].xyz -= brush->owner->origin;
+			}
+		}
+
+		tri->numIndexes = 0;
+		for( i = 1; i < width; i++ )
+		{
+			for( j = 1; j < height; j++ )
+			{
+				tri->indexes[tri->numIndexes++] = ( j - 1 ) * width + i;
+				tri->indexes[tri->numIndexes++] = ( j - 1 ) * width + i - 1;
+				tri->indexes[tri->numIndexes++] = j * width + i - 1;
+
+				tri->indexes[tri->numIndexes++] = j * width + i;
+				tri->indexes[tri->numIndexes++] = ( j - 1 ) * width + i;
+				tri->indexes[tri->numIndexes++] = j * width + i - 1;
+			}
+		}
+
+		delete cp;
+
+		tris->Append( tri );
+		mats->Append( pm->d_texture );
+		//surfaces[numSurfaces] = tri;
+		//materials[numSurfaces] = pm->d_texture;
+		return 1;
+	}
+
+	//
+	// normal brush
+	//
+	for( face_t* face = brush->brush_faces; face; face = face->next )
+	{
+		idWinding* w;
+
+		w = face->face_winding;
+		if( !w )
+		{
+			continue;	// freed or degenerate face
+		}
+
+		tri = R_AllocStaticTriSurf();
+		tri->numVerts = w->GetNumPoints();
+		tri->numIndexes = ( w->GetNumPoints() - 2 ) * 3;
+		R_AllocStaticTriSurfVerts( tri, tri->numVerts );
+		R_AllocStaticTriSurfIndexes( tri, tri->numIndexes );
+
+		for( i = 0; i < tri->numVerts; i++ )
+		{
+
+			tri->verts[i].Clear();
+
+			tri->verts[i].xyz[0] = ( *w )[i][0];
+			tri->verts[i].xyz[1] = ( *w )[i][1];
+			tri->verts[i].xyz[2] = ( *w )[i][2];
+
+			if( bmodel )
+			{
+				tri->verts[i].xyz -= brush->owner->origin;
+			}
+
+			tri->verts[i].SetTexCoord( ( *w )[i][3], ( *w )[i][4] );
+			tri->verts[i].SetNormal( face->plane.Normal() );
+		}
+
+		tri->numIndexes = 0;
+		for( i = 2; i < w->GetNumPoints(); i++ )
+		{
+			tri->indexes[tri->numIndexes++] = 0;
+			tri->indexes[tri->numIndexes++] = i - 1;
+			tri->indexes[tri->numIndexes++] = i;
+		}
+
+		tris->Append( tri );
+		mats->Append( face->d_texture );
+		numSurfaces++;
+	}
+
+	return numSurfaces;
+}
 
 /*
 ================
@@ -61,28 +284,16 @@ void DrawRenderModel( idRenderModel* model, idVec3& origin, idMat3& axis, bool c
 
 		int nDrawMode = g_pParentWnd->GetCamera()->Camera().draw_mode;
 
-		if( cameraView && ( nDrawMode == cd_texture || nDrawMode == cd_light ) )
+		if( cameraView && nDrawMode == cd_texture )
 		{
-			// RB begin
-			const idImageOpts& opts = material->GetEditorImage()->GetOpts();
-			if( opts.colorFormat == CFM_YCOCG_DXT5 )
-			{
-				renderProgManager.BindShader_TextureYCoCG();
-			}
-			else
-			{
-				renderProgManager.BindShader_Texture();
-			}
-			// RB end
-
+			renderProgManager.BindShader_Texture();
 			material->GetEditorImage()->Bind();
 		}
 
-		// RB: FIXME slow
 		if( renderProgManager.IsShaderBound() )
 		{
 			//renderProgManager.BindShader_Color();
-			renderProgManager.CommitUniforms();
+			renderProgManager.CommitUniforms( 0 );
 		}
 		//renderProgManager.Unbind();
 
@@ -94,15 +305,11 @@ void DrawRenderModel( idRenderModel* model, idVec3& origin, idMat3& axis, bool c
 			for( int k = 0; k < 3; k++ )
 			{
 				int		index = tri->indexes[j + k];
-				idVec3	v;
-				idVec2	st;
 
-				// RB begin
-				v = tri->verts[index].xyz * axis + origin;
-				st = tri->verts[index].GetTexCoord();
+				idVec3	v = tri->verts[index].xyz * axis + origin;
+				idVec2	st = tri->verts[index].GetTexCoord();
 				glTexCoord2fv( st.ToFloatPtr() );
 				glVertex3fv( v.ToFloatPtr() );
-				// RB end
 			}
 		}
 
@@ -115,7 +322,7 @@ void DrawRenderModel( idRenderModel* model, idVec3& origin, idMat3& axis, bool c
 SnapVectorToGrid
 ================
 */
-void SnapVectorToGrid( idVec3& v )
+static void SnapVectorToGrid( idVec3& v )
 {
 	v.x = floor( v.x / g_qeglobals.d_gridsize + 0.5f ) * g_qeglobals.d_gridsize;
 	v.y = floor( v.y / g_qeglobals.d_gridsize + 0.5f ) * g_qeglobals.d_gridsize;
@@ -124,31 +331,12 @@ void SnapVectorToGrid( idVec3& v )
 
 /*
 ================
-Brush_Name
-================
-*/
-const char* Brush_Name( brush_t* b )
-{
-	static char cBuff[1024];
-
-	b->numberId = g_nBrushId++;
-	if( g_qeglobals.m_bBrushPrimitMode )
-	{
-		sprintf( cBuff, "Brush %i", b->numberId );
-		Brush_SetEpair( b, "Name", cBuff );
-	}
-
-	return cBuff;
-}
-
-/*
-================
 Brush_Alloc
 ================
 */
-brush_t* Brush_Alloc()
+idEditorBrush* Brush_Alloc()
 {
-	brush_t* b = new brush_t;
+	idEditorBrush* b = new idEditorBrush;
 	b->prev = b->next = NULL;
 	b->oprev = b->onext = NULL;
 	b->owner = NULL;
@@ -178,8 +366,6 @@ brush_t* Brush_Alloc()
 	b->redoId = 0;
 	b->ownerId = 0;
 	b->numberId = 0;
-	b->itemOwner = 0;
-	b->bModelFailed = false;
 	b->modelHandle = NULL;
 	b->forceVisibile = false;
 	b->forceWireFrame = false;
@@ -191,7 +377,7 @@ brush_t* Brush_Alloc()
 TextureAxisFromPlane
 ================
 */
-idVec3	baseaxis[18] =
+static const idVec3	baseaxis[18] =
 {
 	idVec3( 0, 0, 1 ),
 	idVec3( 1, 0, 0 ),
@@ -223,7 +409,7 @@ idVec3	baseaxis[18] =
 	idVec3( 0, 0, -1 )	// north wall
 };
 
-void TextureAxisFromPlane( const idPlane& pln, idVec3& xv, idVec3& yv )
+static void TextureAxisFromPlane( const idPlane& pln, idVec3& xv, idVec3& yv )
 {
 	int		bestaxis;
 	float	dot, best;
@@ -244,6 +430,35 @@ void TextureAxisFromPlane( const idPlane& pln, idVec3& xv, idVec3& yv )
 
 	VectorCopy( baseaxis[bestaxis * 3 + 1], xv );
 	VectorCopy( baseaxis[bestaxis * 3 + 2], yv );
+}
+
+/*
+================
+Brush_RemoveEmptyFaces
+
+  Frees any overconstraining faces
+================
+*/
+static void Brush_RemoveEmptyFaces( idEditorBrush* b )
+{
+	face_t*	f, *next;
+
+	f = b->brush_faces;
+	b->brush_faces = NULL;
+
+	for( ; f; f = next )
+	{
+		next = f->next;
+		if( !f->face_winding )
+		{
+			Face_Free( f );
+		}
+		else
+		{
+			f->next = b->brush_faces;
+			b->brush_faces = f;
+		}
+	}
 }
 
 /*
@@ -395,48 +610,7 @@ Face_MoveTexture
 */
 void Face_MoveTexture( face_t* f, idVec3 delta )
 {
-	idVec3	vX, vY;
-
-	/*
-	 * #ifdef _DEBUG if (g_PrefsDlg.m_bBrushPrimitMode) common->Printf("Warning :
-	 * Face_MoveTexture not done in brush primitive mode\n"); #endif
-	 */
-	if( g_qeglobals.m_bBrushPrimitMode )
-	{
-		Face_MoveTexture_BrushPrimit( f, delta );
-	}
-	else
-	{
-		TextureAxisFromPlane( f->plane, vX, vY );
-
-		idVec3	vDP, vShift;
-		vDP[0] = DotProduct( delta, vX );
-		vDP[1] = DotProduct( delta, vY );
-
-		double	fAngle = DEG2RAD( f->texdef.rotate );
-		double	c = cos( fAngle );
-		double	s = sin( fAngle );
-
-		vShift[0] = vDP[0] * c - vDP[1] * s;
-		vShift[1] = vDP[0] * s + vDP[1] * c;
-
-		if( !f->texdef.scale[0] )
-		{
-			f->texdef.scale[0] = 1;
-		}
-
-		if( !f->texdef.scale[1] )
-		{
-			f->texdef.scale[1] = 1;
-		}
-
-		f->texdef.shift[0] -= vShift[0] / f->texdef.scale[0];
-		f->texdef.shift[1] -= vShift[1] / f->texdef.scale[1];
-
-		// clamp the shifts
-		Clamp( f->texdef.shift[0], f->d_texture->GetEditorImage()->GetUploadWidth() );
-		Clamp( f->texdef.shift[1], f->d_texture->GetEditorImage()->GetUploadHeight() );
-	}
+	Face_MoveTexture_BrushPrimit( f, delta );
 }
 
 /*
@@ -444,7 +618,7 @@ void Face_MoveTexture( face_t* f, idVec3 delta )
 Face_SetColor
 ================
 */
-void Face_SetColor( brush_t* b, face_t* f, float fCurveColor )
+void Face_SetColor( idEditorBrush* b, face_t* f, float fCurveColor )
 {
 	float		shade;
 	const idMaterial*	q;
@@ -483,17 +657,6 @@ void Face_TextureVectors( face_t* f, float STfromXYZ[2][4] )
 	const idMaterial*	q;
 	texdef_t*	td;
 
-#ifdef _DEBUG
-
-	//
-	// ++timo when playing with patches, this sometimes get called and the Warning is
-	// displayed find some way out ..
-	//
-	if( g_qeglobals.m_bBrushPrimitMode && !g_qeglobals.bNeedConvert )
-	{
-		common->Printf( "Warning : illegal call of Face_TextureVectors in brush primitive mode\n" );
-	}
-#endif
 	td = &f->texdef;
 	q = f->d_texture;
 
@@ -637,7 +800,7 @@ void EmitTextureCoordinates( idVec5& xyzst, const idMaterial* q, face_t* f, bool
 {
 	float	STfromXYZ[2][4];
 
-	if( g_qeglobals.m_bBrushPrimitMode && !force )
+	if( !force )
 	{
 		EmitBrushPrimitTextureCoordinates( f, f->face_winding );
 	}
@@ -654,7 +817,7 @@ void EmitTextureCoordinates( idVec5& xyzst, const idMaterial* q, face_t* f, bool
 Brush_MakeFacePlanes
 ================
 */
-void Brush_MakeFacePlanes( brush_t* b )
+void Brush_MakeFacePlanes( idEditorBrush* b )
 {
 	face_t*	f;
 
@@ -669,7 +832,7 @@ void Brush_MakeFacePlanes( brush_t* b )
 DrawBrushEntityName
 ================
 */
-void DrawBrushEntityName( brush_t* b )
+void DrawBrushEntityName( idEditorBrush* b )
 {
 	const char*	name;
 
@@ -692,7 +855,7 @@ void DrawBrushEntityName( brush_t* b )
 	if( !( g_qeglobals.d_savedinfo.exclude & EXCLUDE_ANGLES ) )
 	{
 		// draw the angle pointer
-		float a = FloatForKey( b->owner, "angle" );
+		float a = b->owner->FloatForKey( "angle" );
 		if( a )
 		{
 			float s = sin( DEG2RAD( a ) );
@@ -731,16 +894,16 @@ void DrawBrushEntityName( brush_t* b )
 		}
 	}
 
-	int viewType = g_pParentWnd->ActiveXY()->GetViewType();
+	ViewType viewType = g_pParentWnd->ActiveXY()->GetViewType();
 	float scale = g_pParentWnd->ActiveXY()->Scale();
 
 	if( g_qeglobals.d_savedinfo.show_names && scale >= 1.0f )
 	{
-		name = ValueForKey( b->owner, "name" );
+		name = b->owner->ValueForKey( "name" );
 		int nameLen = strlen( name );
 		if( nameLen == 0 )
 		{
-			name = ValueForKey( b->owner, "classname" );
+			name = b->owner->ValueForKey( "classname" );
 			nameLen = strlen( name );
 		}
 		if( nameLen > 0 )
@@ -752,15 +915,15 @@ void DrawBrushEntityName( brush_t* b )
 
 			switch( viewType )
 			{
-				case XY:
+				case ViewType::XY:
 					origin.x -= halfWidth;
 					origin.y += halfHeight;
 					break;
-				case XZ:
+				case ViewType::XZ:
 					origin.x -= halfWidth;
 					origin.z += halfHeight;
 					break;
-				case YZ:
+				case ViewType::YZ:
 					origin.y -= halfWidth;
 					origin.z += halfHeight;
 					break;
@@ -778,7 +941,7 @@ Brush_MakeFaceWinding
   returns the visible winding
 ================
 */
-idWinding* Brush_MakeFaceWinding( brush_t* b, face_t* face, bool keepOnPlaneWinding )
+idWinding* Brush_MakeFaceWinding( idEditorBrush* b, face_t* face, bool keepOnPlaneWinding )
 {
 	idWinding*	w;
 	face_t*		clip;
@@ -843,16 +1006,10 @@ Brush_Build
   TTimo brush grouping: update the group treeview if necessary
 ================
 */
-void Brush_Build( brush_t* b, bool bSnap, bool bMarkMap, bool bConvert, bool updateLights )
+void Brush_Build( idEditorBrush* b, bool bSnap, bool bMarkMap, bool bConvert, bool updateLights )
 {
 	bool bLocalConvert = false;
 
-#ifdef _DEBUG
-	if( !g_qeglobals.m_bBrushPrimitMode && bConvert )
-	{
-		common->Printf( "Warning : conversion from brush primitive to old brush format not implemented\n" );
-	}
-#endif
 	//
 	// if bConvert is set and g_qeglobals.bNeedConvert is not, that just means we need
 	// convert for this brush only
@@ -864,7 +1021,7 @@ void Brush_Build( brush_t* b, bool bSnap, bool bMarkMap, bool bConvert, bool upd
 	}
 
 	/* build the windings and generate the bounding box */
-	Brush_BuildWindings( b, bSnap, EntityHasModel( b->owner ) || b->pPatch, updateLights );
+	Brush_BuildWindings( b, bSnap, b->owner && b->owner->HasModel() || b->pPatch, updateLights );
 
 	/* move the points and edges if in select mode */
 	if( g_qeglobals.d_select_mode == sel_vertex || g_qeglobals.d_select_mode == sel_edge )
@@ -891,9 +1048,9 @@ Brush_SplitBrushByFace
   The incoming brush is NOT freed. The incoming face is NOT left referenced.
 ================
 */
-void Brush_SplitBrushByFace( brush_t* in, face_t* f, brush_t** front, brush_t** back )
+void Brush_SplitBrushByFace( idEditorBrush* in, face_t* f, idEditorBrush** front, idEditorBrush** back )
 {
-	brush_t* b;
+	idEditorBrush* b;
 	face_t*	nf;
 	idVec3	temp;
 
@@ -952,7 +1109,7 @@ Brush_BestSplitFace
   returns the best face to split the brush with. return NULL if the brush is convex
 ================
 */
-face_t* Brush_BestSplitFace( brush_t* b )
+face_t* Brush_BestSplitFace( idEditorBrush* b )
 {
 	face_t*		face, *f, *bestface;
 	idWinding*	front, *back;
@@ -1023,9 +1180,9 @@ Brush_MakeConvexBrushes
   NOTE: the input brush should have windings for the faces.
 ================
 */
-brush_t* Brush_MakeConvexBrushes( brush_t* b )
+idEditorBrush* Brush_MakeConvexBrushes( idEditorBrush* b )
 {
-	brush_t* front, *back, *end;
+	idEditorBrush* front, *back, *end;
 	face_t*	face;
 
 	b->next = NULL;
@@ -1066,7 +1223,7 @@ Brush_Convex
   returns true if the brush is convex
 ================
 */
-int Brush_Convex( brush_t* b )
+int Brush_Convex( idEditorBrush* b )
 {
 	face_t*	face1, *face2;
 
@@ -1113,7 +1270,7 @@ Brush_MoveVertexes
 #define MAX_MOVE_FACES	64
 #define TINY_EPSILON	0.0325f
 
-int Brush_MoveVertex( brush_t* b, const idVec3& vertex, const idVec3& delta, idVec3& end, bool bSnap )
+int Brush_MoveVertex( idEditorBrush* b, const idVec3& vertex, const idVec3& delta, idVec3& end, bool bSnap )
 {
 	face_t*		f, *face, *newface, *lastface, *nextface;
 	face_t*		movefaces[MAX_MOVE_FACES];
@@ -1501,11 +1658,11 @@ Brush_InsertVertexBetween
   Adds a vertex to the brush windings between the given two points.
 ================
 */
-int Brush_InsertVertexBetween( brush_t* b, idVec3 p1, idVec3 p2 )
+int Brush_InsertVertexBetween( idEditorBrush* b, idVec3 p1, idVec3 p2 )
 {
 	face_t*		face;
 	idWinding*	w, *neww;
-	idVec3		point;
+	idVec5		point;
 	int			i, insert;
 
 	if( p1.Compare( p2, TINY_EPSILON ) )
@@ -1566,7 +1723,7 @@ Brush_ResetFaceOriginals
   reset points to original faces to NULL
 ================
 */
-void Brush_ResetFaceOriginals( brush_t* b )
+void Brush_ResetFaceOriginals( idEditorBrush* b )
 {
 	face_t*	face;
 
@@ -1585,9 +1742,9 @@ Brush_Parse
   run before each face parsing. It works, but it's a performance hit
 ================
 */
-brush_t* Brush_Parse( idVec3 origin )
+idEditorBrush* Brush_Parse( idVec3 origin )
 {
-	brush_t* b;
+	idEditorBrush* b;
 	face_t*	f;
 	int		i, j;
 	idVec3	useOrigin = origin;
@@ -1613,17 +1770,9 @@ brush_t* Brush_Parse( idVec3 origin )
 			g_qeglobals.bPrimitBrushes = true;
 
 			// check the map is not mixing the two kinds of brushes
-			if( g_qeglobals.m_bBrushPrimitMode )
+			if( g_qeglobals.bOldBrushes )
 			{
-				if( g_qeglobals.bOldBrushes )
-				{
-					common->Printf( "Warning : old brushes and brush primitive in the same file are not allowed ( Brush_Parse )\n" );
-				}
-			}
-			else
-			{
-				// ++Timo write new brush primitive -> old conversion code for Q3->Q2 conversions ?
-				common->Printf( "Warning : conversion code from brush primitive not done ( Brush_Parse )\n" );
+				common->Printf( "Warning : old brushes and brush primitive in the same file are not allowed ( Brush_Parse )\n" );
 			}
 
 			bool	newFormat = false;
@@ -1648,7 +1797,7 @@ brush_t* Brush_Parse( idVec3 origin )
 
 			if( b == NULL )
 			{
-				Warning( "parsing brush primitive" );
+				idLib::Warning( "parsing brush primitive" );
 				return NULL;
 			}
 			else
@@ -1665,7 +1814,7 @@ brush_t* Brush_Parse( idVec3 origin )
 			b = Patch_Parse( idStr::Icmp( token, "patchDef2" ) == 0 );
 			if( b == NULL )
 			{
-				Warning( "parsing patch/brush" );
+				idLib::Warning( "parsing patch/brush" );
 				return NULL;
 			}
 			else
@@ -1679,17 +1828,15 @@ brush_t* Brush_Parse( idVec3 origin )
 		{
 			// Timo parsing old brush format
 			g_qeglobals.bOldBrushes = true;
-			if( g_qeglobals.m_bBrushPrimitMode )
-			{
-				// check the map is not mixing the two kinds of brushes
-				if( g_qeglobals.bPrimitBrushes )
-				{
-					common->Printf( "Warning : old brushes and brush primitive in the same file are not allowed ( Brush_Parse )\n" );
-				}
 
-				// set the "need" conversion flag
-				g_qeglobals.bNeedConvert = true;
+			// check the map is not mixing the two kinds of brushes
+			if( g_qeglobals.bPrimitBrushes )
+			{
+				common->Printf( "Warning : old brushes and brush primitive in the same file are not allowed ( Brush_Parse )\n" );
 			}
+
+			// set the "need" conversion flag
+			g_qeglobals.bNeedConvert = true;
 
 			f = Face_Alloc();
 
@@ -1720,7 +1867,7 @@ brush_t* Brush_Parse( idVec3 origin )
 
 				if( strcmp( token, "(" ) )
 				{
-					Warning( "parsing brush" );
+					idLib::Warning( "parsing brush" );
 					return NULL;
 				}
 
@@ -1733,7 +1880,7 @@ brush_t* Brush_Parse( idVec3 origin )
 				GetToken( false );
 				if( strcmp( token, ")" ) )
 				{
-					Warning( "parsing brush" );
+					idLib::Warning( "parsing brush" );
 					return NULL;
 				}
 			}
@@ -1742,11 +1889,6 @@ brush_t* Brush_Parse( idVec3 origin )
 		// read the texturedef
 		GetToken( false );
 		f->texdef.SetName( token );
-		if( token[0] == '(' )
-		{
-			int i = 32;
-		}
-
 		GetToken( false );
 		f->texdef.shift[0] = atoi( token );
 		GetToken( false );
@@ -1807,22 +1949,15 @@ Brush_SetEpair
   sets an epair for the given brush
 ================
 */
-void Brush_SetEpair( brush_t* b, const char* pKey, const char* pValue )
+void Brush_SetEpair( idEditorBrush* b, const char* pKey, const char* pValue )
 {
-	if( g_qeglobals.m_bBrushPrimitMode )
+	if( b->pPatch )
 	{
-		if( b->pPatch )
-		{
-			Patch_SetEpair( b->pPatch, pKey, pValue );
-		}
-		else
-		{
-			b->epairs.Set( pKey, pValue );
-		}
+		Patch_SetEpair( b->pPatch, pKey, pValue );
 	}
 	else
 	{
-		Sys_Status( "Can only set key/values in Brush primitive mode\n" );
+		b->epairs.Set( pKey, pValue );
 	}
 }
 
@@ -1831,25 +1966,16 @@ void Brush_SetEpair( brush_t* b, const char* pKey, const char* pValue )
 Brush_GetKeyValue
 ================
 */
-const char* Brush_GetKeyValue( brush_t* b, const char* pKey )
+const char* Brush_GetKeyValue( idEditorBrush* b, const char* pKey )
 {
-	if( g_qeglobals.m_bBrushPrimitMode )
+	if( b->pPatch )
 	{
-		if( b->pPatch )
-		{
-			return Patch_GetKeyValue( b->pPatch, pKey );
-		}
-		else
-		{
-			return b->epairs.GetString( pKey );
-		}
+		return Patch_GetKeyValue( b->pPatch, pKey );
 	}
 	else
 	{
-		Sys_Status( "Can only set brush/patch key/values in Brush primitive mode\n" );
+		return b->epairs.GetString( pKey );
 	}
-
-	return "";
 }
 
 /*
@@ -1859,137 +1985,71 @@ Brush_Write
 	save all brushes as Brush primitive format
 ================
 */
-void Brush_Write( brush_t* b, FILE* f, const idVec3& origin, bool newFormat )
+void Brush_Write( idEditorBrush* b, FILE* f, const idVec3& origin, bool newFormat )
 {
-	face_t*	fa;
-	char*	pname;
-	int		i;
-
 	if( b->pPatch )
 	{
 		Patch_Write( b->pPatch, f );
 		return;
 	}
 
-	if( g_qeglobals.m_bBrushPrimitMode )
+	// save brush primitive format
+	if( newFormat )
 	{
-		// save brush primitive format
-		if( newFormat )
-		{
-			WriteFileString( f, "{\nbrushDef3\n{\n" );
-		}
-		else
-		{
-			WriteFileString( f, "{\nbrushDef\n{\n" );
-		}
-
-		// brush epairs
-		int count = b->epairs.GetNumKeyVals();
-		for( int j = 0; j < count; j++ )
-		{
-			WriteFileString( f, "\"%s\" \"%s\"\n", b->epairs.GetKeyVal( j )->GetKey().c_str(), b->epairs.GetKeyVal( j )->GetValue().c_str() );
-		}
-
-		for( fa = b->brush_faces; fa; fa = fa->next )
-		{
-			// save planepts
-			if( newFormat )
-			{
-				idPlane plane;
-
-				if( fa->dirty )
-				{
-					fa->planepts[0] -= origin;
-					fa->planepts[1] -= origin;
-					fa->planepts[2] -= origin;
-					plane.FromPoints( fa->planepts[0], fa->planepts[1], fa->planepts[2], false );
-					fa->planepts[0] += origin;
-					fa->planepts[1] += origin;
-					fa->planepts[2] += origin;
-				}
-				else
-				{
-					plane = fa->originalPlane;
-				}
-
-				WriteFileString( f, " ( " );
-				for( i = 0; i < 4; i++ )
-				{
-					if( plane[i] == ( int )plane[i] )
-					{
-						WriteFileString( f, "%i ", ( int )plane[i] );
-					}
-					else
-					{
-						WriteFileString( f, "%f ", plane[i] );
-					}
-				}
-
-				WriteFileString( f, ") " );
-			}
-			else
-			{
-				for( i = 0; i < 3; i++ )
-				{
-					WriteFileString( f, "( " );
-					for( int j = 0; j < 3; j++ )
-					{
-						if( fa->planepts[i][j] == static_cast<int>( fa->planepts[i][j] ) )
-						{
-							WriteFileString( f, "%i ", static_cast<int>( fa->planepts[i][j] ) );
-						}
-						else
-						{
-							WriteFileString( f, "%f ", fa->planepts[i][j] );
-						}
-					}
-
-					WriteFileString( f, ") " );
-				}
-			}
-
-			// save texture coordinates
-			WriteFileString( f, "( ( " );
-			for( i = 0; i < 3; i++ )
-			{
-				if( fa->brushprimit_texdef.coords[0][i] == static_cast<int>( fa->brushprimit_texdef.coords[0][i] ) )
-				{
-					WriteFileString( f, "%i ", static_cast<int>( fa->brushprimit_texdef.coords[0][i] ) );
-				}
-				else
-				{
-					WriteFileString( f, "%f ", fa->brushprimit_texdef.coords[0][i] );
-				}
-			}
-
-			WriteFileString( f, ") ( " );
-			for( i = 0; i < 3; i++ )
-			{
-				if( fa->brushprimit_texdef.coords[1][i] == static_cast<int>( fa->brushprimit_texdef.coords[1][i] ) )
-				{
-					WriteFileString( f, "%i ", static_cast<int>( fa->brushprimit_texdef.coords[1][i] ) );
-				}
-				else
-				{
-					WriteFileString( f, "%f ", fa->brushprimit_texdef.coords[1][i] );
-				}
-			}
-
-			WriteFileString( f, ") ) " );
-
-			char*	pName = strlen( fa->texdef.name ) > 0 ? fa->texdef.name : "notexture";
-			WriteFileString( f, "\"%s\" ", pName );
-			WriteFileString( f, "%i %i %i\n", 0, 0, 0 );
-		}
-
-		WriteFileString( f, "}\n}\n" );
+		WriteFileString( f, "{\nbrushDef3\n{\n" );
 	}
 	else
 	{
-		WriteFileString( f, "{\n" );
-		for( fa = b->brush_faces; fa; fa = fa->next )
+		WriteFileString( f, "{\nbrushDef\n{\n" );
+	}
+
+	// brush epairs
+	int count = b->epairs.GetNumKeyVals();
+	for( int j = 0; j < count; j++ )
+	{
+		WriteFileString( f, "\"%s\" \"%s\"\n", b->epairs.GetKeyVal( j )->GetKey().c_str(), b->epairs.GetKeyVal( j )->GetValue().c_str() );
+	}
+
+	for( auto fa = b->brush_faces; fa; fa = fa->next )
+	{
+		// save planepts
+		if( newFormat )
 		{
-			for( i = 0; i < 3; i++ )
+			idPlane plane;
+
+			if( fa->dirty )
+			{
+				fa->planepts[0] -= origin;
+				fa->planepts[1] -= origin;
+				fa->planepts[2] -= origin;
+				plane.FromPoints( fa->planepts[0], fa->planepts[1], fa->planepts[2], false );
+				fa->planepts[0] += origin;
+				fa->planepts[1] += origin;
+				fa->planepts[2] += origin;
+			}
+			else
+			{
+				plane = fa->originalPlane;
+			}
+
+			WriteFileString( f, " ( " );
+			for( int i = 0; i < 4; i++ )
+			{
+				if( plane[i] == ( int )plane[i] )
+				{
+					WriteFileString( f, "%i ", ( int )plane[i] );
+				}
+				else
+				{
+					WriteFileString( f, "%f ", plane[i] );
+				}
+			}
+
+			WriteFileString( f, ") " );
+		}
+		else
+		{
+			for( int i = 0; i < 3; i++ )
 			{
 				WriteFileString( f, "( " );
 				for( int j = 0; j < 3; j++ )
@@ -2006,70 +2066,43 @@ void Brush_Write( brush_t* b, FILE* f, const idVec3& origin, bool newFormat )
 
 				WriteFileString( f, ") " );
 			}
-
-			pname = fa->texdef.name;
-			if( pname[0] == 0 )
-			{
-				pname = "unnamed";
-			}
-
-			WriteFileString
-			(
-				f,
-				"%s %i %i %i ",
-				pname,
-				( int )fa->texdef.shift[0],
-				( int )fa->texdef.shift[1],
-				( int )fa->texdef.rotate
-			);
-
-			if( fa->texdef.scale[0] == ( int )fa->texdef.scale[0] )
-			{
-				WriteFileString( f, "%i ", ( int )fa->texdef.scale[0] );
-			}
-			else
-			{
-				WriteFileString( f, "%f ", ( float )fa->texdef.scale[0] );
-			}
-
-			if( fa->texdef.scale[1] == ( int )fa->texdef.scale[1] )
-			{
-				WriteFileString( f, "%i", ( int )fa->texdef.scale[1] );
-			}
-			else
-			{
-				WriteFileString( f, "%f", ( float )fa->texdef.scale[1] );
-			}
-
-			WriteFileString( f, " %i %i %i", 0, 0, 0 );
-
-			WriteFileString( f, "\n" );
 		}
 
-		WriteFileString( f, "}\n" );
+		// save texture coordinates
+		WriteFileString( f, "( ( " );
+		for( int i = 0; i < 3; i++ )
+		{
+			if( fa->brushprimit_texdef.coords[0][i] == static_cast<int>( fa->brushprimit_texdef.coords[0][i] ) )
+			{
+				WriteFileString( f, "%i ", static_cast<int>( fa->brushprimit_texdef.coords[0][i] ) );
+			}
+			else
+			{
+				WriteFileString( f, "%f ", fa->brushprimit_texdef.coords[0][i] );
+			}
+		}
+
+		WriteFileString( f, ") ( " );
+		for( int i = 0; i < 3; i++ )
+		{
+			if( fa->brushprimit_texdef.coords[1][i] == static_cast<int>( fa->brushprimit_texdef.coords[1][i] ) )
+			{
+				WriteFileString( f, "%i ", static_cast<int>( fa->brushprimit_texdef.coords[1][i] ) );
+			}
+			else
+			{
+				WriteFileString( f, "%f ", fa->brushprimit_texdef.coords[1][i] );
+			}
+		}
+
+		WriteFileString( f, ") ) " );
+
+		char*	pName = strlen( fa->texdef.name ) > 0 ? fa->texdef.name : "notexture";
+		WriteFileString( f, "\"%s\" ", pName );
+		WriteFileString( f, "%i %i %i\n", 0, 0, 0 );
 	}
-}
 
-/*
-================
-QERApp_MapPrintf_MEMFILE
-
-  callback for surface properties plugin must fit a PFN_QERAPP_MAPPRINTF ( see isurfaceplugin.h )
-  carefully initialize !
-================
-*/
-CMemFile*	g_pMemFile;
-
-void WINAPI QERApp_MapPrintf_MEMFILE( char* text, ... )
-{
-	va_list argptr;
-	char	buf[32768];
-
-	va_start( argptr, text );
-	vsprintf( buf, text, argptr );
-	va_end( argptr );
-
-	MemFile_fprintf( g_pMemFile, buf );
+	WriteFileString( f, "}\n}\n" );
 }
 
 /*
@@ -2079,140 +2112,72 @@ Brush_Write
   save all brushes as Brush primitive format to a CMemFile*
 ================
 */
-void Brush_Write( brush_t* b, CMemFile* pMemFile, const idVec3& origin, bool newFormat )
+void Brush_Write( idEditorBrush* b, CMemFile* pMemFile, const idVec3& origin, bool newFormat )
 {
-	face_t*	fa;
-	char*	pname;
-	int		i;
-
 	if( b->pPatch )
 	{
 		Patch_Write( b->pPatch, pMemFile );
 		return;
 	}
 
-	if( g_qeglobals.m_bBrushPrimitMode )
+	// brush primitive format
+	if( newFormat )
 	{
-		// brush primitive format
-		if( newFormat )
-		{
-			MemFile_fprintf( pMemFile, "{\nBrushDef2\n{\n" );
-		}
-		else
-		{
-			MemFile_fprintf( pMemFile, "{\nBrushDef\n{\n" );
-		}
-
-		// brush epairs
-		// brush epairs
-		int count = b->epairs.GetNumKeyVals();
-		for( int j = 0; j < count; j++ )
-		{
-			MemFile_fprintf( pMemFile, "\"%s\" \"%s\"\n", b->epairs.GetKeyVal( j )->GetKey().c_str(), b->epairs.GetKeyVal( j )->GetValue().c_str() );
-		}
-
-		for( fa = b->brush_faces; fa; fa = fa->next )
-		{
-			if( newFormat )
-			{
-				// save planepts
-				idPlane plane;
-
-				if( fa->dirty )
-				{
-					fa->planepts[0] -= origin;
-					fa->planepts[1] -= origin;
-					fa->planepts[2] -= origin;
-					plane.FromPoints( fa->planepts[0], fa->planepts[1], fa->planepts[2], false );
-					fa->planepts[0] += origin;
-					fa->planepts[1] += origin;
-					fa->planepts[2] += origin;
-				}
-				else
-				{
-					plane = fa->originalPlane;
-				}
-
-				MemFile_fprintf( pMemFile, " ( " );
-				for( i = 0; i < 4; i++ )
-				{
-					if( plane[i] == ( int )plane[i] )
-					{
-						MemFile_fprintf( pMemFile, "%i ", ( int )plane[i] );
-					}
-					else
-					{
-						MemFile_fprintf( pMemFile, "%f ", plane[i] );
-					}
-				}
-
-				MemFile_fprintf( pMemFile, ") " );
-			}
-			else
-			{
-				for( i = 0; i < 3; i++ )
-				{
-					MemFile_fprintf( pMemFile, "( " );
-					for( int j = 0; j < 3; j++ )
-					{
-						if( fa->planepts[i][j] == static_cast<int>( fa->planepts[i][j] ) )
-						{
-							MemFile_fprintf( pMemFile, "%i ", static_cast<int>( fa->planepts[i][j] ) );
-						}
-						else
-						{
-							MemFile_fprintf( pMemFile, "%f ", fa->planepts[i][j] );
-						}
-					}
-
-					MemFile_fprintf( pMemFile, ") " );
-				}
-			}
-
-			// save texture coordinates
-			MemFile_fprintf( pMemFile, "( ( " );
-			for( i = 0; i < 3; i++ )
-			{
-				if( fa->brushprimit_texdef.coords[0][i] == static_cast<int>( fa->brushprimit_texdef.coords[0][i] ) )
-				{
-					MemFile_fprintf( pMemFile, "%i ", static_cast<int>( fa->brushprimit_texdef.coords[0][i] ) );
-				}
-				else
-				{
-					MemFile_fprintf( pMemFile, "%f ", fa->brushprimit_texdef.coords[0][i] );
-				}
-			}
-
-			MemFile_fprintf( pMemFile, ") ( " );
-			for( i = 0; i < 3; i++ )
-			{
-				if( fa->brushprimit_texdef.coords[1][i] == static_cast<int>( fa->brushprimit_texdef.coords[1][i] ) )
-				{
-					MemFile_fprintf( pMemFile, "%i ", static_cast<int>( fa->brushprimit_texdef.coords[1][i] ) );
-				}
-				else
-				{
-					MemFile_fprintf( pMemFile, "%f ", fa->brushprimit_texdef.coords[1][i] );
-				}
-			}
-
-			MemFile_fprintf( pMemFile, ") ) " );
-
-			// save texture attribs
-			char*	pName = strlen( fa->texdef.name ) > 0 ? fa->texdef.name : "unnamed";
-			MemFile_fprintf( pMemFile, "\"%s\" ", pName );
-			MemFile_fprintf( pMemFile, "%i %i %i\n", 0, 0, 0 );
-		}
-
-		MemFile_fprintf( pMemFile, "}\n}\n" );
+		MemFile_fprintf( pMemFile, "{\nBrushDef2\n{\n" );
 	}
 	else
 	{
-		// old brushes format also handle surface properties plugin
-		MemFile_fprintf( pMemFile, "{\n" );
-		for( fa = b->brush_faces; fa; fa = fa->next )
+		MemFile_fprintf( pMemFile, "{\nBrushDef\n{\n" );
+	}
+
+	// brush epairs
+	// brush epairs
+	int count = b->epairs.GetNumKeyVals();
+	for( int j = 0; j < count; j++ )
+	{
+		MemFile_fprintf( pMemFile, "\"%s\" \"%s\"\n", b->epairs.GetKeyVal( j )->GetKey().c_str(), b->epairs.GetKeyVal( j )->GetValue().c_str() );
+	}
+
+	for( auto fa = b->brush_faces; fa; fa = fa->next )
+	{
+		if( newFormat )
 		{
-			for( i = 0; i < 3; i++ )
+			// save planepts
+			idPlane plane;
+
+			if( fa->dirty )
+			{
+				fa->planepts[0] -= origin;
+				fa->planepts[1] -= origin;
+				fa->planepts[2] -= origin;
+				plane.FromPoints( fa->planepts[0], fa->planepts[1], fa->planepts[2], false );
+				fa->planepts[0] += origin;
+				fa->planepts[1] += origin;
+				fa->planepts[2] += origin;
+			}
+			else
+			{
+				plane = fa->originalPlane;
+			}
+
+			MemFile_fprintf( pMemFile, " ( " );
+			for( int i = 0; i < 4; i++ )
+			{
+				if( plane[i] == ( int )plane[i] )
+				{
+					MemFile_fprintf( pMemFile, "%i ", ( int )plane[i] );
+				}
+				else
+				{
+					MemFile_fprintf( pMemFile, "%f ", plane[i] );
+				}
+			}
+
+			MemFile_fprintf( pMemFile, ") " );
+		}
+		else
+		{
+			for( int i = 0; i < 3; i++ )
 			{
 				MemFile_fprintf( pMemFile, "( " );
 				for( int j = 0; j < 3; j++ )
@@ -2229,48 +2194,44 @@ void Brush_Write( brush_t* b, CMemFile* pMemFile, const idVec3& origin, bool new
 
 				MemFile_fprintf( pMemFile, ") " );
 			}
-
-			pname = fa->texdef.name;
-			if( pname[0] == 0 )
-			{
-				pname = "unnamed";
-			}
-
-			MemFile_fprintf
-			(
-				pMemFile,
-				"%s %i %i %i ",
-				pname,
-				( int )fa->texdef.shift[0],
-				( int )fa->texdef.shift[1],
-				( int )fa->texdef.rotate
-			);
-
-			if( fa->texdef.scale[0] == ( int )fa->texdef.scale[0] )
-			{
-				MemFile_fprintf( pMemFile, "%i ", ( int )fa->texdef.scale[0] );
-			}
-			else
-			{
-				MemFile_fprintf( pMemFile, "%f ", ( float )fa->texdef.scale[0] );
-			}
-
-			if( fa->texdef.scale[1] == ( int )fa->texdef.scale[1] )
-			{
-				MemFile_fprintf( pMemFile, "%i", ( int )fa->texdef.scale[1] );
-			}
-			else
-			{
-				MemFile_fprintf( pMemFile, "%f", ( float )fa->texdef.scale[1] );
-			}
-
-			MemFile_fprintf( pMemFile, " %i %i %i", 0, 0, 0 );
-
-			MemFile_fprintf( pMemFile, "\n" );
 		}
 
-		MemFile_fprintf( pMemFile, "}\n" );
+		// save texture coordinates
+		MemFile_fprintf( pMemFile, "( ( " );
+		for( int i = 0; i < 3; i++ )
+		{
+			if( fa->brushprimit_texdef.coords[0][i] == static_cast<int>( fa->brushprimit_texdef.coords[0][i] ) )
+			{
+				MemFile_fprintf( pMemFile, "%i ", static_cast<int>( fa->brushprimit_texdef.coords[0][i] ) );
+			}
+			else
+			{
+				MemFile_fprintf( pMemFile, "%f ", fa->brushprimit_texdef.coords[0][i] );
+			}
+		}
+
+		MemFile_fprintf( pMemFile, ") ( " );
+		for( int i = 0; i < 3; i++ )
+		{
+			if( fa->brushprimit_texdef.coords[1][i] == static_cast<int>( fa->brushprimit_texdef.coords[1][i] ) )
+			{
+				MemFile_fprintf( pMemFile, "%i ", static_cast<int>( fa->brushprimit_texdef.coords[1][i] ) );
+			}
+			else
+			{
+				MemFile_fprintf( pMemFile, "%f ", fa->brushprimit_texdef.coords[1][i] );
+			}
+		}
+
+		MemFile_fprintf( pMemFile, ") ) " );
+
+		// save texture attribs
+		char*	pName = strlen( fa->texdef.name ) > 0 ? fa->texdef.name : "unnamed";
+		MemFile_fprintf( pMemFile, "\"%s\" ", pName );
+		MemFile_fprintf( pMemFile, "%i %i %i\n", 0, 0, 0 );
 	}
+
+	MemFile_fprintf( pMemFile, "}\n}\n" );
 }
 
 /*
@@ -2280,12 +2241,12 @@ Brush_Create
   Create non-textured blocks for entities The brush is NOT linked to any list
 ================
 */
-brush_t* Brush_Create( idVec3 mins, idVec3 maxs, texdef_t* texdef )
+idEditorBrush* Brush_Create( idVec3 mins, idVec3 maxs, texdef_t* texdef )
 {
 	int		i, j;
 	idVec3	pts[4][2];
 	face_t*	f;
-	brush_t* b;
+	idEditorBrush* b;
 
 	//
 	// brush primitive mode : convert texdef to brushprimit_texdef ? most of the time
@@ -2295,7 +2256,7 @@ brush_t* Brush_Create( idVec3 mins, idVec3 maxs, texdef_t* texdef )
 	{
 		if( maxs[i] < mins[i] )
 		{
-			Error( "Brush_InitSolid: backwards" );
+			idLib::Error( "Brush_InitSolid: backwards" );
 		}
 	}
 
@@ -2360,7 +2321,7 @@ brush_t* Brush_Create( idVec3 mins, idVec3 maxs, texdef_t* texdef )
 Brush_Scale
 =============
 */
-void Brush_Scale( brush_t* b )
+void Brush_Scale( idEditorBrush* b )
 {
 	for( face_t* f = b->brush_faces; f; f = f->next )
 	{
@@ -2378,11 +2339,12 @@ Brush_CreatePyramid
   Create non-textured pyramid for light entities The brush is NOT linked to any list
 ================
 */
-brush_t* Brush_CreatePyramid( idVec3 mins, idVec3 maxs, texdef_t* texdef )
+idEditorBrush* Brush_CreatePyramid( idVec3 mins, idVec3 maxs, texdef_t* texdef )
 {
 	// ++timo handle new brush primitive ? return here ??
 	return Brush_Create( mins, maxs, texdef );
 
+#if 0
 	int i;
 	for( i = 0; i < 3; i++ )
 	{
@@ -2392,7 +2354,7 @@ brush_t* Brush_CreatePyramid( idVec3 mins, idVec3 maxs, texdef_t* texdef )
 		}
 	}
 
-	brush_t* b = Brush_Alloc();
+	idEditorBrush* b = Brush_Alloc();
 
 	idVec3	corners[4];
 
@@ -2448,6 +2410,7 @@ brush_t* Brush_CreatePyramid( idVec3 mins, idVec3 maxs, texdef_t* texdef )
 	}
 
 	return b;
+#endif
 }
 
 /*
@@ -2459,9 +2422,9 @@ Brush_MakeSided
 */
 void Brush_MakeSided( int sides )
 {
-	int			i, axis;
+	int			i, axis = 0;
 	idVec3		mins, maxs;
-	brush_t*		b;
+	idEditorBrush*		b;
 	texdef_t*	texdef;
 	face_t*		f;
 	idVec3		mid;
@@ -2497,13 +2460,13 @@ void Brush_MakeSided( int sides )
 	{
 		switch( g_pParentWnd->ActiveXY()->GetViewType() )
 		{
-			case XY:
+			case ViewType::XY:
 				axis = 2;
 				break;
-			case XZ:
+			case ViewType::XZ:
 				axis = 1;
 				break;
-			case YZ:
+			case ViewType::YZ:
 				axis = 0;
 				break;
 		}
@@ -2608,7 +2571,7 @@ Brush_Free
   set bRemoveNode to false to avoid trying to delete the item in group view tree control
 ================
 */
-void Brush_Free( brush_t* b, bool bRemoveNode )
+void Brush_Free( idEditorBrush* b, bool bRemoveNode )
 {
 	face_t*	f, *next;
 
@@ -2649,13 +2612,13 @@ Face_MemorySize
   returns the size in memory of the face
 ================
 */
-int Face_MemorySize( face_t* f )
+int Face_MemorySize( const face_t* face )
 {
 	int size = 0;
 
-	if( f->face_winding )
+	if( face->face_winding )
 	{
-		size += sizeof( idWinding ) + f->face_winding->GetNumPoints() * sizeof( ( f->face_winding )[0] );
+		size += sizeof( idWinding ) + face->face_winding->GetNumPoints() * sizeof( ( face->face_winding )[0] );
 	}
 	size += sizeof( face_t );
 	return size;
@@ -2668,21 +2631,20 @@ Brush_MemorySize
   returns the size in memory of the brush
 ================
 */
-int Brush_MemorySize( brush_t* b )
+int Brush_MemorySize( const idEditorBrush* brush )
 {
-	face_t*	f;
-	int		size = 0;
-	if( b->pPatch )
+	int size = 0;
+	if( brush->pPatch )
 	{
-		size += Patch_MemorySize( b->pPatch );
+		size += Patch_MemorySize( brush->pPatch );
 	}
 
-	for( f = b->brush_faces; f; f = f->next )
+	for( const face_t* face = brush->brush_faces; face; face = face->next )
 	{
-		size += Face_MemorySize( f );
+		size += Face_MemorySize( face );
 	}
 
-	size += sizeof( brush_t ) + b->epairs.Size();
+	size += sizeof( idEditorBrush ) + brush->epairs.Size();
 	return size;
 }
 
@@ -2693,9 +2655,9 @@ Brush_Clone
   does not add the brush to any lists
 ================
 */
-brush_t* Brush_Clone( brush_t* b )
+idEditorBrush* Brush_Clone( idEditorBrush* b )
 {
-	brush_t* n = NULL;
+	idEditorBrush* n = NULL;
 	face_t*	f, *nf;
 
 	if( b->pPatch )
@@ -2742,11 +2704,10 @@ Brush_FullClone
   Does NOT add the new brush to any lists.
 ================
 */
-brush_t* Brush_FullClone( brush_t* b )
+idEditorBrush* Brush_FullClone( idEditorBrush* b )
 {
-	brush_t* n = NULL;
+	idEditorBrush* n = NULL;
 	face_t*	f, *nf, *f2, *nf2;
-	int		j;
 
 	if( b->pPatch )
 	{
@@ -2807,17 +2768,7 @@ brush_t* Brush_FullClone( brush_t* b )
 			Face_SetColor( n, nf, 1.0f );
 			if( nf->face_winding )
 			{
-				if( g_qeglobals.m_bBrushPrimitMode )
-				{
-					EmitBrushPrimitTextureCoordinates( nf, nf->face_winding );
-				}
-				else
-				{
-					for( j = 0; j < nf->face_winding->GetNumPoints(); j++ )
-					{
-						EmitTextureCoordinates( ( *nf->face_winding )[j], nf->d_texture, nf );
-					}
-				}
+				EmitBrushPrimitTextureCoordinates( nf, nf->face_winding );
 			}
 		}
 	}
@@ -2825,7 +2776,6 @@ brush_t* Brush_FullClone( brush_t* b )
 	return n;
 }
 
-extern bool GetMatrixForKey( entity_t* ent, const char* key, idMat3& mat );
 extern bool Patch_Intersect( patchMesh_t* pm, idVec3 origin, idVec3 direction , float& scale );
 extern bool RayIntersectsTri
 (
@@ -2863,7 +2813,7 @@ Brush_ModelIntersect
 ================
 */
 
-bool Brush_ModelIntersect( brush_t* b, idVec3 origin, idVec3 dir, float& scale )
+bool Brush_ModelIntersect( idEditorBrush* b, idVec3 origin, idVec3 dir, float& scale )
 {
 	idRenderModel* model = b->modelHandle;
 	idRenderModel* md5;
@@ -2883,13 +2833,13 @@ bool Brush_ModelIntersect( brush_t* b, idVec3 origin, idVec3 dir, float& scale )
 				// take care of animated models
 				md5 = b->owner->eclass->entityModel;
 
-				const char* classname = ValueForKey( b->owner, "classname" );
+				const char* classname = b->owner->ValueForKey( "classname" );
 				if( stricmp( classname, "func_static" ) == 0 )
 				{
-					classname = ValueForKey( b->owner, "animclass" );
+					classname = b->owner->ValueForKey( "animclass" );
 				}
-				const char* anim = ValueForKey( b->owner, "anim" );
-				int frame = IntForKey( b->owner, "frame" ) + 1;
+				const char* anim = b->owner->ValueForKey( "anim" );
+				int frame = b->owner->IntForKey( "frame" ) + 1;
 				if( frame < 1 )
 				{
 					frame = 1;
@@ -2908,14 +2858,14 @@ bool Brush_ModelIntersect( brush_t* b, idVec3 origin, idVec3 dir, float& scale )
 
 		bool matrix = false;
 		idMat3 mat;
-		float a, s, c;
-		if( GetMatrixForKey( b->owner, "rotation", mat ) )
+		float a = 0.0f, s = 0.0f, c = 0.0f;
+		if( b->owner->GetMatrixForKey( "rotation", mat ) )
 		{
 			matrix = true;
 		}
 		else
 		{
-			a = FloatForKey( b->owner, "angle" );
+			a = b->owner->FloatForKey( "angle" );
 			if( a )
 			{
 				s = sin( DEG2RAD( a ) );
@@ -2968,9 +2918,9 @@ bool Brush_ModelIntersect( brush_t* b, idVec3 origin, idVec3 dir, float& scale )
 	return false;
 }
 
-face_t* Brush_Ray( idVec3 origin, idVec3 dir, brush_t* b, float* dist, bool testPrimitive )
+face_t* Brush_Ray( idVec3 origin, idVec3 dir, idEditorBrush* b, float* dist, bool testPrimitive )
 {
-	face_t*	f, *firstface = NULL;
+	face_t*	firstface = NULL;
 	idVec3	p1, p2;
 	float	frac, d1, d2;
 	int		i;
@@ -2981,7 +2931,7 @@ face_t* Brush_Ray( idVec3 origin, idVec3 dir, brush_t* b, float* dist, bool test
 		p2[i] = p1[i] + dir[i] * HUGE_DISTANCE * 2;
 	}
 
-	for( f = b->brush_faces; f; f = f->next )
+	for( face_t* f = b->brush_faces; f; f = f->next )
 	{
 		d1 = DotProduct( p1, f->plane ) + f->plane[3];
 		d2 = DotProduct( p2, f->plane ) + f->plane[3];
@@ -3048,7 +2998,7 @@ face_t* Brush_Ray( idVec3 origin, idVec3 dir, brush_t* b, float* dist, bool test
 Brush_Point
 ================
 */
-face_t* Brush_Point( idVec3 origin, brush_t* b )
+face_t* Brush_Point( idVec3 origin, idEditorBrush* b )
 {
 	face_t*	f;
 	float	d1;
@@ -3070,11 +3020,11 @@ face_t* Brush_Point( idVec3 origin, brush_t* b )
 Brush_AddToList
 ================
 */
-void Brush_AddToList( brush_t* b, brush_t* list )
+void Brush_AddToList( idEditorBrush* b, idEditorBrush* list )
 {
 	if( b->next || b->prev )
 	{
-		Error( "Brush_AddToList: allready linked" );
+		idLib::Error( "Brush_AddToList: already linked" );
 	}
 
 	if( list == &selected_brushes || list == &active_brushes )
@@ -3098,11 +3048,11 @@ void Brush_AddToList( brush_t* b, brush_t* list )
 Brush_RemoveFromList
 ================
 */
-void Brush_RemoveFromList( brush_t* b )
+void Brush_RemoveFromList( idEditorBrush* b )
 {
 	if( !b->next || !b->prev )
 	{
-		Error( "Brush_RemoveFromList: not linked" );
+		idLib::Error( "Brush_RemoveFromList: not linked" );
 	}
 
 	if( b->pPatch )
@@ -3130,45 +3080,10 @@ SetFaceTexdef
   get ->Copy() of it into the face ( and remember to hook ) if NULL, ask for a default
 ================
 */
-void SetFaceTexdef( brush_t* b, face_t* f, texdef_t* texdef, brushprimit_texdef_t* brushprimit_texdef, bool bFitScale )
+void SetFaceTexdef( idEditorBrush* b, face_t* f, texdef_t* texdef, brushprimit_texdef_t* brushprimit_texdef, bool bFitScale )
 {
-
-	if( g_qeglobals.m_bBrushPrimitMode )
-	{
-		f->texdef = *texdef;
-		ConvertTexMatWithQTexture( brushprimit_texdef, NULL, &f->brushprimit_texdef, Texture_ForName( f->texdef.name ) );
-	}
-	else if( bFitScale )
-	{
-		f->texdef = *texdef;
-
-		// fit the scaling of the texture on the actual plane
-		idVec3	p1, p2, p3; // absolute coordinates
-
-		// compute absolute coordinates
-		ComputeAbsolute( f, p1, p2, p3 );
-
-		// compute the scale
-		idVec3	vx, vy;
-		VectorSubtract( p2, p1, vx );
-		vx.Normalize();
-		VectorSubtract( p3, p1, vy );
-		vy.Normalize();
-
-		// assign scale
-		VectorScale( vx, texdef->scale[0], vx );
-		VectorScale( vy, texdef->scale[1], vy );
-		VectorAdd( p1, vx, p2 );
-		VectorAdd( p1, vy, p3 );
-
-		// compute back shift scale rot
-		AbsoluteToLocal( f->plane, f, p1, p2, p3 );
-	}
-	else
-	{
-		f->texdef = *texdef;
-	}
-
+	f->texdef = *texdef;
+	ConvertTexMatWithQTexture( brushprimit_texdef, NULL, &f->brushprimit_texdef, Texture_ForName( f->texdef.name ) );
 }
 
 /*
@@ -3176,7 +3091,7 @@ void SetFaceTexdef( brush_t* b, face_t* f, texdef_t* texdef, brushprimit_texdef_
 Brush_SetTexture
 ================
 */
-void Brush_SetTexture( brush_t* b, texdef_t* texdef, brushprimit_texdef_t* brushprimit_texdef, bool bFitScale )
+void Brush_SetTexture( idEditorBrush* b, texdef_t* texdef, brushprimit_texdef_t* brushprimit_texdef, bool bFitScale )
 {
 	if( b->pPatch )
 	{
@@ -3198,7 +3113,7 @@ void Brush_SetTexture( brush_t* b, texdef_t* texdef, brushprimit_texdef_t* brush
 Brush_SetTextureName
 ====================
 */
-void Brush_SetTextureName( brush_t* b, const char* name )
+void Brush_SetTextureName( idEditorBrush* b, const char* name )
 {
 	if( b->pPatch )
 	{
@@ -3292,7 +3207,7 @@ int AddPlanept( idVec3* f )
 AddMovePlane
 ================
 */
-void AddMovePlane( idPlane* p )
+static void AddMovePlane( idPlane* p )
 {
 
 	for( int i = 0; i < g_qeglobals.d_num_move_planes; i++ )
@@ -3321,16 +3236,16 @@ Brush_SelectFaceForDragging
   Adds the faces planepts to move_points, and rotates and adds the planepts of adjacent face if shear is set
 ================
 */
-void Brush_SelectFaceForDragging( brush_t* b, face_t* f, bool shear )
+void Brush_SelectFaceForDragging( idEditorBrush* b, face_t* f, bool shear )
 {
 	int			i;
 	face_t*		f2;
 	idWinding*	w;
 	float		d;
-	brush_t*		b2;
+	idEditorBrush*		b2;
 	int			c;
 
-	if( b->owner->eclass->fixedsize || EntityHasModel( b->owner ) )
+	if( b->owner->eclass->fixedsize || b->owner->HasModel() )
 	{
 		return;
 	}
@@ -3345,7 +3260,7 @@ void Brush_SelectFaceForDragging( brush_t* b, face_t* f, bool shear )
 
 	if( c == 0 )
 	{
-		return;				// allready completely added
+		return;				// already completely added
 	}
 
 	// select all points on this plane in all brushes the selection
@@ -3457,7 +3372,7 @@ Brush_SideSelect
   The mouse click did not hit the brush, so grab one or more side planes for dragging.
 ================
 */
-void Brush_SideSelect( brush_t* b, idVec3 origin, idVec3 dir, bool shear )
+void Brush_SideSelect( idEditorBrush* b, idVec3 origin, idVec3 dir, bool shear )
 {
 	face_t*	f, *f2;
 	idVec3	p1, p2;
@@ -3502,29 +3417,26 @@ void Brush_SideSelect( brush_t* b, idVec3 origin, idVec3 dir, bool shear )
 	}
 }
 
-extern void UpdateSelectablePoint( brush_t* b, idVec3 v, int type );
-extern void	AddSelectablePoint( brush_t* b, idVec3 v, int type, bool priority );
-extern void	ClearSelectablePoints( brush_t* b );
+extern void UpdateSelectablePoint( idEditorBrush* b, idVec3 v, int type );
 
 /*
 ================
 Brush_TransformedPoint
 ================
 */
-extern void VectorSnapGrid( idVec3& v );
 
-idMat3 Brush_RotationMatrix( brush_t* b )
+idMat3 Brush_RotationMatrix( idEditorBrush* b )
 {
 	idMat3 mat;
 	mat.Identity();
-	if( !GetMatrixForKey( b->owner, "light_rotation", mat ) )
+	if( !b->owner->GetMatrixForKey( "light_rotation", mat ) )
 	{
-		GetMatrixForKey( b->owner, "rotation", mat );
+		b->owner->GetMatrixForKey( "rotation", mat );
 	}
 	return mat;
 }
 
-idVec3 Brush_TransformedPoint( brush_t* b, const idVec3& in )
+idVec3 Brush_TransformedPoint( idEditorBrush* b, const idVec3& in )
 {
 	idVec3 out = in;
 	out -= b->owner->origin;
@@ -3537,7 +3449,7 @@ idVec3 Brush_TransformedPoint( brush_t* b, const idVec3& in )
 Brush_UpdateLightPoints
 ================
 */
-void Brush_UpdateLightPoints( brush_t* b, const idVec3& offset )
+static void Brush_UpdateLightPoints( idEditorBrush* b, const idVec3& offset )
 {
 
 	if( !( b->owner->eclass->nShowFlags & ECLASS_LIGHT ) )
@@ -3559,33 +3471,33 @@ void Brush_UpdateLightPoints( brush_t* b, const idVec3& offset )
 	idVec3	vCenter;
 	idVec3* origin = ( b->trackLightOrigin ) ? &b->owner->lightOrigin : &b->owner->origin;
 
-	if( !GetVectorForKey( b->owner, "_color", b->lightColor ) )
+	if( !b->owner->GetVectorForKey( "_color", b->lightColor ) )
 	{
 		b->lightColor[0] = b->lightColor[1] = b->lightColor[2] = 1;
 	}
 
-	const char*	str = ValueForKey( b->owner, "texture" );
+	const char* str = b->owner->ValueForKey( "texture" );
 	b->lightTexture = -1;
 	if( str && strlen( str ) > 0 )
 	{
 		const idMaterial*	q = Texture_LoadLight( str );
 		if( q )
 		{
-			//b->lightTexture = q->GetEditorImage()->GetTe;
+			b->lightTexture = q->GetEditorImage()->GetTextureNum();
 		}
 	}
 
-	str = ValueForKey( b->owner, "light_right" );
+	str = b->owner->ValueForKey( "light_right" );
 	if( str && *str )
 	{
 		idVec3	vRight, vUp, vTarget, vTemp;
 
-		if( GetVectorForKey( b->owner, "light_start", b->lightStart ) )
+		if( b->owner->GetVectorForKey( "light_start", b->lightStart ) )
 		{
 			b->startEnd = true;
-			if( !GetVectorForKey( b->owner, "light_end", b->lightEnd ) )
+			if( !b->owner->GetVectorForKey( "light_end", b->lightEnd ) )
 			{
-				GetVectorForKey( b->owner, "light_target", b->lightEnd );
+				b->owner->GetVectorForKey( "light_target", b->lightEnd );
 			}
 
 
@@ -3598,14 +3510,14 @@ void Brush_UpdateLightPoints( brush_t* b, const idVec3& offset )
 			b->startEnd = false;
 		}
 
-		GetVectorForKey( b->owner, "light_right", vRight );
-		GetVectorForKey( b->owner, "light_up", vUp );
-		GetVectorForKey( b->owner, "light_target", vTarget );
+		b->owner->GetVectorForKey( "light_right", vRight );
+		b->owner->GetVectorForKey( "light_up", vUp );
+		b->owner->GetVectorForKey( "light_target", vTarget );
 		if( offset.x || offset.y || offset.z )
 		{
 			CString str;
 			VectorAdd( vTarget, offset, vTarget );
-			SetKeyVec3( b->owner, "light_target", vTarget );
+			b->owner->SetKeyVec3( "light_target", vTarget );
 		}
 
 		VectorAdd( vTarget, *origin, b->lightTarget );
@@ -3623,23 +3535,22 @@ void Brush_UpdateLightPoints( brush_t* b, const idVec3& offset )
 	{
 		b->pointLight = true;
 
-		if( GetVectorForKey( b->owner, "light_center", vCenter ) )
+		if( b->owner->GetVectorForKey( "light_center", vCenter ) )
 		{
 
 			if( offset.x || offset.y || offset.z )
 			{
-				CString str;
 				VectorAdd( vCenter, offset, vCenter );
-				SetKeyVec3( b->owner, "light_center", vCenter );
+				b->owner->SetKeyVec3( "light_center", vCenter );
 			}
 
 			VectorAdd( vCenter, *origin, b->lightCenter );
 			UpdateSelectablePoint( b, b->lightCenter, LIGHT_CENTER );
 		}
 
-		if( !GetVectorForKey( b->owner, "light_radius", b->lightRadius ) )
+		if( !b->owner->GetVectorForKey( "light_radius", b->lightRadius ) )
 		{
-			float	f = FloatForKey( b->owner, "light" );
+			float	f = b->owner->FloatForKey( "light" );
 			if( f == 0 )
 			{
 				f = 300;
@@ -3663,7 +3574,7 @@ void Brush_UpdateLightPoints( brush_t* b, const idVec3& offset )
 Brush_BuildWindings
 ================
 */
-void Brush_BuildWindings( brush_t* b, bool bSnap, bool keepOnPlaneWinding, bool updateLights, bool makeFacePlanes )
+void Brush_BuildWindings( idEditorBrush* b, bool bSnap, bool keepOnPlaneWinding, bool updateLights, bool makeFacePlanes )
 {
 	idWinding*	w;
 	face_t*		face;
@@ -3725,39 +3636,28 @@ void Brush_BuildWindings( brush_t* b, bool bSnap, bool keepOnPlaneWinding, bool 
 			}
 
 			// computing ST coordinates for the windings
-			if( g_qeglobals.m_bBrushPrimitMode )
+			if( g_qeglobals.bNeedConvert )
 			{
-				if( g_qeglobals.bNeedConvert )
-				{
-					//
-					// we have parsed old brushes format and need conversion convert old brush texture
-					// representation to new format
-					//
-					FaceToBrushPrimitFace( face );
+				//
+				// we have parsed old brushes format and need conversion convert old brush texture
+				// representation to new format
+				//
+				FaceToBrushPrimitFace( face );
 #ifdef _DEBUG
-					// use old texture coordinates code to check against
-					for( i = 0; i < w->GetNumPoints(); i++ )
-					{
-						EmitTextureCoordinates( ( *w )[i], face->d_texture, face );
-					}
-#endif
-				}
-
-				//
-				// use new texture representation to compute texture coordinates in debug mode we
-				// will check against old code and warn if there are differences
-				//
-				EmitBrushPrimitTextureCoordinates( face, w );
-			}
-			else
-			{
+				// use old texture coordinates code to check against
 				for( i = 0; i < w->GetNumPoints(); i++ )
 				{
 					EmitTextureCoordinates( ( *w )[i], face->d_texture, face );
 				}
+#endif
 			}
-		}
 
+			//
+			// use new texture representation to compute texture coordinates in debug mode we
+			// will check against old code and warn if there are differences
+			//
+			EmitBrushPrimitTextureCoordinates( face, w );
+		}
 	}
 
 	if( updateLights )
@@ -3770,39 +3670,10 @@ void Brush_BuildWindings( brush_t* b, bool bSnap, bool keepOnPlaneWinding, bool 
 
 /*
 ================
-Brush_RemoveEmptyFaces
-
-  Frees any overconstraining faces
-================
-*/
-void Brush_RemoveEmptyFaces( brush_t* b )
-{
-	face_t*	f, *next;
-
-	f = b->brush_faces;
-	b->brush_faces = NULL;
-
-	for( ; f; f = next )
-	{
-		next = f->next;
-		if( !f->face_winding )
-		{
-			Face_Free( f );
-		}
-		else
-		{
-			f->next = b->brush_faces;
-			b->brush_faces = f;
-		}
-	}
-}
-
-/*
-================
 Brush_SnapToGrid
 ================
 */
-void Brush_SnapToGrid( brush_t* pb )
+void Brush_SnapToGrid( idEditorBrush* pb )
 {
 	int i;
 	for( face_t* f = pb->brush_faces; f; f = f->next )
@@ -3828,47 +3699,49 @@ void Brush_SnapToGrid( brush_t* pb )
 	}
 	idVec3 v;
 	idStr str;
-	if( GetVectorForKey( pb->owner, "origin", v ) )
+	idEditorEntity* owner = pb->owner;
+
+	if( owner->GetVectorForKey( "origin", v ) )
 	{
 		SnapVectorToGrid( pb->owner->origin );
 		sprintf( str, "%i %i %i", ( int )pb->owner->origin.x, ( int )pb->owner->origin.y, ( int )pb->owner->origin.z );
-		SetKeyValue( pb->owner, "origin", str );
+		owner->SetKeyValue( "origin", str );
 	}
 
 	if( pb->owner->eclass->nShowFlags & ECLASS_LIGHT )
 	{
-		if( GetVectorForKey( pb->owner, "light_right", v ) )
+		if( owner->GetVectorForKey( "light_right", v ) )
 		{
 			// projected
 			SnapVectorToGrid( v );
 			pb->lightRight = v;
-			SetKeyVec3( pb->owner, "light_right", v );
-			GetVectorForKey( pb->owner, "light_up", v );
+			owner->SetKeyVec3( "light_right", v );
+			owner->GetVectorForKey( "light_up", v );
 			SnapVectorToGrid( v );
 			pb->lightUp = v;
-			SetKeyVec3( pb->owner, "light_up", v );
-			GetVectorForKey( pb->owner, "light_target", v );
+			owner->SetKeyVec3( "light_up", v );
+			owner->GetVectorForKey( "light_target", v );
 			SnapVectorToGrid( v );
 			pb->lightTarget = v;
-			SetKeyVec3( pb->owner, "light_target", v );
-			if( GetVectorForKey( pb->owner, "light_start", v ) )
+			owner->SetKeyVec3( "light_target", v );
+			if( owner->GetVectorForKey( "light_start", v ) )
 			{
 				SnapVectorToGrid( v );
 				pb->lightStart = v;
-				SetKeyVec3( pb->owner, "light_start", v );
-				GetVectorForKey( pb->owner, "light_end", v );
+				owner->SetKeyVec3( "light_start", v );
+				owner->GetVectorForKey( "light_end", v );
 				SnapVectorToGrid( v );
 				pb->lightEnd = v;
-				SetKeyVec3( pb->owner, "light_end", v );
+				owner->SetKeyVec3( "light_end", v );
 			}
 		}
 		else
 		{
 			// point
-			if( GetVectorForKey( pb->owner, "light_center", v ) )
+			if( owner->GetVectorForKey( "light_center", v ) )
 			{
 				SnapVectorToGrid( v );
-				SetKeyVec3( pb->owner, "light_center", v );
+				owner->SetKeyVec3( "light_center", v );
 			}
 		}
 	}
@@ -3892,7 +3765,7 @@ void Brush_SnapToGrid( brush_t* pb )
 Brush_Rotate
 ================
 */
-void Brush_Rotate( brush_t* b, idMat3 matrix, idVec3 origin, bool bBuild )
+void Brush_Rotate( idEditorBrush* b, idMat3 matrix, idVec3 origin, bool bBuild )
 {
 	for( face_t* f = b->brush_faces; f; f = f->next )
 	{
@@ -3917,7 +3790,7 @@ extern void VectorRotate3Origin( const idVec3& vIn, const idVec3& vRotation, con
 Brush_Rotate
 ================
 */
-void Brush_Rotate( brush_t* b, idVec3 vAngle, idVec3 vOrigin, bool bBuild )
+void Brush_Rotate( idEditorBrush* b, idVec3 vAngle, idVec3 vOrigin, bool bBuild )
 {
 	for( face_t* f = b->brush_faces; f; f = f->next )
 	{
@@ -3935,32 +3808,12 @@ void Brush_Rotate( brush_t* b, idVec3 vAngle, idVec3 vOrigin, bool bBuild )
 
 /*
 ================
-Brush_Center
-================
-*/
-void Brush_Center( brush_t* b, idVec3 vNewCenter )
-{
-	idVec3	vMid;
-
-	// get center of the brush
-	for( int j = 0; j < 3; j++ )
-	{
-		vMid[j] = b->mins[j] + abs( ( b->maxs[j] - b->mins[j] ) * 0.5f );
-	}
-
-	// calc distance between centers
-	VectorSubtract( vNewCenter, vMid, vMid );
-	Brush_Move( b, vMid, true );
-}
-
-/*
-================
 Brush_Resize
 
   the brush must be a true axial box
 ================
 */
-void Brush_Resize( brush_t* b, idVec3 vMin, idVec3 vMax )
+void Brush_Resize( idEditorBrush* b, idVec3 vMin, idVec3 vMax )
 {
 	int i, j;
 	face_t* f;
@@ -3998,66 +3851,15 @@ void Brush_Resize( brush_t* b, idVec3 vMin, idVec3 vMax )
 
 /*
 ================
-HasModel
-================
-*/
-eclass_t* HasModel( brush_t* b )
-{
-	idVec3	vMin, vMax;
-	vMin[0] = vMin[1] = vMin[2] = 999999;
-	vMax[0] = vMax[1] = vMax[2] = -999999;
-
-	if( b->owner->md3Class != NULL )
-	{
-		return b->owner->md3Class;
-	}
-
-	if( b->owner->eclass->modelHandle > 0 )
-	{
-		return b->owner->eclass;
-	}
-
-	eclass_t*	e = NULL;
-
-	// FIXME: entity needs to track whether a cache hit failed and not ask again
-	if( b->owner->eclass->nShowFlags & ECLASS_MISCMODEL )
-	{
-		const char*	pModel = ValueForKey( b->owner, "model" );
-		if( pModel != NULL && strlen( pModel ) > 0 )
-		{
-			e = GetCachedModel( b->owner, pModel, vMin, vMax );
-			if( e != NULL )
-			{
-				//
-				// we need to scale the brush to the proper size based on the model load recreate
-				// brush just like in load/save
-				//
-				VectorAdd( vMin, b->owner->origin, vMin );
-				VectorAdd( vMax, b->owner->origin, vMax );
-				Brush_Resize( b, vMin, vMax );
-				b->bModelFailed = false;
-			}
-			else
-			{
-				b->bModelFailed = true;
-			}
-		}
-	}
-
-	return e;
-}
-
-/*
-================
 Entity_GetRotationMatrixAngles
 ================
 */
-bool Entity_GetRotationMatrixAngles( entity_t* e, idMat3& mat, idAngles& angles )
+static bool Entity_GetRotationMatrixAngles( idEditorEntity* e, idMat3& mat, idAngles& angles )
 {
 	int angle;
 
 	/* the angle keyword is a yaw value, except for two special markers */
-	if( GetMatrixForKey( e, "rotation", mat ) )
+	if( e->GetMatrixForKey( "rotation", mat ) )
 	{
 		angles = mat.ToAngles();
 		return true;
@@ -4092,7 +3894,7 @@ bool Entity_GetRotationMatrixAngles( entity_t* e, idMat3& mat, idAngles& angles 
 FacingVectors
 ================
 */
-static void FacingVectors( entity_t* e, idVec3& forward, idVec3& right, idVec3& up )
+static void FacingVectors( idEditorEntity* e, idVec3& forward, idVec3& right, idVec3& up )
 {
 	idAngles	angles;
 	idMat3		mat;
@@ -4106,7 +3908,7 @@ static void FacingVectors( entity_t* e, idVec3& forward, idVec3& right, idVec3& 
 Brush_DrawFacingAngle
 ================
 */
-void Brush_DrawFacingAngle( brush_t* b, entity_t* e, bool particle )
+static void Brush_DrawFacingAngle( const idEditorBrush* b, idEditorEntity* e, bool particle )
 {
 	idVec3	forward, right, up;
 	idVec3	endpoint, tip1, tip2;
@@ -4125,16 +3927,13 @@ void Brush_DrawFacingAngle( brush_t* b, entity_t* e, bool particle )
 	VectorMA( tip1, -dist, ( particle ) ? forward : up, tip1 );
 	VectorMA( tip1, 2 * dist, ( particle ) ? forward : up, tip2 );
 
-	globalImages->BindNull();
-
-	// RB begin
 	glColor4f( 1, 1, 1, 1 );
-	GL_Color( 1, 1, 1, 1 );
+	tr.backend.GL_Color( 1, 1, 1, 1 );
 
 	renderProgManager.BindShader_Color();
-	renderProgManager.CommitUniforms();
-	// RB end
+	renderProgManager.CommitUniforms( 0 );
 
+	glColor4f( 1, 1, 1, 1 );
 	glLineWidth( 2 );
 	glBegin( GL_LINES );
 	glVertex3fv( start.ToFloatPtr() );
@@ -4152,7 +3951,7 @@ void Brush_DrawFacingAngle( brush_t* b, entity_t* e, bool particle )
 DrawProjectedLight
 ================
 */
-void DrawProjectedLight( brush_t* b, bool bSelected, bool texture )
+static void DrawProjectedLight( const idEditorBrush* b, bool bSelected, bool texture )
 {
 	int		i;
 	idVec3	v1, v2, cross, vieworg, edge[8][2], v[4];
@@ -4170,7 +3969,7 @@ void DrawProjectedLight( brush_t* b, bool bSelected, bool texture )
 
 	// use the game's epair parsing code so
 	// we can use the same renderLight generation
-	entity_t* ent = b->owner;
+	idEditorEntity* ent = b->owner;
 	idDict	spawnArgs;
 	renderLight_t	parms;
 
@@ -4180,9 +3979,7 @@ void DrawProjectedLight( brush_t* b, bool bSelected, bool texture )
 
 	tri = R_PolytopeSurface( 6, planes, NULL );
 
-	// RB begin
 	renderProgManager.Unbind();
-	// RB end
 
 	glColor3f( 1, 0, 1 );
 	for( i = 0; i < tri->numIndexes; i += 3 )
@@ -4204,10 +4001,10 @@ void DrawProjectedLight( brush_t* b, bool bSelected, bool texture )
 	}
 
 	idMat3 mat;
-	bool transform = GetMatrixForKey( b->owner, "light_rotation", mat );
+	bool transform = b->owner->GetMatrixForKey( "light_rotation", mat );
 	if( !transform )
 	{
-		transform = GetMatrixForKey( b->owner, "rotation", mat );
+		transform = b->owner->GetMatrixForKey( "rotation", mat );
 	}
 	idVec3 tv;
 	idVec3* origin = ( b->trackLightOrigin ) ? &b->owner->lightOrigin : &b->owner->origin;
@@ -4317,10 +4114,42 @@ void GLCircle( float x, float y, float z, float r )
 
 /*
 ================
+GLSphere - DG: from SteelStorm2
+================
+*/
+void GLSphere( float r, int lats, int longs )
+{
+	int i, j;
+	for( i = 0; i <= lats; i++ )
+	{
+		float lat0 = idMath::PI  * ( -0.5 + ( float )( i - 1 ) / lats );
+		float z0  = idMath::Sin( lat0 );
+		float zr0 =  idMath::Cos( lat0 );
+		float lat1 = idMath::PI * ( -0.5 + ( float ) i / lats );
+		float z1 = sin( lat1 );
+		float zr1 = cos( lat1 );
+
+		glBegin( GL_QUAD_STRIP );
+		for( j = 0; j <= longs; j++ )
+		{
+			float lng = 2 * idMath::PI * ( float )( j - 1 ) / longs;
+			float x = idMath::Cos( lng );
+			float y = idMath::Sin( lng );
+
+			glNormal3f( x * zr0, y * zr0, z0 );
+			glVertex3f( x * zr0, y * zr0, z0 );
+			glNormal3f( x * zr1, y * zr1, z1 );
+			glVertex3f( x * zr1, y * zr1, z1 );
+		}
+		glEnd();
+	}
+}
+/*
+================
 DrawSpeaker
 ================
 */
-void DrawSpeaker( brush_t* b, bool bSelected, bool twoD )
+static void DrawSpeaker( const idEditorBrush* b, bool bSelected, bool twoD )
 {
 
 	if( !( g_qeglobals.d_savedinfo.showSoundAlways || ( g_qeglobals.d_savedinfo.showSoundWhenSelected && bSelected ) ) )
@@ -4329,8 +4158,8 @@ void DrawSpeaker( brush_t* b, bool bSelected, bool twoD )
 	}
 
 	// convert to units ( inches )
-	float min = FloatForKey( b->owner, "s_mindistance" );
-	float max = FloatForKey( b->owner, "s_maxdistance" );
+	float min = b->owner->FloatForKey( "s_mindistance" );
+	float max = b->owner->FloatForKey( "s_maxdistance" );
 
 	const char* s = b->owner->epairs.GetString( "s_shader" );
 	if( s && *s )
@@ -4354,9 +4183,7 @@ void DrawSpeaker( brush_t* b, bool bSelected, bool twoD )
 		return;
 	}
 
-	// RB begin
 	renderProgManager.Unbind();
-	// RB end
 
 	// convert from meters to doom units
 	min *= METERS_TO_DOOM;
@@ -4390,14 +4217,12 @@ void DrawSpeaker( brush_t* b, bool bSelected, bool twoD )
 		glTranslatef( b->owner->origin.x, b->owner->origin.y, b->owner->origin.z );
 		glColor3f( 0.4f, 0.4f, 0.4f );
 		glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
-		GLUquadricObj* qobj = gluNewQuadric();
-		gluSphere( qobj, min, 8, 8 );
+
 		glColor3f( 0.8f, 0.8f, 0.8f );
-		gluSphere( qobj, max, 8, 8 );
+		GLSphere( max, 8, 8 );
 		glEnable( GL_BLEND );
 		glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 		glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-		globalImages->BindNull();
 		if( bSelected )
 		{
 			glColor4f( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].x, g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].y, g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].z, 0.35f );
@@ -4406,7 +4231,7 @@ void DrawSpeaker( brush_t* b, bool bSelected, bool twoD )
 		{
 			glColor4f( b->owner->eclass->color.x, b->owner->eclass->color.y, b->owner->eclass->color.z, 0.35f );
 		}
-		gluSphere( qobj, min, 8, 8 );
+		GLSphere( min, 8, 8 );
 		if( bSelected )
 		{
 			glColor4f( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].x, g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].y, g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].z, 0.1f );
@@ -4415,8 +4240,7 @@ void DrawSpeaker( brush_t* b, bool bSelected, bool twoD )
 		{
 			glColor4f( b->owner->eclass->color.x, b->owner->eclass->color.y, b->owner->eclass->color.z, 0.1f );
 		}
-		gluSphere( qobj, max, 8, 8 );
-		gluDeleteQuadric( qobj );
+		GLSphere( max, 8, 8 );
 		glPopMatrix();
 	}
 
@@ -4428,7 +4252,7 @@ void DrawSpeaker( brush_t* b, bool bSelected, bool twoD )
 DrawLight
 ================
 */
-void DrawLight( brush_t* b, bool bSelected )
+static void DrawLight( const idEditorBrush* b, bool bSelected )
 {
 	idVec3	vTriColor;
 	bool	bTriPaint = false;
@@ -4437,22 +4261,12 @@ void DrawLight( brush_t* b, bool bSelected )
 	vTriColor[1] = 1.0f;
 	bTriPaint = true;
 
-	CString strColor = ValueForKey( b->owner, "_color" );
-	if( strColor.GetLength() > 0 )
+	if( !b->owner->GetVectorForKey( "_color", vTriColor ) )
 	{
-		float	fR, fG, fB;
-		int		n = sscanf( strColor, "%f %f %f", &fR, &fG, &fB );
-		if( n == 3 )
-		{
-			vTriColor[0] = fR;
-			vTriColor[1] = fG;
-			vTriColor[2] = fB;
-		}
+		vTriColor = idVec3( 1, 1, 1 );
 	}
 
-	// RB begin
 	renderProgManager.Unbind();
-	// RB end
 
 	glColor3f( vTriColor[0], vTriColor[1], vTriColor[2] );
 
@@ -4487,7 +4301,6 @@ void DrawLight( brush_t* b, bool bSelected )
 	idVec3	vSave;
 	VectorCopy( vTriColor, vSave );
 
-	globalImages->BindNull();
 	glBegin( GL_TRIANGLE_FAN );
 	glVertex3fv( vTop.ToFloatPtr() );
 	int i;
@@ -4530,15 +4343,13 @@ void DrawLight( brush_t* b, bool bSelected )
 Control_Draw
 ================
 */
-void Control_Draw( brush_t* b )
+void Control_Draw( idEditorBrush* b )
 {
 	face_t*		face;
 	int			i, order;
-	qtexture_t*	prev = 0;
 	idWinding*	w;
 
 	// guarantee the texture will be set first
-	prev = NULL;
 	for( face = b->brush_faces, order = 0; face; face = face->next, order++ )
 	{
 		w = face->face_winding;
@@ -4548,7 +4359,7 @@ void Control_Draw( brush_t* b )
 		}
 
 		glColor4f( 1, 1, .5, 1 );
-		GL_Color( 1, 1, .5, 1 );
+		tr.backend.GL_Color( 1, 1, .5, 1 );
 
 		glBegin( GL_POLYGON );
 		for( i = 0; i < w->GetNumPoints(); i++ )
@@ -4565,7 +4376,7 @@ void Control_Draw( brush_t* b )
 Brush_DrawModel
 ================
 */
-void Brush_DrawModel( brush_t* b, bool camera, bool bSelected )
+static void Brush_DrawModel( const idEditorBrush* b, bool camera, bool bSelected )
 {
 	idMat3 axis;
 	idAngles angles;
@@ -4596,13 +4407,13 @@ void Brush_DrawModel( brush_t* b, bool camera, bool bSelected )
 		{
 			if( dynamic_cast<idRenderModelMD5*>( model ) )
 			{
-				const char* classname = ValueForKey( b->owner, "classname" );
+				const char* classname = b->owner->ValueForKey( "classname" );
 				if( stricmp( classname, "func_static" ) == 0 )
 				{
-					classname = ValueForKey( b->owner, "animclass" );
+					classname = b->owner->ValueForKey( "animclass" );
 				}
-				const char* anim = ValueForKey( b->owner, "anim" );
-				int frame = IntForKey( b->owner, "frame" ) + 1;
+				const char* anim = b->owner->ValueForKey( "anim" );
+				int frame = b->owner->IntForKey( "frame" ) + 1;
 				if( frame < 1 )
 				{
 					frame = 1;
@@ -4656,50 +4467,43 @@ void Brush_DrawModel( brush_t* b, bool camera, bool bSelected )
 
 		Entity_GetRotationMatrixAngles( b->owner, axis, angles );
 
-		// RB: avoid glGetFloatv( GL_CURRENT_COLOR ) for performance reasons
 		idVec4 colorSave = g_qeglobals.d_currentColor;
-		//glGetFloatv( GL_CURRENT_COLOR, colorSave.ToFloatPtr() );
-		// RB end
 
 		if( bSelected )
 		{
 			glColor3fv( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].ToFloatPtr() );
-			GL_Color( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES] );
+			tr.backend.GL_Color( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES] );
 		}
 
 		DrawRenderModel( model, b->owner->origin, axis, camera );
 
 		glColor4fv( colorSave.ToFloatPtr() );
-		GL_Color( colorSave );
+		tr.backend.GL_Color( colorSave );
 
 		if( bSelected && camera )
 		{
 			//draw selection tints
 			/*
 			if ( camera && g_PrefsDlg.m_nEntityShowState != ENTITY_WIREFRAME ) {
-			    glPolygonMode ( GL_FRONT_AND_BACK , GL_FILL );
-			    glColor3fv ( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].ToFloatPtr () );
-			    glEnable ( GL_BLEND );
-			    glBlendFunc ( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-			    DrawRenderModel( model, b->owner->origin, axis, camera );
+				glPolygonMode ( GL_FRONT_AND_BACK , GL_FILL );
+				glColor3fv ( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].ToFloatPtr () );
+				glEnable ( GL_BLEND );
+				glBlendFunc ( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+				DrawRenderModel( model, b->owner->origin, axis, camera );
 			}
 			*/
 
-			// RB begin
 			glColor4f( 1, 1, 1, 1 );
-			GL_Color( 1, 1, 1, 1 );
+			tr.backend.GL_Color( 1, 1, 1, 1 );
 
 			renderProgManager.BindShader_Color();
-			renderProgManager.CommitUniforms();
-			// RB end
+			renderProgManager.CommitUniforms( 0 );
 
 			//draw white triangle outlines
-			globalImages->BindNull();
-
 			glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
 			glDisable( GL_BLEND );
 			glDisable( GL_DEPTH_TEST );
-
+			glColor3f( 1.0f, 1.0f, 1.0f );
 			glPolygonOffset( 1.0f, 3.0f );
 			DrawRenderModel( model, b->owner->origin, axis, false );
 			glEnable( GL_DEPTH_TEST );
@@ -4715,10 +4519,6 @@ void Brush_DrawModel( brush_t* b, bool camera, bool bSelected )
 	if( bSelected && camera )
 	{
 		glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-	}
-	else if( camera )
-	{
-		globalImages->BindNull();
 	}
 
 	if( g_bPatchShowBounds )
@@ -4751,7 +4551,7 @@ void Brush_DrawModel( brush_t* b, bool camera, bool bSelected )
 GLTransformedVertex
 ================
 */
-void GLTransformedVertex( float x, float y, float z, idMat3 mat, idVec3 origin, idVec3 color, float maxDist )
+static void GLTransformedVertex( float x, float y, float z, idMat3 mat, idVec3 origin, idVec3 color, float maxDist )
 {
 	idVec3 v( x, y, z );
 	v -= origin;
@@ -4782,7 +4582,7 @@ void GLTransformedVertex( float x, float y, float z, idMat3 mat, idVec3 origin, 
 GLTransformedCircle
 ================
 */
-void GLTransformedCircle( int type, idVec3 origin, float r, idMat3 mat, float pointSize, idVec3 color, float maxDist )
+static void GLTransformedCircle( int type, idVec3 origin, float r, idMat3 mat, float pointSize, idVec3 color, float maxDist )
 {
 	glPointSize( pointSize );
 	glBegin( GL_POINTS );
@@ -4818,24 +4618,22 @@ void GLTransformedCircle( int type, idVec3 origin, float r, idMat3 mat, float po
 Brush_DrawAxis
 ================
 */
-void Brush_DrawAxis( brush_t* b )
+static void Brush_DrawAxis( const idEditorBrush* b )
 {
 	if( g_pParentWnd->ActiveXY()->RotateMode() && b->modelHandle )
 	{
-		// RB begin
 		renderProgManager.Unbind();
-		// RB end
 
 		bool matrix = false;
 		idMat3 mat;
 		float a, s, c;
-		if( GetMatrixForKey( b->owner, "rotation", mat ) )
+		if( b->owner->GetMatrixForKey( "rotation", mat ) )
 		{
 			matrix = true;
 		}
 		else
 		{
-			a = FloatForKey( b->owner, "angle" );
+			a = b->owner->FloatForKey( "angle" );
 			if( a )
 			{
 				s = sin( DEG2RAD( a ) );
@@ -4861,8 +4659,6 @@ void Brush_DrawAxis( brush_t* b )
 		xr = ( b->modelHandle->Bounds()[1].x > b->modelHandle->Bounds()[0].x ) ? b->modelHandle->Bounds()[1].x - b->modelHandle->Bounds()[0].x : b->modelHandle->Bounds()[0].x - b->modelHandle->Bounds()[1].x;
 		yr = ( b->modelHandle->Bounds()[1].y > b->modelHandle->Bounds()[0].y ) ? b->modelHandle->Bounds()[1].y - b->modelHandle->Bounds()[0].y : b->modelHandle->Bounds()[0].y - b->modelHandle->Bounds()[1].y;
 		zr = ( b->modelHandle->Bounds()[1].z > b->modelHandle->Bounds()[0].z ) ? b->modelHandle->Bounds()[1].z - b->modelHandle->Bounds()[0].z : b->modelHandle->Bounds()[0].z - b->modelHandle->Bounds()[1].z;
-
-		globalImages->BindNull();
 
 		GLTransformedCircle( 0, b->owner->origin, xr, mat, 1.25, idVec3( 0, 0, 1 ), dist );
 		GLTransformedCircle( 1, b->owner->origin, yr, mat, 1.25, idVec3( 0, 1, 0 ), dist );
@@ -4919,29 +4715,26 @@ void Brush_DrawAxis( brush_t* b )
 Brush_DrawModelInfo
 ================
 */
-void Brush_DrawModelInfo( brush_t* b, bool selected )
+static void Brush_DrawModelInfo( const idEditorBrush* b, bool selected )
 {
 	if( b->modelHandle > 0 )
 	{
-		// RB: avoid glGetFloatv( GL_CURRENT_COLOR ) for performance reasons
 		idVec4 colorSave = g_qeglobals.d_currentColor;
-		//glGetFloatv( GL_CURRENT_COLOR, colorSave.ToFloatPtr() );
-		// RB end
+
 		if( selected )
 		{
 			glColor3fv( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].ToFloatPtr() );
-			GL_Color( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES] );
+			tr.backend.GL_Color( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES] );
 		}
 		else
 		{
 			glColor3fv( b->owner->eclass->color.ToFloatPtr() );
-			GL_Color( b->owner->eclass->color );
+			tr.backend.GL_Color( b->owner->eclass->color );
 		}
 
 		Brush_DrawModel( b, true, selected );
-
 		glColor4fv( colorSave.ToFloatPtr() );
-		GL_Color( colorSave );
+		tr.backend.GL_Color( colorSave );
 
 		if( selected )
 		{
@@ -4956,7 +4749,7 @@ void Brush_DrawModelInfo( brush_t* b, bool selected )
 Brush_DrawEmitter
 ================
 */
-void Brush_DrawEmitter( brush_t* b, bool bSelected, bool cam )
+static void Brush_DrawEmitter( const idEditorBrush* b, bool bSelected, bool cam )
 {
 	if( !( b->owner->eclass->nShowFlags & ECLASS_PARTICLE ) )
 	{
@@ -4966,12 +4759,12 @@ void Brush_DrawEmitter( brush_t* b, bool bSelected, bool cam )
 	if( bSelected )
 	{
 		glColor4f( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].x, g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].y, g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].z, .5 );
-		GL_Color( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].x, g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].y, g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].z, .5 );
+		tr.backend.GL_Color( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].x, g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].y, g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].z, .5 );
 	}
 	else
 	{
 		glColor4f( b->owner->eclass->color.x, b->owner->eclass->color.y, b->owner->eclass->color.z, .5 );
-		GL_Color( b->owner->eclass->color.x, b->owner->eclass->color.y, b->owner->eclass->color.z, .5 );
+		tr.backend.GL_Color( b->owner->eclass->color.x, b->owner->eclass->color.y, b->owner->eclass->color.z, .5 );
 	}
 
 	if( cam )
@@ -4985,7 +4778,7 @@ void Brush_DrawEmitter( brush_t* b, bool bSelected, bool cam )
 Brush_DrawEnv
 ================
 */
-void Brush_DrawEnv( brush_t* b, bool cameraView, bool bSelected )
+static void Brush_DrawEnv( const idEditorBrush* b, bool cameraView, bool bSelected )
 {
 	idVec3 origin, newOrigin;
 	idMat3 axis, newAxis;
@@ -5017,31 +4810,24 @@ void Brush_DrawEnv( brush_t* b, bool cameraView, bool bSelected )
 			glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
 		}
 
-		// RB: avoid glGetFloatv( GL_CURRENT_COLOR ) for performance reasons
 		idVec4 colorSave = g_qeglobals.d_currentColor;
-		//glGetFloatv( GL_CURRENT_COLOR, colorSave.ToFloatPtr() );
-		// RB end
 
 		if( bSelected )
 		{
 			glColor3fv( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES].ToFloatPtr() );
-			GL_Color( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES] );
+			tr.backend.GL_Color( g_qeglobals.d_savedinfo.colors[COLOR_SELBRUSHES] );
 		}
 		else
 		{
 			glColor3f( 1.f, 1.f, 1.f );
-			GL_Color( 1.f, 1.f, 1.f );
+			tr.backend.GL_Color( 1.f, 1.f, 1.f );
 		}
-
-		// RB: cameraView instead of true
 		DrawRenderModel( model, origin, axis, cameraView );
-		// RB end
-		globalImages->BindNull();
 		delete model;
 		model = NULL;
 
 		glColor4fv( colorSave.ToFloatPtr() );
-		GL_Color( colorSave );
+		tr.backend.GL_Color( colorSave );
 	}
 }
 
@@ -5050,7 +4836,7 @@ void Brush_DrawEnv( brush_t* b, bool cameraView, bool bSelected )
 Brush_DrawCombatNode
 ================
 */
-void Brush_DrawCombatNode( brush_t* b, bool cameraView, bool bSelected )
+static void Brush_DrawCombatNode( const idEditorBrush* b, bool cameraView, bool bSelected )
 {
 	float min_dist = b->owner->epairs.GetFloat( "min" );
 	float max_dist = b->owner->epairs.GetFloat( "max" );
@@ -5062,7 +4848,6 @@ void Brush_DrawCombatNode( brush_t* b, bool cameraView, bool bSelected )
 	idVec3 cone_left = leftang.ToForward();
 	idAngles rightang( 0.0f, yaw - fov * 0.5f + 90.0f, 0.0f );
 	idVec3 cone_right = rightang.ToForward();
-	bool disabled = b->owner->epairs.GetBool( "start_off" );
 
 	idVec4 color;
 	if( bSelected )
@@ -5124,10 +4909,10 @@ void Brush_DrawCombatNode( brush_t* b, bool cameraView, bool bSelected )
 
 /*
 ================
-Brush_DrawCam
+Brush_Draw
 ================
 */
-void Brush_DrawCam( brush_t* b, bool bSelected )
+void Brush_Draw( const idEditorBrush* b, bool bSelected )
 {
 	face_t*		face;
 	int			i, order;
@@ -5161,6 +4946,7 @@ void Brush_DrawCam( brush_t* b, bool bSelected )
 
 	if( b->owner->eclass->fixedsize )
 	{
+
 		DrawSpeaker( b, bSelected, false );
 
 		if( g_PrefsDlg.m_bNewLightDraw && ( b->owner->eclass->nShowFlags & ECLASS_LIGHT ) && !( b->modelHandle || b->entityModel ) )
@@ -5178,18 +4964,17 @@ void Brush_DrawCam( brush_t* b, bool bSelected )
 		{
 			Brush_DrawCombatNode( b, true, bSelected );
 		}
+
 	}
 
 
 	if( !( b->owner && ( b->owner->eclass->nShowFlags & ECLASS_WORLDSPAWN ) ) )
 	{
-		// RB begin
 		glColor4f( 1.0f, 0.0f, 0.0f, 0.8f );
-		GL_Color( 1.0f, 0.0f, 0.0f, 0.8f );
+		tr.backend.GL_Color( 1.0f, 0.0f, 0.0f, 0.8f );
 
 		renderProgManager.BindShader_Color();
-		renderProgManager.CommitUniforms();
-		// RB end
+		renderProgManager.CommitUniforms( 0 );
 
 		glPointSize( 4 );
 		glBegin( GL_POINTS );
@@ -5200,7 +4985,7 @@ void Brush_DrawCam( brush_t* b, bool bSelected )
 	if( b->owner->eclass->entityModel )
 	{
 		glColor3fv( b->owner->eclass->color.ToFloatPtr() );
-		GL_Color( b->owner->eclass->color );
+		tr.backend.GL_Color( b->owner->eclass->color );
 
 		Brush_DrawModel( b, true, bSelected );
 		return;
@@ -5248,65 +5033,46 @@ void Brush_DrawCam( brush_t* b, bool bSelected )
 			}
 		}
 
-		// RB: YCoCG
-		if( ( nDrawMode == cd_texture || nDrawMode == cd_light ) && !b->forceWireFrame )
+		if( nDrawMode == cd_texture && face->d_texture != prev && !b->forceWireFrame )
 		{
 			if( face->d_texture != prev )
 			{
 				// set the texture for this face
 				prev = face->d_texture;
 
-				GL_SelectTexture( 0 );
+				tr.backend.GL_SelectTexture( 0 );
 				face->d_texture->GetEditorImage()->Bind();
 			}
 
-			const idImageOpts& opts = face->d_texture->GetEditorImage()->GetOpts();
-			if( opts.colorFormat == CFM_YCOCG_DXT5 )
-			{
-				renderProgManager.BindShader_TextureYCoCG();
-			}
-			else
-			{
-				renderProgManager.BindShader_Texture();
-			}
+			renderProgManager.BindShader_Texture();
+			renderProgManager.CommitUniforms( 0 );
 		}
 		else
 		{
 			renderProgManager.BindShader_Color();
+			renderProgManager.CommitUniforms( 0 );
 		}
-		// RB end
 
 		if( model )
 		{
 			glEnable( GL_BLEND );
 			glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-
 			glColor4f( face->d_color.x, face->d_color.y, face->d_color.z, 0.1f );
-			GL_Color( face->d_color.x, face->d_color.y, face->d_color.z, 0.1f );
+			tr.backend.GL_Color( face->d_color.x, face->d_color.y, face->d_color.z, 0.1f );
 		}
 		else
 		{
-			// RB: support qer_trans
-			if( face->d_texture->GetEditorAlpha() != 1.0f )
-			{
-				//glEnable( GL_BLEND );
-				//glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-			}
-			// RB end
-
 			glColor4f( face->d_color.x, face->d_color.y, face->d_color.z, face->d_texture->GetEditorAlpha() );
-			GL_Color( face->d_color.x, face->d_color.y, face->d_color.z, face->d_texture->GetEditorAlpha() );
+			tr.backend.GL_Color( face->d_color.x, face->d_color.y, face->d_color.z, face->d_texture->GetEditorAlpha() );
 		}
 
-		// RB begin
-		renderProgManager.CommitUniforms();
-		// RB end
+		renderProgManager.CommitUniforms( 0 );
 
 		glBegin( GL_POLYGON );
 
 		for( i = 0; i < w->GetNumPoints(); i++ )
 		{
-			if( !b->forceWireFrame && ( nDrawMode == cd_texture || nDrawMode == cd_light ) )
+			if( !b->forceWireFrame && nDrawMode == cd_texture )
 			{
 				glTexCoord2fv( &( *w )[i][3] );
 			}
@@ -5316,19 +5082,13 @@ void Brush_DrawCam( brush_t* b, bool bSelected )
 
 		glEnd();
 
-		// RB: support qer_trans
 		if( model  || face->d_texture->GetEditorAlpha() != 1.0f )
 		{
 			glDisable( GL_BLEND );
 		}
-		// RB end
 	}
 
-	globalImages->BindNull();
-
-	// RB begin
 	renderProgManager.Unbind();
-	// RB end
 }
 
 /*
@@ -5352,52 +5112,12 @@ void Face_Draw( face_t* f )
 	glEnd();
 }
 
-
-idSurface_SweptSpline* SplineToSweptSpline( idCurve<idVec3>* curve )
-{
-	// expects a vec3 curve and creates a vec4 based swept spline
-	// must be either nurbs or catmull
-	idCurve_Spline<idVec4>* newCurve = NULL;
-	if( dynamic_cast<idCurve_NURBS<idVec3>*>( curve ) )
-	{
-		newCurve = new idCurve_NURBS<idVec4>;
-	}
-	else if( dynamic_cast<idCurve_CatmullRomSpline<idVec3>*>( curve ) )
-	{
-		newCurve = new idCurve_CatmullRomSpline<idVec4>;
-	}
-
-	if( curve == NULL || newCurve == NULL )
-	{
-		return NULL;
-	}
-
-	int c = curve->GetNumValues();
-	float len = 0.0f;
-	for( int i = 0; i < c; i++ )
-	{
-		idVec3 v = curve->GetValue( i );
-		newCurve->AddValue( curve->GetTime( i ), idVec4( v.x, v.y, v.z, len ) );
-		if( i < c - 1 )
-		{
-			len += curve->GetLengthBetweenKnots( i, i + 1 ) * 0.1f;
-		}
-	}
-
-	idSurface_SweptSpline* ss = new idSurface_SweptSpline;
-	ss->SetSpline( newCurve );
-	ss->SetSweptCircle( 10.0f );
-	ss->Tessellate( newCurve->GetNumValues() * 6, 6 );
-
-	return ss;
-}
-
 /*
 ================
 Brush_DrawCurve
 ================
 */
-void Brush_DrawCurve( brush_t* b, bool bSelected, bool cam )
+void Brush_DrawCurve( const idEditorBrush* b, bool bSelected, bool cam )
 {
 	if( b == NULL || b->owner->curve == NULL )
 	{
@@ -5405,10 +5125,9 @@ void Brush_DrawCurve( brush_t* b, bool bSelected, bool cam )
 	}
 
 	int maxage = b->owner->curve->GetNumValues();
-	int i, time = 0;
-
+	int i;
 	glColor3f( 0.0f, 0.0f, 1.0f );
-	GL_Color( 0.0f, 0.0f, 1.0f );
+	tr.backend.GL_Color( 0.0f, 0.0f, 1.0f );
 
 	for( i = 0; i < maxage; i++ )
 	{
@@ -5501,7 +5220,7 @@ void Brush_DrawCurve( brush_t* b, bool bSelected, bool cam )
 Brush_DrawXY
 ================
 */
-void Brush_DrawXY( brush_t* b, int nViewType, bool bSelected, bool ignoreViewType )
+void Brush_DrawXY( idEditorBrush* b, ViewType nViewType, bool bSelected, bool ignoreViewType )
 {
 	face_t*		face;
 	int			order;
@@ -5513,10 +5232,8 @@ void Brush_DrawXY( brush_t* b, int nViewType, bool bSelected, bool ignoreViewTyp
 		return;
 	}
 
-	// RB: avoid glGetFloatv( GL_CURRENT_COLOR ) for performance reasons
 	idVec4 colorSave = g_qeglobals.d_currentColor;
 	//glGetFloatv( GL_CURRENT_COLOR, colorSave.ToFloatPtr() );
-	// RB end
 
 	if( !( b->owner && ( b->owner->eclass->nShowFlags & ECLASS_WORLDSPAWN ) ) )
 	{
@@ -5616,6 +5333,7 @@ void Brush_DrawXY( brush_t* b, int nViewType, bool bSelected, bool ignoreViewTyp
 			glColor4fv( colorSave.ToFloatPtr() );
 			return;
 		}
+
 	}
 
 	glColor4fv( colorSave.ToFloatPtr() );
@@ -5628,7 +5346,6 @@ void Brush_DrawXY( brush_t* b, int nViewType, bool bSelected, bool ignoreViewTyp
 		return;
 	}
 
-// --->	sikk - Added - Filter brush faces
 	bool hasFilteredFace = false;
 	for( face = b->brush_faces; face; face = face->next )
 	{
@@ -5657,11 +5374,9 @@ void Brush_DrawXY( brush_t* b, int nViewType, bool bSelected, bool ignoreViewTyp
 			}
 		}
 	}
-// <---	sikk - Added - Filter brush faces
 
 	for( face = b->brush_faces, order = 0; face; face = face->next, order++ )
 	{
-// --->	sikk - Added - Filter brush faces
 		bool stipple = false;
 		if( hasFilteredFace )
 		{
@@ -5716,12 +5431,11 @@ void Brush_DrawXY( brush_t* b, int nViewType, bool bSelected, bool ignoreViewTyp
 				ignoreViewType = true;
 			}
 		}
-// <---	sikk - Added - Filter brush faces
 
 		// only draw polygons facing in a direction we care about
 		if( !ignoreViewType )
 		{
-			if( nViewType == XY )
+			if( nViewType == ViewType::XY )
 			{
 				if( face->plane[2] <= 0 )
 				{
@@ -5730,7 +5444,7 @@ void Brush_DrawXY( brush_t* b, int nViewType, bool bSelected, bool ignoreViewTyp
 			}
 			else
 			{
-				if( nViewType == XZ )
+				if( nViewType == ViewType::XZ )
 				{
 					if( face->plane[1] <= 0 )
 					{
@@ -5753,8 +5467,10 @@ void Brush_DrawXY( brush_t* b, int nViewType, bool bSelected, bool ignoreViewTyp
 			continue;
 		}
 
+		//
 		// if (b->alphaBrush && !(face->texdef.flags & SURF_ALPHA)) continue;
 		// draw the polygon
+		//
 		glBegin( GL_LINE_LOOP );
 		for( i = 0; i < w->GetNumPoints(); i++ )
 		{
@@ -5767,41 +5483,24 @@ void Brush_DrawXY( brush_t* b, int nViewType, bool bSelected, bool ignoreViewTyp
 				}
 		*/
 	}
-// --->	sikk - Added - We're stippling selected ignored faces
+
+	// We're stippling selected ignored faces
 	if( hasFilteredFace )
 	{
 		glDisable( GL_LINE_STIPPLE );
 	}
-// <---	sikk - Added - We're stippling selected ignored faces
 
 	DrawBrushEntityName( b );
 }
 
-/*
-==================
-PointValueInPointList
-==================
-*/
-static int PointValueInPointList( idVec3 v )
-{
-	for( int i = 0; i < g_qeglobals.d_numpoints; i++ )
-	{
-		if( v == g_qeglobals.d_points[i] )
-		{
-			return i;
-		}
-	}
-	return -1;
-}
-
-
 extern bool Sys_KeyDown( int key );
+
 /*
 ================
 Brush_Move
 ================
 */
-void Brush_Move( brush_t* b, const idVec3 move, bool bSnap, bool updateOrigin )
+void Brush_Move( idEditorBrush* b, const idVec3 move, bool bSnap, bool updateOrigin )
 {
 	int		i;
 	face_t*	f;
@@ -5834,13 +5533,13 @@ void Brush_Move( brush_t* b, const idVec3 move, bool bSnap, bool updateOrigin )
 	if( b->owner->curve )
 	{
 		b->owner->curve->Translate( move );
-		Entity_UpdateCurveData( b->owner );
+		b->owner->UpdateCurveData();
 	}
 
 	idVec3	temp;
 
 	// PGM - keep the origin vector up to date on fixed size entities.
-	if( b->owner->eclass->fixedsize || EntityHasModel( b->owner ) || ( updateOrigin && GetVectorForKey( b->owner, "origin", temp ) ) )
+	if( b->owner->eclass->fixedsize || b->owner->HasModel() || ( updateOrigin && b->owner->GetVectorForKey( "origin", temp ) ) )
 	{
 //		if (!b->entityModel) {
 		bool adjustOrigin = true;
@@ -5848,7 +5547,7 @@ void Brush_Move( brush_t* b, const idVec3 move, bool bSnap, bool updateOrigin )
 		{
 			b->owner->lightOrigin += move;
 			sprintf( text, "%i %i %i", ( int )b->owner->lightOrigin[0], ( int )b->owner->lightOrigin[1], ( int )b->owner->lightOrigin[2] );
-			SetKeyValue( b->owner, "light_origin", text );
+			b->owner->SetKeyValue( "light_origin", text );
 			if( QE_SingleBrush( true, true ) )
 			{
 				adjustOrigin = false;
@@ -5866,7 +5565,7 @@ void Brush_Move( brush_t* b, const idVec3 move, bool bSnap, bool updateOrigin )
 			{
 				sprintf( text, "%i %i %i", ( int )b->owner->origin[0], ( int )b->owner->origin[1], ( int )b->owner->origin[2] );
 			}
-			SetKeyValue( b->owner, "origin", text );
+			b->owner->SetKeyValue( "origin", text );
 		}
 
 		// rebuild the light dragging points now that the origin has changed
@@ -5908,43 +5607,10 @@ void Brush_Move( brush_t* b, const idVec3 move, bool bSnap, bool updateOrigin )
 
 /*
 ================
-Select_AddProjectedLight
-================
-*/
-void Select_AddProjectedLight()
-{
-	idVec3	vTemp;
-	CString str;
-
-	// if (!QE_SingleBrush ()) return;
-	brush_t* b = selected_brushes.next;
-
-	if( b->owner->eclass->nShowFlags & ECLASS_LIGHT )
-	{
-		vTemp[0] = vTemp[1] = 0;
-		vTemp[2] = -256;
-		str.Format( "%f %f %f", vTemp[0], vTemp[1], vTemp[2] );
-		SetKeyValue( b->owner, "light_target", str );
-
-		vTemp[2] = 0;
-		vTemp[1] = -128;
-		str.Format( "%f %f %f", vTemp[0], vTemp[1], vTemp[2] );
-		SetKeyValue( b->owner, "light_up", str );
-
-		vTemp[1] = 0;
-		vTemp[0] = -128;
-		str.Format( "%f %f %f", vTemp[0], vTemp[1], vTemp[2] );
-		SetKeyValue( b->owner, "light_right", str );
-		Brush_Build( b );
-	}
-}
-
-/*
-================
 Brush_Print
 ================
 */
-void Brush_Print( brush_t* b )
+void Brush_Print( idEditorBrush* b )
 {
 	int nFace = 0;
 	for( face_t* f = b->brush_faces; f; f = f->next )
@@ -5967,7 +5633,7 @@ void Brush_MakeSidedCone( int sides )
 {
 	int			i;
 	idVec3		mins, maxs;
-	brush_t*		b;
+	idEditorBrush*		b;
 	texdef_t*	texdef;
 	face_t*		f;
 	idVec3		mid;
@@ -6067,7 +5733,7 @@ void Brush_MakeSidedSphere( int sides )
 {
 	int			i, j;
 	idVec3		mins, maxs;
-	brush_t*		b;
+	idEditorBrush*		b;
 	texdef_t*	texdef;
 	face_t*		f;
 	idVec3		mid;
@@ -6140,49 +5806,9 @@ Face_FitTexture
 */
 void Face_FitTexture( face_t* face, float nHeight, float nWidth )
 {
-	if( g_qeglobals.m_bBrushPrimitMode )
-	{
-		idVec3	mins, maxs;
-		mins[0] = maxs[0] = 0;
-		Face_FitTexture_BrushPrimit( face, mins, maxs, nHeight, nWidth );
-	}
-	else
-	{
-		/*
-		 * winding_t *w; idBounds bounds; int i; float width, height, temp; float rot_width,
-		 * rot_height; float cosv,sinv,ang; float min_t, min_s, max_t, max_s; float s,t;
-		 * idVec3 vecs[2]; idVec3 coords[4]; texdef_t *td; if (nHeight < 1) { nHeight = 1;
-		 * } if (nWidth < 1) { nWidth = 1; } bounds.Clear(); td = &face->texdef; w =
-		 * face->face_winding; if (!w) { return; } for (i=0 ; i<w->numpoints ; i++) {
-		 * bounds.AddPoint( w->p[i] ); } // // get the current angle // ang = td->rotate /
-		 * 180 * Q_PI; sinv = sin(ang); cosv = cos(ang); // get natural texture axis
-		 * TextureAxisFromPlane(&face->plane, vecs[0], vecs[1]); min_s = DotProduct(
-		 * bounds.b[0], vecs[0] ); min_t = DotProduct( bounds.b[0], vecs[1] ); max_s =
-		 * DotProduct( bounds.b[1], vecs[0] ); max_t = DotProduct( bounds.b[1], vecs[1] );
-		 * width = max_s - min_s; height = max_t - min_t; coords[0][0] = min_s;
-		 * coords[0][1] = min_t; coords[1][0] = max_s; coords[1][1] = min_t; coords[2][0]
-		 * = min_s; coords[2][1] = max_t; coords[3][0] = max_s; coords[3][1] = max_t;
-		 * min_s = min_t = 999999; max_s = max_t = -999999; for (i=0; i<4; i++) { s = cosv
-		 * * coords[i][0] - sinv * coords[i][1]; t = sinv * coords[i][0] + cosv *
-		 * coords[i][1]; if (i&1) { if (s > max_s) { max_s = s; } } else { if (s < min_s)
-		 * { min_s = s; } if (i<2) { if (t < min_t) { min_t = t; } } else { if (t > max_t)
-		 * { max_t = t; } } } } rot_width = (max_s - min_s); rot_height = (max_t - min_t);
-		 * td->scale[0] =
-		 * -(rot_width/((float)(face->d_texture->GetEditorImage()->GetUploadWidth()*nWidth)));
-		 * td->scale[1] =
-		 * -(rot_height/((float)(face->d_texture->GetEditorImage()->GetUploadHeight()*nHeight)));
-		 * td->shift[0] = min_s/td->scale[0]; temp = (int)(td->shift[0] /
-		 * (face->d_texture->GetEditorImage()->GetUploadWidth()*nWidth)); temp =
-		 * (temp+1)*face->d_texture->GetEditorImage()->GetUploadWidth()*nWidth; td->shift[0] =
-		 * (int)(temp -
-		 * td->shift[0])%(face->d_texture->GetEditorImage()->GetUploadWidth()*nWidth);
-		 * td->shift[1] = min_t/td->scale[1]; temp = (int)(td->shift[1] /
-		 * (face->d_texture->GetEditorImage()->GetUploadHeight()*nHeight)); temp =
-		 * (temp+1)*(face->d_texture->GetEditorImage()->GetUploadHeight()*nHeight);
-		 * td->shift[1] = (int)(temp -
-		 * td->shift[1])%(face->d_texture->GetEditorImage()->GetUploadHeight()*nHeight);
-		 */
-	}
+	idVec3	mins, maxs;
+	mins[0] = maxs[0] = 0;
+	Face_FitTexture_BrushPrimit( face, mins, maxs, nHeight, nWidth );
 }
 
 /*
@@ -6190,7 +5816,7 @@ void Face_FitTexture( face_t* face, float nHeight, float nWidth )
 Brush_FitTexture
 ================
 */
-void Brush_FitTexture( brush_t* b, float nHeight, float nWidth )
+void Brush_FitTexture( idEditorBrush* b, float nHeight, float nWidth )
 {
 	face_t*	face;
 	for( face = b->brush_faces; face; face = face->next )
@@ -6199,7 +5825,7 @@ void Brush_FitTexture( brush_t* b, float nHeight, float nWidth )
 	}
 }
 
-void Brush_GetBounds( brush_t* b, idBounds& bo )
+void Brush_GetBounds( idEditorBrush* b, idBounds& bo )
 {
 	if( b == NULL )
 	{

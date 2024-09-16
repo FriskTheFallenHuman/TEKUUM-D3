@@ -43,21 +43,22 @@ public:
 
 	const char*		GetFilename();
 	const char*		GetContents();
-
+	idProgram*		GetProgram();
+#if 0// Test code
 	idProgram&		GetProgram();
+#endif
 
 	bool			IsLineCode( int linenumber );
 	bool			IsFileModified( bool updateTime = false );
 
 protected:
-
 	void			Unload();
 
 	idProgram*				mProgram;
 	idUserInterfaceLocal*	mInterface;
 	char*					mContents;
 	idStr					mFilename;
-	ID_TIME_T					mModifiedTime;
+	ID_TIME_T				mModifiedTime;
 };
 
 ID_INLINE const char* rvDebuggerScript::GetFilename()
@@ -70,9 +71,10 @@ ID_INLINE const char* rvDebuggerScript::GetContents()
 	return mContents ? mContents : "";
 }
 
-ID_INLINE idProgram& rvDebuggerScript::GetProgram()
+ID_INLINE idProgram* rvDebuggerScript::GetProgram()
 {
-	return *mProgram;
+	return mProgram;
 }
+
 
 #endif // DEBUGGERSCRIPT_H_
