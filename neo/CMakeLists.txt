@@ -12,7 +12,7 @@ set_property( GLOBAL PROPERTY USE_FOLDERS ON )
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
-project(RBDOOM3 C CXX)
+project(KROOM3 C CXX)
 
 option(USE_CMDLINE_TOOLS "Compile the built-in command line based tools" ON)
 option(USE_MFC_TOOLS "Compile the built-in MFC based tools" ON)
@@ -21,6 +21,7 @@ option(FORCE_COLOR_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)."
 option(COMPILE_COMMANDS "Generate compile_commands.json" OFF)
 option(USE_PRECOMPILED_HEADERS "Use precompiled headers during build" ON)
 option(ONATIVE "Optimize for the host CPU" OFF)
+option(REPRODUCIBLE_BUILD "Replace __DATE__ and __TIME__ by hardcoded values for reproducible builds." OFF)
 option(RETAIL "Strip certain developer features and cheats from shipping builds" OFF)
 
 # Define our cpu variable
@@ -64,6 +65,8 @@ if( CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang" )
 	add_definitions(-Werror=format)
 	add_definitions(-Wno-format-zero-length)
 	add_definitions(-Wno-nonnull)
+	
+	set(USE_MFC_TOOLS OFF)
 
 	# Compiler check (needs -std=c++17 flag)
 	include( CheckCXXCompilerFlag )
@@ -192,6 +195,11 @@ endif()
 # CMake only used for desktop builds
 add_definitions(-DID_PC )
 
+if( REPRODUCIBLE_BUILD )
+	# don't use __DATE__ and __TIME__ macros so builds are reproducible
+	add_definitions( -DID_REPRODUCIBLE_BUILD )
+endif()
+
 if ( USE_INTRINSICS_SSE )
 	add_definitions( -DUSE_INTRINSICS_SSE )
 endif()
@@ -280,47 +288,6 @@ file(GLOB SYS_SOURCES sys/*.cpp)
 file(GLOB UI_INCLUDES ui/*.h)
 file(GLOB UI_SOURCES ui/*.cpp)
 
-set(TOOLS_INCLUDES tools/edit_public.h)
-
-file(GLOB TOOLS_COMAFX_INCLUDES tools/comafx/*.h)
-file(GLOB TOOLS_COMAFX_SOURCES tools/comafx/*.cpp)
-
-file(GLOB TOOLS_COMMON_INCLUDES tools/common/*.h)
-file(GLOB TOOLS_COMMON_SOURCES tools/common/*.cpp)
-
-file(GLOB TOOLS_COMMON_PROPTREE_INCLUDES tools/common/PropTree/*.h)
-file(GLOB TOOLS_COMMON_PROPTREE_SOURCES tools/common/PropTree/*.cpp)
-
-file(GLOB EDITOR_AF_INCLUDES tools/af/*.h)
-file(GLOB EDITOR_AF_SOURCES tools/af/*.cpp)
-
-file(GLOB EDITOR_DECL_INCLUDES tools/decl/*.h)
-file(GLOB EDITOR_DECL_SOURCES tools/decl/*.cpp)
-
-file(GLOB EDITOR_DEBUGGER_INCLUDES tools/debugger/*.h)
-file(GLOB EDITOR_DEBUGGER_SOURCES tools/debugger/*.cpp)
-
-file(GLOB EDITOR_GUIED_INCLUDES tools/guied/*.h)
-file(GLOB EDITOR_GUIED_SOURCES tools/guied/*.cpp)
-
-file(GLOB EDITOR_MATERIALEDITOR_INCLUDES tools/materialeditor/*.h)
-file(GLOB EDITOR_MATERIALEDITOR_SOURCES tools/materialeditor/*.cpp)
-
-file(GLOB EDITOR_PARTICLE_INCLUDES tools/particle/*.h)
-file(GLOB EDITOR_PARTICLE_SOURCES tools/particle/*.cpp)
-
-file(GLOB EDITOR_PDA_INCLUDES tools/pda/*.h)
-file(GLOB EDITOR_PDA_SOURCES tools/pda/*.cpp)
-
-file(GLOB EDITOR_RADIANT_INCLUDES tools/radiant/*.h)
-file(GLOB EDITOR_RADIANT_SOURCES tools/radiant/*.cpp)
-
-file(GLOB EDITOR_SCRIPT_INCLUDES tools/script/*.h)
-file(GLOB EDITOR_SCRIPT_SOURCES tools/script/*.cpp)
-
-file(GLOB EDITOR_SOUND_INCLUDES tools/sound/*.h)
-file(GLOB EDITOR_SOUND_SOURCES tools/sound/*.cpp)
-
 file(GLOB_RECURSE WIN32_INCLUDES sys/win32/*.h)
 file(GLOB_RECURSE WIN32_SOURCES sys/win32/*.cpp)
 
@@ -330,10 +297,10 @@ file(GLOB_RECURSE WIN32_MANIFEST sys/win32/manifest/*.manifest)
 if( USE_MFC_TOOLS )
 	file(GLOB_RECURSE WIN32_RESOURCES sys/win32/rc/res/*.BMP sys/win32/rc/res/*.ico sys/win32/rc/res/*.cur)
 	list(APPEND WIN32_RESOURCES sys/win32/rc/doom.rc)
-	list(REMOVE_ITEM WIN32_INCLUDES ${CMAKE_SOURCE_DIR}/sys/win32/rc/rbdoom3_resource.h)
-	list(REMOVE_ITEM WIN32_RESOURCES ${CMAKE_SOURCE_DIR}/sys/win32/rc/rbdoom3.rc)
+	list(REMOVE_ITEM WIN32_INCLUDES ${CMAKE_SOURCE_DIR}/sys/win32/rc/kroom3_resource.h)
+	list(REMOVE_ITEM WIN32_RESOURCES ${CMAKE_SOURCE_DIR}/sys/win32/rc/kroom3.rc)
 else()
-	set(WIN32_RESOURCES sys/win32/rc/rbdoom3_resource.h sys/win32/rc/rbdoom3.rc sys/win32/rc/res/doom3.ico)
+	set(WIN32_RESOURCES sys/win32/rc/kroom3_resource.h sys/win32/rc/kroom3.rc sys/win32/rc/res/doom3.ico)
 	list(REMOVE_ITEM WIN32_INCLUDES ${CMAKE_SOURCE_DIR}/sys/win32/rc/resource.h)
 endif()
 

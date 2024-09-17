@@ -50,8 +50,6 @@ If you have questions concerning this license or the applicable additional terms
 
 idCVar Win32Vars_t::sys_cpustring( "sys_cpustring", "detect", CVAR_SYSTEM | CVAR_INIT, "" );
 idCVar Win32Vars_t::in_mouse( "in_mouse", "1", CVAR_SYSTEM | CVAR_BOOL, "enable mouse input" );
-idCVar Win32Vars_t::win_allowAltTab( "win_allowAltTab", "0", CVAR_SYSTEM | CVAR_BOOL, "allow Alt-Tab when fullscreen" );
-idCVar Win32Vars_t::win_notaskkeys( "win_notaskkeys", "0", CVAR_SYSTEM | CVAR_INTEGER, "disable windows task keys" );
 idCVar Win32Vars_t::win_outputDebugString( "win_outputDebugString", "1", CVAR_SYSTEM | CVAR_BOOL, "" );
 idCVar Win32Vars_t::win_outputEditString( "win_outputEditString", "1", CVAR_SYSTEM | CVAR_BOOL, "" );
 idCVar Win32Vars_t::win_viewlog( "win_viewlog", "0", CVAR_SYSTEM | CVAR_INTEGER, "" );
@@ -983,17 +981,6 @@ void Sys_PumpEvents()
 			common->Quit();
 		}
 
-		// save the msg time, because wndprocs don't have access to the timestamp
-		if( win32.sysMsgTime && win32.sysMsgTime > ( int )msg.time )
-		{
-			// don't ever let the event times run backwards
-//			common->Printf( "Sys_PumpEvents: win32.sysMsgTime (%i) > msg.time (%i)\n", win32.sysMsgTime, msg.time );
-		}
-		else
-		{
-			win32.sysMsgTime = msg.time;
-		}
-
 #ifdef ID_ALLOW_TOOLS
 		if( GUIEditorHandleMessage( &msg ) )
 		{
@@ -1542,13 +1529,6 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 #endif
 
 	common->Init( 0, NULL );
-
-#ifndef	ID_DEDICATED
-	if( win32.win_notaskkeys.GetInteger() )
-	{
-		DisableTaskKeys( TRUE, FALSE, /*( win32.win_notaskkeys.GetInteger() == 2 )*/ FALSE );
-	}
-#endif
 
 	Sys_StartAsyncThread();
 

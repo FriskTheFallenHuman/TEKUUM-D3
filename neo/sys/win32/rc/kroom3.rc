@@ -1,6 +1,6 @@
 // Microsoft Visual C++ generated resource script.
 //
-#include "rbdoom3_resource.h"
+#include "kroom3_resource.h"
 
 #define APSTUDIO_READONLY_SYMBOLS
 /////////////////////////////////////////////////////////////////////////////
@@ -27,7 +27,7 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 
 1 TEXTINCLUDE 
 BEGIN
-    "rbdoom3_resource.h\0"
+    "kroom3_resource.h\0"
 END
 
 3 TEXTINCLUDE 
@@ -52,7 +52,7 @@ END
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDI_ICON1               ICON                    "res\\doom3.ico"
+IDI_ICON1               ICON                    "res\\game.ico"
 
 
 /////////////////////////////////////////////////////////////////////////////

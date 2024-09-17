@@ -36,15 +36,15 @@ If you have questions concerning this license or the applicable additional terms
 */
 
 #define GAME_NAME						"DOOM 3"		/// appears in errors
-#define GAME_NAME_LOWER					"rbdoom3"		// appears in screenshot names
+#define GAME_NAME_LOWER					"kroom3"		// appears in screenshot names
 
-#define ENGINE_VERSION					"RBDOOM 3 0.4.0"	// printed in console, used for window title
+#define ENGINE_VERSION					"KROOM 3 0.5.0"	// printed in console, used for window title
 
 #ifdef ID_REPRODUCIBLE_BUILD
 	// for reproducible builds we hardcode values that would otherwise come from __DATE__ and __TIME__
 	// NOTE: remember to update esp. the date for (pre-) releases and RCs and the like
-	#define ID__DATE__  "Aug 15 2024"
-	#define ID__TIME__  "13:37:42"
+	#define ID__DATE__  "Sept 16 2024"
+	#define ID__TIME__  "14:48:00"
 
 #else // not reproducible build, use __DATE__ and __TIME__ macros
 	#define ID__DATE__  __DATE__
@@ -90,12 +90,12 @@ If you have questions concerning this license or the applicable additional terms
 // NOTE: a seperate core savegame version and game savegame version could be useful
 // 16: Doom v1.1
 // 17: Doom v1.2 / D3XP. Can still read old v16 with defaults for new data
-// 18: RBDOOM3
+// 18: KROOM3
 #define SAVEGAME_VERSION				18
 
 // <= Doom v1.1: 1. no DS_VERSION token ( default )
 // Doom v1.2: 2
-// RBDOOM3 : 3
+// KROOM3 : 3
 #define RENDERDEMO_VERSION				3
 
 // editor info

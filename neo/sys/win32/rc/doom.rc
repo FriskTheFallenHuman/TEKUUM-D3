@@ -2310,9 +2310,9 @@ END
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDI_ICON2               ICON                    "res\\doom3.ico"
+IDI_ICON2               ICON                    "res\\game.ico"
 
-IDR_MAINFRAME           ICON                    "res\\doom3.ico"
+IDR_MAINFRAME           ICON                    "res\\game.ico"
 
 IDI_GUIED_NAV_VISIBLE   ICON                    "res\\guied_nav_visible.ico"
 
@@ -2344,7 +2344,7 @@ IDI_ME_OFF_ICON         ICON                    "res\\me_off_icon.ico"
 
 IDI_ME_DISABLED_ICON    ICON                    "res\\me_disabled_icon.ico"
 
-IDI_ICON1               ICON                    "res\\doom3.ico"
+IDI_ICON1               ICON                    "res\\game.ico"
 
 IDI_MAINFRAME_IDSTUDIO  ICON                    "res\\editor.ico"
 

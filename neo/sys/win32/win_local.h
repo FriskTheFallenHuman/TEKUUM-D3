@@ -61,8 +61,6 @@ void	IN_ActivateMouse();
 
 void	IN_Frame();
 
-void	DisableTaskKeys( BOOL bDisable, BOOL bBeep, BOOL bTaskMgr );
-
 const unsigned char* Win_GetScanTable( void );
 
 void Conbuf_AppendText( const char* msg );
@@ -85,27 +83,15 @@ struct Win32Vars_t
 
 	cpuid_t			cpuid;
 
-	// when we get a windows message, we store the time off so keyboard processing
-	// can know the exact time of an event (not really needed now that we use async direct input)
-	int				sysMsgTime;
-
 	bool			windowClassRegistered;
 
 	WNDPROC			wndproc;
 
 	HDC				hDC;							// handle to device context
 
-#if defined(USE_ANGLE)
-	EGLDisplay		eglDisplay;
-	EGLContext		eglContext;
-	EGLSurface		eglSurface;
-#else
 	HGLRC			hGLRC;							// handle to GL rendering context
 	PIXELFORMATDESCRIPTOR pfd;
 	int				pixelformat;
-#endif
-
-	HINSTANCE		hinstOpenGL;	// HINSTANCE for the OpenGL library
 
 	int				desktopBitsPixel;
 	int				desktopWidth, desktopHeight;
@@ -117,8 +103,6 @@ struct Win32Vars_t
 
 	static idCVar	sys_cpustring;
 	static idCVar	in_mouse;
-	static idCVar	win_allowAltTab;
-	static idCVar	win_notaskkeys;
 	static idCVar	win_outputDebugString;
 	static idCVar	win_outputEditString;
 	static idCVar	win_viewlog;
