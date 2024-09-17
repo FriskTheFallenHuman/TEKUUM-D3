@@ -1,5 +1,8 @@
 <img src="logo.png">
-<font size=5 ><center>"don't worry, you'll get your product" - Bertruger</center></font>
+
+                                                    "don't worry, you'll get your product"
+                                                                                          - Bertruger
+
 Fork of TEKUUM source port aims to modernize DOOM 3 (2004) while also trying to mainting the same look of the game but giving more flexibility to modders, succesor of D3ModdingKit.
 
 ## About the Port
