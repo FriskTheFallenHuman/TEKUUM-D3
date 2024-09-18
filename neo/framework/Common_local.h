@@ -51,7 +51,6 @@ public:
 	virtual bool				IsInitialized() const;
 	virtual void				Frame();
 	virtual void				GUIFrame( bool execCmd, bool network );
-	virtual void				Async();
 	virtual void				StartupVariable( const char* match, bool once );
 	virtual void				InitTool( const toolFlag_t tool, const idDict* dict );
 	virtual void				ActivateTool( bool active );
@@ -121,7 +120,6 @@ private:
 	void						CloseLogFile();
 	void						WriteConfiguration();
 	void						DumpWarnings();
-	void						SingleAsyncTic();
 	void						LoadGameDLL();
 	void						UnloadGameDLL();
 	void						PrintLoadingMessage( const char* msg );
@@ -151,12 +149,6 @@ private:
 #ifdef ID_WRITE_VERSION
 	idCompressor* 				config_compressor;
 #endif
-
-	// RB begin
-#if defined(USE_SDL_ASYNC)
-	SDL_TimerID					asyncTimerID;
-#endif
-	// RB end
 };
 
 extern idCommonLocal commonLocal;

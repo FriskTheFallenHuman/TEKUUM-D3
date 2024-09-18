@@ -111,6 +111,8 @@ class idSoundSample;
 class idSampleDecoder;
 class idSoundWorldLocal;
 
+#define Sys_EnterCriticalSection()
+#define Sys_LeaveCriticalSection()
 
 /*
 ===================================================================================

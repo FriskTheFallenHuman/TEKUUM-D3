@@ -59,150 +59,7 @@ Win32Vars_t	win32;
 
 static char		sys_cmdline[MAX_STRING_CHARS];
 
-// not a hard limit, just what we keep track of for debugging
-xthreadInfo* g_threads[MAX_THREADS];
-
-int g_thread_count = 0;
-
-static	xthreadInfo	threadInfo;
 static	HANDLE		hTimer;
-
-/*
-==================
-Sys_Createthread
-==================
-*/
-void Sys_CreateThread( xthread_t function, void* parms, xthreadPriority priority, xthreadInfo& info, const char* name, xthreadInfo* threads[MAX_THREADS], int* thread_count )
-{
-	DWORD id;
-	HANDLE temp = CreateThread(	NULL,	// LPSECURITY_ATTRIBUTES lpsa,
-								0,		// DWORD cbStack,
-								( LPTHREAD_START_ROUTINE )function,	// LPTHREAD_START_ROUTINE lpStartAddr,
-								parms,	// LPVOID lpvThreadParm,
-								0,		//   DWORD fdwCreate,
-								&id );
-
-	info.threadId = id;
-	info.threadHandle = ( intptr_t ) temp;
-	if( priority == THREAD_HIGHEST )
-	{
-		SetThreadPriority( ( HANDLE )info.threadHandle, THREAD_PRIORITY_HIGHEST );		//  we better sleep enough to do this
-	}
-	else if( priority == THREAD_ABOVE_NORMAL )
-	{
-		SetThreadPriority( ( HANDLE )info.threadHandle, THREAD_PRIORITY_ABOVE_NORMAL );
-	}
-	info.name = name;
-	if( *thread_count < MAX_THREADS )
-	{
-		threads[( *thread_count )++] = &info;
-	}
-	else
-	{
-		common->DPrintf( "WARNING: MAX_THREADS reached\n" );
-	}
-}
-
-/*
-==================
-Sys_DestroyThread
-==================
-*/
-void Sys_DestroyThread( xthreadInfo& info )
-{
-	WaitForSingleObject( ( HANDLE )info.threadHandle, INFINITE );
-	CloseHandle( ( HANDLE )info.threadHandle );
-	info.threadHandle = 0;
-}
-
-/*
-==================
-Sys_GetThreadName
-==================
-*/
-const char* Sys_GetThreadName( int* index )
-{
-	int id = GetCurrentThreadId();
-	for( int i = 0; i < g_thread_count; i++ )
-	{
-		if( id == g_threads[i]->threadId )
-		{
-			if( index )
-			{
-				*index = i;
-			}
-			return g_threads[i]->name;
-		}
-	}
-	if( index )
-	{
-		*index = -1;
-	}
-	return "main";
-}
-
-// RB begin
-void Sys_InitCriticalSections()
-{
-	for( int i = 0; i < MAX_CRITICAL_SECTIONS; i++ )
-	{
-		InitializeCriticalSection( &win32.criticalSections[i] );
-	}
-}
-// RB end
-
-/*
-==================
-Sys_EnterCriticalSection
-==================
-*/
-void Sys_EnterCriticalSection( int index )
-{
-	assert( index >= 0 && index < MAX_CRITICAL_SECTIONS );
-	if( TryEnterCriticalSection( &win32.criticalSections[index] ) == 0 )
-	{
-		EnterCriticalSection( &win32.criticalSections[index] );
-//		Sys_DebugPrintf( "busy lock '%s' in thread '%s'\n", lock->name, Sys_GetThreadName() );
-	}
-}
-
-/*
-==================
-Sys_LeaveCriticalSection
-==================
-*/
-void Sys_LeaveCriticalSection( int index )
-{
-	assert( index >= 0 && index < MAX_CRITICAL_SECTIONS );
-	LeaveCriticalSection( &win32.criticalSections[index] );
-}
-
-/*
-==================
-Sys_WaitForEvent
-==================
-*/
-void Sys_WaitForEvent( int index )
-{
-	assert( index == 0 );
-	if( !win32.backgroundDownloadSemaphore )
-	{
-		win32.backgroundDownloadSemaphore = CreateEvent( NULL, TRUE, FALSE, NULL );
-	}
-	WaitForSingleObject( win32.backgroundDownloadSemaphore, INFINITE );
-	ResetEvent( win32.backgroundDownloadSemaphore );
-}
-
-/*
-==================
-Sys_TriggerEvent
-==================
-*/
-void Sys_TriggerEvent( int index )
-{
-	assert( index == 0 );
-	SetEvent( win32.backgroundDownloadSemaphore );
-}
 
 /*
 =============
@@ -516,7 +373,7 @@ static int WPath2A( char* dst, size_t size, const WCHAR* src )
 
 /*
 ==============
-Returns "My Documents"/My Games/rbdoom3 directory (or equivalent - "CSIDL_PERSONAL").
+Returns "My Documents"/My Games/kroom3 directory (or equivalent - "CSIDL_PERSONAL").
 To be used with Sys_GetPath(PATH_SAVE), so savegames, screenshots etc will be
 saved to the users files instead of systemwide.
 
@@ -540,7 +397,7 @@ extern "C" { // DG: I need this in SDL_win32_main.c
 			return 0;
 		}
 
-		idStr::Append( dst, size, "/My Games/rbdoom3" );
+		idStr::Append( dst, size, "/My Games/kroom3" );
 
 		return len;
 	}
@@ -1078,80 +935,6 @@ void Sys_In_Restart_f( const idCmdArgs& args )
 	Sys_InitInput();
 }
 
-
-/*
-==================
-Sys_AsyncThread
-==================
-*/
-static void Sys_AsyncThread( void* parm )
-{
-	int		wakeNumber;
-	int		startTime;
-
-	startTime = Sys_Milliseconds();
-	wakeNumber = 0;
-
-	while( 1 )
-	{
-#ifdef WIN32
-		// this will trigger 60 times a second
-		int r = WaitForSingleObject( hTimer, 100 );
-		if( r != WAIT_OBJECT_0 )
-		{
-			OutputDebugString( "idPacketServer::PacketServerInterrupt: bad wait return" );
-		}
-#endif
-
-#if 0
-		wakeNumber++;
-		int		msec = Sys_Milliseconds();
-		int		deltaTime = msec - startTime;
-		startTime = msec;
-
-		char	str[1024];
-		sprintf( str, "%i ", deltaTime );
-		OutputDebugString( str );
-#endif
-
-
-		common->Async();
-	}
-}
-
-/*
-==============
-Sys_StartAsyncThread
-
-Start the thread that will call idCommon::Async()
-==============
-*/
-void Sys_StartAsyncThread()
-{
-	// create an auto-reset event that happens 60 times a second
-	hTimer = CreateWaitableTimer( NULL, false, NULL );
-	if( !hTimer )
-	{
-		common->Error( "idPacketServer::Spawn: CreateWaitableTimer failed" );
-	}
-
-	LARGE_INTEGER	t;
-	t.HighPart = t.LowPart = 0;
-	SetWaitableTimer( hTimer, &t, USERCMD_MSEC, NULL, NULL, TRUE );
-
-	Sys_CreateThread( ( xthread_t )Sys_AsyncThread, NULL, THREAD_ABOVE_NORMAL, threadInfo, "Async", g_threads,  &g_thread_count );
-
-#ifdef SET_THREAD_AFFINITY
-	// give the async thread an affinity for the second cpu
-	SetThreadAffinityMask( ( HANDLE )threadInfo.threadHandle, 2 );
-#endif
-
-	if( !threadInfo.threadHandle )
-	{
-		common->Error( "Sys_StartAsyncThread: failed" );
-	}
-}
-
 /*
 ================
 Sys_Init
@@ -1513,9 +1296,11 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	// no abort/retry/fail errors
 	SetErrorMode( SEM_FAILCRITICALERRORS );
 
-// RB begin
-	Sys_InitCriticalSections();
-// RB end
+	for( int i = 0; i < MAX_CRITICAL_SECTIONS; i++ )
+	{
+		InitializeCriticalSection( &win32.criticalSections[i] );
+	}
+
 	// make sure the timer is high precision, otherwise
 	// NT gets 18ms resolution
 	timeBeginPeriod( 1 );
@@ -1529,8 +1314,6 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 #endif
 
 	common->Init( 0, NULL );
-
-	Sys_StartAsyncThread();
 
 	// hide or show the early console as necessary
 	if( win32.win_viewlog.GetInteger() || com_skipRenderer.GetBool() || idAsyncNetwork::serverDedicated.GetInteger() )

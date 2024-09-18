@@ -1012,7 +1012,6 @@ extern idCVar r_windowWidth;
 extern idCVar r_windowHeight;
 
 extern idCVar r_debugContext;				// enable various levels of context debug
-extern idCVar r_glDriver;					// "opengl32", etc
 // SRS - Added cvar to control workarounds for AMD OSX driver bugs when shadow mapping enabled
 extern idCVar r_skipAMDWorkarounds;         // skip work arounds for AMD driver bugs
 // SRS end

@@ -93,7 +93,7 @@ else()
 	SEPARATE_ARGUMENTS( _compiler_FLAGS )
 	
 	if( USE_PRECOMPILED_HEADERS )
-		# we need to recreate the precompiled header for RBDoom3BFG 
+		# we need to recreate the precompiled header for Kroom3
 		# (i.e. can't use the one created for idlib before)
 		# because some definitions (e.g. -D__IDLIB__ -D__DOOM_DLL__) differ
 		add_custom_target( precomp_header_game ALL

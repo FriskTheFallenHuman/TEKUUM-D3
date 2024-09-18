@@ -29,12 +29,6 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-// RB begin
-#if defined(USE_SDL_ASYNC)
-	#include <SDL.h>
-#endif
-// RB end
-
 #include "Common_local.h"
 
 #include "../renderer/Image.h"
@@ -62,8 +56,6 @@ idCVar com_purgeAll( "com_purgeAll", "0", CVAR_BOOL | CVAR_ARCHIVE | CVAR_SYSTEM
 idCVar com_memoryMarker( "com_memoryMarker", "-1", CVAR_INTEGER | CVAR_SYSTEM | CVAR_INIT, "used as a marker for memory stats" );
 idCVar com_preciseTic( "com_preciseTic", "1", CVAR_BOOL | CVAR_SYSTEM, "run one game tick every async thread update" );
 idCVar com_asyncInput( "com_asyncInput", "0", CVAR_BOOL | CVAR_SYSTEM, "sample input from the async thread" );
-#define ASYNCSOUND_INFO "0: mix sound inline, 1 or 3: async update every 16ms 2: async update about every 100ms (original behavior)"
-idCVar com_asyncSound( "com_asyncSound", "1", CVAR_INTEGER | CVAR_SYSTEM, ASYNCSOUND_INFO, 0, 3 );
 idCVar com_forceGenericSIMD( "com_forceGenericSIMD", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "force generic platform independent SIMD" );
 idCVar com_developer( "developer", "0", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "developer mode" );
 idCVar com_allowConsole( "com_allowConsole", "1", CVAR_BOOL | CVAR_SYSTEM | CVAR_NOCHEAT, "allow toggling console with the tilde key" );
@@ -137,13 +129,6 @@ idCommonLocal::idCommonLocal()
 #ifdef ID_WRITE_VERSION
 	config_compressor = NULL;
 #endif
-
-	// RB begin
-#if defined(USE_SDL_ASYNC)
-	asyncTimerID = 0;
-#endif
-	// RB end
-
 }
 
 /*
@@ -1423,7 +1408,7 @@ void idCommonLocal::Frame()
 
 		eventLoop->RunEventLoop();
 
-		com_frameTime = com_ticNumber * USERCMD_MSEC;
+		com_frameTime = Sys_Milliseconds();
 
 		idAsyncNetwork::RunFrame();
 
@@ -1487,166 +1472,15 @@ void idCommonLocal::GUIFrame( bool execCmd, bool network )
 {
 	Sys_GenerateEvents();
 	eventLoop->RunEventLoop( execCmd );	// and execute any commands
-	com_frameTime = com_ticNumber * USERCMD_MSEC;
 	if( network )
 	{
 		idAsyncNetwork::RunFrame();
 	}
 	session->Frame();
 
-	// RB: added captureToImage
 	const bool captureToImage = false;
 	session->UpdateScreen( captureToImage, false );
-	// RB end
 }
-
-/*
-=================
-idCommonLocal::SingleAsyncTic
-
-The system will asyncronously call this function 60 times a second to
-handle the time-critical functions that we don't want limited to
-the frame rate:
-
-sound mixing
-user input generation (conditioned by com_asyncInput)
-packet server operation
-packet client operation
-
-We are not using thread safe libraries, so any functionality put here must
-be VERY VERY careful about what it calls.
-=================
-*/
-
-typedef struct
-{
-	int				milliseconds;			// should always be incremeting by 60hz
-	int				deltaMsec;				// should always be 16
-	int				timeConsumed;			// msec spent in Com_AsyncThread()
-	int				clientPacketsReceived;
-	int				serverPacketsReceived;
-	int				mostRecentServerPacketSequence;
-} asyncStats_t;
-
-static const int MAX_ASYNC_STATS = 1024;
-asyncStats_t	com_asyncStats[MAX_ASYNC_STATS];		// indexed by com_ticNumber
-int prevAsyncMsec;
-int	lastTicMsec;
-
-void idCommonLocal::SingleAsyncTic()
-{
-	// main thread code can prevent this from happening while modifying
-	// critical data structures
-	Sys_EnterCriticalSection();
-
-	asyncStats_t* stat = &com_asyncStats[com_ticNumber & ( MAX_ASYNC_STATS - 1 )];
-	memset( stat, 0, sizeof( *stat ) );
-	stat->milliseconds = Sys_Milliseconds();
-	stat->deltaMsec = stat->milliseconds - com_asyncStats[( com_ticNumber - 1 ) & ( MAX_ASYNC_STATS - 1 )].milliseconds;
-
-	if( usercmdGen && com_asyncInput.GetBool() )
-	{
-		usercmdGen->UsercmdInterrupt();
-	}
-
-	switch( com_asyncSound.GetInteger() )
-	{
-		case 1:
-		case 3:
-			// DG: these are now used for the new default behavior of "update every async tic (every 16ms)"
-			soundSystem->AsyncUpdateWrite( stat->milliseconds );
-			break;
-		case 2:
-			// DG: use 2 for the old "update only 10x/second" behavior in case anyone likes that..
-			soundSystem->AsyncUpdate( stat->milliseconds );
-			break;
-	}
-
-	// we update com_ticNumber after all the background tasks
-	// have completed their work for this tic
-	com_ticNumber++;
-
-	stat->timeConsumed = Sys_Milliseconds() - stat->milliseconds;
-
-	Sys_LeaveCriticalSection();
-}
-
-/*
-=================
-idCommonLocal::Async
-=================
-*/
-void idCommonLocal::Async()
-{
-	if( com_shuttingDown )
-	{
-		return;
-	}
-
-	int	msec = Sys_Milliseconds();
-	if( !lastTicMsec )
-	{
-		lastTicMsec = msec - USERCMD_MSEC;
-	}
-
-	if( !com_preciseTic.GetBool() )
-	{
-		// just run a single tic, even if the exact msec isn't precise
-		SingleAsyncTic();
-		return;
-	}
-
-	int ticMsec = USERCMD_MSEC;
-
-	// the number of msec per tic can be varies with the timescale cvar
-	float timescale = com_timescale.GetFloat();
-	if( timescale != 1.0f )
-	{
-		ticMsec /= timescale;
-		if( ticMsec < 1 )
-		{
-			ticMsec = 1;
-		}
-	}
-
-	// don't skip too many
-	if( timescale == 1.0f )
-	{
-		if( lastTicMsec + 10 * USERCMD_MSEC < msec )
-		{
-			lastTicMsec = msec - 10 * USERCMD_MSEC;
-		}
-	}
-
-	while( lastTicMsec + ticMsec <= msec )
-	{
-		SingleAsyncTic();
-		lastTicMsec += ticMsec;
-	}
-}
-
-// RB begin
-#if defined(USE_SDL_ASYNC)
-unsigned int AsyncTimer( unsigned int interval, void* )
-{
-	common->Async();
-
-	Sys_TriggerEvent( TRIGGER_EVENT_ONE );
-
-	// calculate the next interval to get as close to 60fps as possible
-	unsigned int now = Sys_Milliseconds();
-	unsigned int tick = com_ticNumber * USERCMD_MSEC;
-
-	if( now >= tick )
-	{
-		return 1;
-	}
-
-	return tick - now;
-
-}
-#endif
-// RB end
 
 /*
 =================
@@ -1900,17 +1734,6 @@ void idCommonLocal::Init( int argc, char** argv )
 	{
 		Sys_Error( "Error during initialization" );
 	}
-
-// RB begin
-#if defined(USE_SDL_ASYNC)
-	asyncTimerID = SDL_AddTimer( USERCMD_MSEC, AsyncTimer, NULL );
-
-	if( !asyncTimerID )
-	{
-		Sys_Error( "Error while starting the async timer: %s", SDL_GetError() );
-	}
-#endif
-// RB end
 }
 
 
@@ -1922,16 +1745,6 @@ idCommonLocal::Shutdown
 void idCommonLocal::Shutdown()
 {
 	com_shuttingDown = true;
-
-	// RB begin
-#if defined(USE_SDL_ASYNC)
-	if( asyncTimerID )
-	{
-		SDL_RemoveTimer( asyncTimerID );
-		asyncTimerID = 0;
-	}
-#endif
-	// RB end
 
 	idAsyncNetwork::server.Kill();
 	idAsyncNetwork::client.Shutdown();
@@ -2009,21 +1822,16 @@ void idCommonLocal::InitGame()
 		Com_ExecMachineSpec_f( args );
 	}
 
-// RB begin
-	// init the parallel job manager
-	parallelJobManager->Init();
-// RB end
-
 	// initialize string database right off so we can use it for loading messages
 	InitLanguageDict();
 
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04344" ) );
 
-	// load the font, etc
-	//console->LoadGraphics();
-
 	// init journalling, etc
 	eventLoop->Init();
+
+	// init the parallel job manager
+	parallelJobManager->Init();
 
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_04345" ) );
 

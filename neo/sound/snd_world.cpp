@@ -2189,7 +2189,7 @@ void idSoundWorldLocal::AddChannelContribution( idSoundEmitterLocal* sound, idSo
 			}
 		}
 	}
-#if 1 // DG: I /think/ this was only relevant for the old sound backends?
+#if 0 // DG: I /think/ this was only relevant for the old sound backends?
 	// FIXME: completely remove else branch, but for testing leave it in under com_asyncSound 2
 	//        (which also does the old 92-100ms updates)
 	else if( com_asyncSound.GetInteger() == 2 )

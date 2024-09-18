@@ -429,7 +429,7 @@ public:
 	static void				TouchFileList_f( const idCmdArgs& args );
 
 private:
-	friend dword 			BackgroundDownloadThread( void* parms );
+	friend void				BackgroundDownloadThread( void* parms );
 
 	searchpath_t* 			searchPaths;
 	int						readCount;			// total bytes read
@@ -456,7 +456,7 @@ private:
 
 	backgroundDownload_t* 	backgroundDownloads;
 	backgroundDownload_t	defaultBackgroundDownload;
-	xthreadInfo				backgroundThread;
+	uintptr_t				backgroundThread;
 
 	idList<pack_t*>		serverPaks;
 	bool					loadedFileFromDir;		// set to true once a file was loaded from a directory - can't switch to pure anymore
@@ -4354,21 +4354,21 @@ BackgroundDownload
 Reads part of a file from a background thread.
 ===================
 */
-dword BackgroundDownloadThread( void* parms )
+void BackgroundDownloadThread( void* parms )
 {
 	while( 1 )
 	{
-		Sys_EnterCriticalSection();
+		//Sys_EnterCriticalSection();
 		backgroundDownload_t*	bgl = fileSystemLocal.backgroundDownloads;
 		if( !bgl )
 		{
-			Sys_LeaveCriticalSection();
-			Sys_WaitForEvent();
+			//Sys_LeaveCriticalSection();
+			//Sys_WaitForEvent();
 			continue;
 		}
 		// remove this from the list
 		fileSystemLocal.backgroundDownloads = bgl->next;
-		Sys_LeaveCriticalSection();
+		//Sys_LeaveCriticalSection();
 
 		bgl->next = NULL;
 
@@ -4486,7 +4486,6 @@ dword BackgroundDownloadThread( void* parms )
 #endif
 		}
 	}
-	return 0;
 }
 
 /*
@@ -4496,10 +4495,10 @@ idFileSystemLocal::StartBackgroundReadThread
 */
 void idFileSystemLocal::StartBackgroundDownloadThread()
 {
-	if( !backgroundThread.threadHandle )
+	if( !backgroundThread )
 	{
-		Sys_CreateThread( ( xthread_t )BackgroundDownloadThread, NULL, THREAD_NORMAL, backgroundThread, "backgroundDownload", g_threads, &g_thread_count );
-		if( !backgroundThread.threadHandle )
+		backgroundThread = Sys_CreateThread( ( xthread_t )BackgroundDownloadThread, NULL, THREAD_NORMAL, "BackDL", CORE_ANY );
+		if( !backgroundThread )
 		{
 			common->Warning( "idFileSystemLocal::StartBackgroundDownloadThread: failed" );
 		}
@@ -4522,11 +4521,11 @@ void idFileSystemLocal::BackgroundDownload( backgroundDownload_t* bgl )
 		if( dynamic_cast<idFile_Permanent*>( bgl->f ) )
 		{
 			// add the bgl to the background download list
-			Sys_EnterCriticalSection();
+			//Sys_EnterCriticalSection();
 			bgl->next = backgroundDownloads;
 			backgroundDownloads = bgl;
-			Sys_TriggerEvent();
-			Sys_LeaveCriticalSection();
+			//Sys_TriggerEvent();
+			//Sys_LeaveCriticalSection();
 		}
 		else
 		{
@@ -4538,11 +4537,11 @@ void idFileSystemLocal::BackgroundDownload( backgroundDownload_t* bgl )
 	}
 	else
 	{
-		Sys_EnterCriticalSection();
+		//Sys_EnterCriticalSection();
 		bgl->next = backgroundDownloads;
 		backgroundDownloads = bgl;
-		Sys_TriggerEvent();
-		Sys_LeaveCriticalSection();
+		//Sys_TriggerEvent();
+		//Sys_LeaveCriticalSection();
 	}
 }
 

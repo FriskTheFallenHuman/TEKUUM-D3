@@ -88,7 +88,6 @@ typedef enum
 extern idCVar		com_version;
 extern idCVar		com_skipRenderer;
 extern idCVar		com_asyncInput;
-extern idCVar		com_asyncSound;
 extern idCVar		com_machineSpec;
 extern idCVar		com_purgeAll;
 extern idCVar		com_developer;
@@ -181,10 +180,6 @@ public:
 
 	// Called repeatedly by blocking function calls with GUI interactivity.
 	virtual void				GUIFrame( bool execCmd, bool network ) = 0;
-
-	// Called 60 times a second from a background thread for sound mixing,
-	// and input generation. Not called until idCommon::Init() has completed.
-	virtual void				Async() = 0;
 
 	// Checks for and removes command line "+set var arg" constructs.
 	// If match is NULL, all set commands will be executed, otherwise

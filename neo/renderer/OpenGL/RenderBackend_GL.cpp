@@ -124,7 +124,7 @@ bool GL_CheckErrors_( const char* filename, int line )
 				break;
 		}
 
-		common->Printf( "caught OpenGL error: %s in file %s line %i\n", s, filename, line );
+		common->Printf( "caught OpenGL error: %d-%s in file %s line %i\n", err, s, filename, line );
 	}
 
 	return error;
@@ -571,9 +571,15 @@ void idRenderBackend::Init()
 	// recheck all the extensions (FIXME: this might be dangerous)
 	R_CheckPortableExtensions();
 
+	GL_CheckErrors();
+
 	renderProgManager.Init();
 
+	GL_CheckErrors();
+
 	tr.SetInitialized();
+
+	GL_CheckErrors();
 
 	// allocate the vertex array range or vertex objects
 	vertexCache.Init( glConfig.uniformBufferOffsetAlignment );

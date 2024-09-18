@@ -109,7 +109,6 @@ struct Win32Vars_t
 	static idCVar	win_timerUpdate;
 
 	CRITICAL_SECTION criticalSections[MAX_CRITICAL_SECTIONS];
-	HANDLE			backgroundDownloadSemaphore;
 
 	HINSTANCE		hInstDI;			// direct input
 

@@ -410,30 +410,17 @@ void idSessionLocal::ShowLoadingGui()
 	}
 	console->Close();
 
-	// introduced in D3XP code. don't think it actually fixes anything, but doesn't hurt either
-#if 1
 	// Try and prevent the while loop from being skipped over (long hitch on the main thread?)
 	int stop = Sys_Milliseconds() + 1000;
 	int force = 10;
 	while( Sys_Milliseconds() < stop || force-- > 0 )
 	{
-		com_frameTime = com_ticNumber * USERCMD_MSEC;
+		com_frameTime = Sys_Milliseconds();
 		session->Frame();
 
-		// RB: added captureToImage
 		const bool captureToImage = false;
 		session->UpdateScreen( captureToImage, false );
-		// RB end
 	}
-#else
-	int stop = com_ticNumber + 1000.0f / USERCMD_MSEC * 1.0f;
-	while( com_ticNumber < stop )
-	{
-		com_frameTime = com_ticNumber * USERCMD_MSEC;
-		session->Frame();
-		session->UpdateScreen( false );
-	}
-#endif
 }
 
 /*
@@ -677,7 +664,6 @@ void Session_Hitch_f( const idCmdArgs& args )
 	{
 		soundSystem->SetMute( true );
 		sw->Pause();
-		Sys_EnterCriticalSection();
 	}
 	if( args.Argc() == 2 )
 	{
@@ -689,7 +675,6 @@ void Session_Hitch_f( const idCmdArgs& args )
 	}
 	if( sw )
 	{
-		Sys_LeaveCriticalSection();
 		sw->UnPause();
 		soundSystem->SetMute( false );
 	}

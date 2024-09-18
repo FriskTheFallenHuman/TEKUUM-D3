@@ -44,7 +44,7 @@ If you have questions concerning this license or the applicable additional terms
 #ifdef ID_ALLOW_TOOLS
 	#include "rc/resource.h"
 #else
-	#include "rc/rbdoom3_resource.h"
+	#include "rc/kroom3_resource.h"
 #endif
 
 #define COPY_ID			1

@@ -75,6 +75,7 @@ void idSessionLocal::CompleteWipe()
 #if ID_CONSOLE_LOCK
 		emptyDrawCount = 0;
 #endif
+		com_ticNumber++;
 		UpdateScreen( captureToImage, true );
 	}
 }
