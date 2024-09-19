@@ -668,7 +668,7 @@ bool idDeclParticle::LoadBinary( idFile* file, unsigned int checksum )
 
 	unsigned int loadedChecksum;
 	file->ReadBig( loadedChecksum );
-	if( checksum != loadedChecksum /*&& !fileSystem->InProductionMode()*/ )
+	if( checksum != loadedChecksum && !fileSystem->InProductionMode() )
 	{
 		return false;
 	}

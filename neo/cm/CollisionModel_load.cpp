@@ -3499,7 +3499,7 @@ cm_model_t* idCollisionModelManagerLocal::LoadBinaryModelFromFile( idFile* file,
 	file->ReadBig( storedTimeStamp );
 
 	// RB: source might be from .pk4, so we ignore the time stamp and assume a release build
-	if( ( sourceTimeStamp != FILE_NOT_FOUND_TIMESTAMP ) && ( sourceTimeStamp != 0 ) && ( sourceTimeStamp != storedTimeStamp ) )
+	if( !fileSystem->InProductionMode() && ( sourceTimeStamp != FILE_NOT_FOUND_TIMESTAMP ) && ( sourceTimeStamp != 0 ) && ( sourceTimeStamp != storedTimeStamp ) )
 	{
 		return NULL;
 	}

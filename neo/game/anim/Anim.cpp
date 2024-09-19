@@ -430,7 +430,7 @@ bool idMD5Anim::LoadBinary( idFile* file, ID_TIME_T sourceTimeStamp )
 	file->ReadBig( loadedTimeStamp );
 
 	// RB: source might be from pk4, so we ignore the time stamp and assume a release build
-	if( ( sourceTimeStamp != FILE_NOT_FOUND_TIMESTAMP ) && ( sourceTimeStamp != 0 ) && ( sourceTimeStamp != loadedTimeStamp ) /* && !fileSystem->InProductionMode()*/ )
+	if( !fileSystem->InProductionMode() && ( sourceTimeStamp != FILE_NOT_FOUND_TIMESTAMP ) && ( sourceTimeStamp != 0 ) && ( sourceTimeStamp != loadedTimeStamp ) )
 	{
 		return false;
 	}
@@ -1076,7 +1076,7 @@ void idMD5Anim::CheckModelHierarchy( const idRenderModel* model ) const
 {
 	if( jointInfo.Num() != model->NumJoints() )
 	{
-		if( true ) //!fileSystem->InProductionMode() )
+		if( !fileSystem->InProductionMode() )
 		{
 			gameLocal.Warning( "Model '%s' has different # of joints than anim '%s'", model->Name(), name.c_str() );
 		}

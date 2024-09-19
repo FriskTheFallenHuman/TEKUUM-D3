@@ -955,9 +955,6 @@ void Sys_Init()
 //	SetTimer( NULL, 0, 100, NULL );
 
 	cmdSystem->AddCommand( "in_restart", Sys_In_Restart_f, CMD_FL_SYSTEM, "restarts the input system" );
-#if 0
-	cmdSystem->AddCommand( "setAsyncSound", Sys_SetAsyncSound_f, CMD_FL_SYSTEM, "set the async sound option" );
-#endif
 
 	//
 	// Windows version

@@ -575,7 +575,6 @@ void idRenderBackend::BindVariableStageImage( const textureStage_t* texture, con
 		// We make no attempt to optimize for multiple identical cinematics being in view, or
 		// for cinematics going at a lower framerate than the renderer.
 		cin = texture->cinematic->ImageForTime( viewDef->renderView.time[0] + idMath::Ftoi( 1000.0f * viewDef->renderView.shaderParms[11] ) );
-#if 0
 		if( cin.imageY != NULL )
 		{
 			GL_SelectTexture( 0 );
@@ -603,8 +602,8 @@ void idRenderBackend::BindVariableStageImage( const textureStage_t* texture, con
 			GL_SelectTexture( 0 );
 			cin.image->Bind();
 
-			/*
-			if( backEnd.viewDef->is2Dgui )
+			// SRS - Reenable shaders so ffmpeg and RoQ decoder cinematics are rendered with correct colour
+			if( viewDef->is2Dgui )
 			{
 				renderProgManager.BindShader_TextureVertexColor_sRGB();
 			}
@@ -612,7 +611,6 @@ void idRenderBackend::BindVariableStageImage( const textureStage_t* texture, con
 			{
 				renderProgManager.BindShader_TextureVertexColor();
 			}
-			*/
 		}
 		else
 		{
@@ -622,30 +620,6 @@ void idRenderBackend::BindVariableStageImage( const textureStage_t* texture, con
 			// SWF GUI case is handled better, too
 			renderProgManager.BindShader_TextureVertexColor();
 		}
-#else
-		if( cin.image != NULL )
-		{
-			GL_SelectTexture( 0 );
-			//cin.image->Bind();
-			//globalImages->cinematicImage->Bind();
-			globalImages->cinematicImage->UploadScratch( cin.image, cin.imageWidth, cin.imageHeight );
-
-			/*
-			GL_SelectTexture( 1 );
-			cin.imageCr->Bind();
-			GL_SelectTexture( 2 );
-			cin.imageCb->Bind();
-			*/
-		}
-		else
-		{
-			globalImages->blackImage->Bind();
-			// because the shaders may have already been set - we need to make sure we are not using a bink shader which would
-			// display incorrectly.  We may want to get rid of RB_BindVariableStageImage and inline the code so that the
-			// SWF GUI case is handled better, too
-			renderProgManager.BindShader_TextureVertexColor();
-		}
-#endif
 	}
 	else
 	{
@@ -915,6 +889,7 @@ void idRenderBackend::FillDepthBufferGeneric( const drawSurf_t* const* drawSurfs
 				break;
 			}
 		}
+
 		if( stage == shader->GetNumStages() )
 		{
 			continue;
@@ -4207,11 +4182,7 @@ int idRenderBackend::DrawShaderPasses( const drawSurf_t* const* const drawSurfs,
 			}
 			else if( pStage->texture.cinematic )
 			{
-#if 0
 				renderProgManager.BindShader_Bink();
-#else
-				renderProgManager.BindShader_RoQ();
-#endif
 			}
 			else
 			{
@@ -4833,9 +4804,13 @@ void idRenderBackend::Bloom( const viewDef_t* _viewDef )
 		return;
 	}
 
+	renderLog.OpenMainBlock( MRB_BLOOM );
+	renderLog.OpenBlock( "Render_Bloom", colorBlue );
+
 	RENDERLOG_PRINTF( "---------- RB_Bloom( avg = %f, max = %f, key = %f ) ----------\n", hdrAverageLuminance, hdrMaxLuminance, hdrKey );
 
 	// BRIGHTPASS
+	renderLog.OpenBlock( "Brightpass" );
 
 	//GL_CheckErrors();
 
@@ -4916,6 +4891,10 @@ void idRenderBackend::Bloom( const viewDef_t* _viewDef )
 	// Draw
 	DrawElementsWithCounters( &unitSquareSurface );
 
+	renderLog.CloseBlock(); // Brightpass
+
+	renderLog.OpenBlock( "Bloom Ping Pong" );
+
 	// BLOOM PING PONG rendering
 	renderProgManager.BindShader_HDRGlareChromatic();
 
@@ -4947,9 +4926,14 @@ void idRenderBackend::Bloom( const viewDef_t* _viewDef )
 
 	DrawElementsWithCounters( &unitSquareSurface );
 
+	renderLog.CloseBlock(); // Bloom Ping Pong
+
 	renderProgManager.Unbind();
 
 	GL_State( GLS_DEFAULT );
+
+	renderLog.CloseBlock(); // Render_Bloom
+	renderLog.CloseMainBlock(); // MRB_BLOOM
 }
 
 
@@ -5055,8 +5039,6 @@ void idRenderBackend::DrawScreenSpaceAmbientOcclusion( const viewDef_t* _viewDef
 
 	GL_Viewport( 0, 0, aoScreenWidth, aoScreenHeight );
 	GL_Scissor( 0, 0, aoScreenWidth, aoScreenHeight );
-
-
 
 	if( downModulateScreen )
 	{
@@ -5323,7 +5305,6 @@ void idRenderBackend::DrawScreenSpaceGlobalIllumination( const viewDef_t* _viewD
 		glClearColor( 0, 0, 0, 1 );
 
 		GL_SelectTexture( 0 );
-		//globalImages->currentDepthImage->Bind();
 
 		for( int i = 0; i < MAX_HIERARCHICAL_ZBUFFERS; i++ )
 		{
@@ -5738,7 +5719,7 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 
 	//GL_CheckErrors();
 
-#if !defined(USE_VULKAN)
+#if !defined( USE_VULKAN ) && !defined( USE_NVRHI )
 	// bind one global Vertex Array Object (VAO)
 	glBindVertexArray( glConfig.global_vao );
 #endif

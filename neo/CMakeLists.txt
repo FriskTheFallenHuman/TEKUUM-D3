@@ -22,7 +22,13 @@ option(COMPILE_COMMANDS "Generate compile_commands.json" OFF)
 option(USE_PRECOMPILED_HEADERS "Use precompiled headers during build" ON)
 option(ONATIVE "Optimize for the host CPU" OFF)
 option(REPRODUCIBLE_BUILD "Replace __DATE__ and __TIME__ by hardcoded values for reproducible builds." OFF)
+option(FFMPEG "Use FMPEG to render Bink videos" ON)
+option(BINKDEC "Use included libbinkdec to render Bink videos" OFF)
 option(RETAIL "Strip certain developer features and cheats from shipping builds" OFF)
+
+if( FFMPEG AND BINKDEC )
+	message( FATAL_ERROR "Only one of FFMPEG and BINKDEC (or neither) can be enabled at a time" )
+endif()
 
 # Define our cpu variable
 include( CPUDefine )
@@ -222,6 +228,17 @@ find_path( FREETYPE_INCLUDE_DIR "fttypes.h" PATH_SUFFIXES "freetype" )
 include_directories( ${FREETYPE_INCLUDE_DIR} )
 set( FREETYPE_LIBRARY Freetype::Freetype )
 
+if( FFMPEG )
+	find_package( FFMPEG REQUIRED )
+	include_directories( ${FFMPEG_INCLUDE_DIRS} )
+	link_directories( ${FFMPEG_LIBRARY_DIRS} )
+	add_definitions(-DUSE_FFMPEG)		
+endif()
+
+if( BINKDEC )
+	add_definitions(-DUSE_BINKDEC)
+endif()
+
 add_subdirectory(game)
 add_subdirectory(idlib)
 add_subdirectory(libs)
@@ -318,8 +335,6 @@ set(LINUX_INCLUDES
 
 set(LINUX_SOURCES
 	sys/linux/linux_main.cpp
-	sys/linux/sound.cpp
-	sys/linux/sound_pulse.cpp
 	sys/linux/stack.cpp)
 
 set(SDL_INCLUDES
@@ -518,7 +533,7 @@ if(MSVC)
 		${OPENAL_LIBRARY}
 		${FREETYPE_LIBRARY}
 		${DirectX_LIBRARIES}
-		#openal32
+		${FFMPEG_LIBRARIES}
 		opengl32
 		glu32
 		dbghelp
@@ -639,6 +654,7 @@ elseif( UNIX )
 		GLEW::GLEW
 		${OPENAL_LIBRARY}
 		${FREETYPE_LIBRARY}
+		${FFMPEG_LIBRARIES}
 		GL
 		pthread
 		dl

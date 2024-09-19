@@ -39,7 +39,6 @@ If you have questions concerning this license or the applicable additional terms
 #include "Framebuffer.h"
 
 
-
 // maximum texture units
 const int MAX_PROG_TEXTURE_PARMS	= 16;
 
@@ -605,6 +604,7 @@ struct viewDef_t
 	bool				isEditor;
 	bool				is2Dgui;
 
+	bool                isObliqueProjection;    // true if this view has an oblique projection
 	int					numClipPlanes;			// mirrors will often use a single clip plane
 	idPlane				clipPlanes[MAX_CLIP_PLANES];		// in world space, the positive side
 	// of the plane is the visible side
@@ -653,6 +653,8 @@ struct viewDef_t
 	idImage* 			irradianceImage;			// cubemap image used for diffuse IBL by backend
 	idImage* 			radianceImages[3];			// cubemap image used for specular IBL by backend
 	idVec4				radianceImageBlends;		// blending weights
+
+	Framebuffer*		targetRender;				// The framebuffer to render to
 };
 
 
@@ -801,9 +803,6 @@ const idMaterial* R_RemapShaderBySkin( const idMaterial* shader, const idDeclSki
 
 
 //====================================================
-
-
-
 
 enum vertexLayoutType_t
 {
@@ -1091,7 +1090,6 @@ extern idCVar r_skipDynamicTextures;		// don't dynamically create textures
 extern idCVar r_skipBump;					// uses a flat surface instead of the bump map
 extern idCVar r_skipSpecular;				// use black for specular
 extern idCVar r_skipDiffuse;				// use black for diffuse
-extern idCVar r_skipROQ;
 extern idCVar r_skipDecals;					// skip decal surfaces
 extern idCVar r_skipOverlays;				// skip overlay surfaces
 extern idCVar r_skipShadows;				// disable shadows
@@ -1183,6 +1181,7 @@ extern idCVar r_shadowMapRegularDepthBiasScale;
 extern idCVar r_shadowMapSunDepthBiasScale;
 
 extern idCVar r_hdrAutoExposure;
+extern idCVar r_hdrAdaptionRate;
 extern idCVar r_hdrMinLuminance;
 extern idCVar r_hdrMaxLuminance;
 extern idCVar r_hdrKey;
@@ -1248,8 +1247,8 @@ struct vidMode_t
 	// RB begin
 	vidMode_t()
 	{
-		width = 640;
-		height = 480;
+		width = SCREEN_WIDTH;
+		height = SCREEN_HEIGHT;
 		displayHz = 60;
 	}
 
@@ -1288,9 +1287,7 @@ struct glimpParms_t
 
 #define CLAMP(x, lo, hi)    ((x) < (lo) ? (lo) : (x) > (hi) ? (hi) : (x))
 // Helper function for using SDL2 and Vulkan on Linux.
-std::vector<const char*> get_required_extensions( const std::vector<const char*>& instanceExtensions, bool enableValidationLayers );
-
-const std::vector<const char*> sdlInstanceExtensions = {};
+std::vector<const char*> get_required_extensions();
 
 extern vulkanContext_t vkcontext;
 
@@ -1404,99 +1401,6 @@ void R_SampleCubeMapHDR16F( const idVec3& dir, int size, halfFloat_t* buffers[6]
 
 idVec2 NormalizedOctCoord( int x, int y, const int probeSideLength );
 
-class CommandlineProgressBar
-{
-private:
-	size_t tics = 0;
-	size_t nextTicCount = 0;
-	int	count = 0;
-	int expectedCount = 0;
-
-	int sysWidth = 1280;
-	int sysHeight = 720;
-
-public:
-	CommandlineProgressBar( int _expectedCount, int width, int height )
-	{
-		expectedCount = _expectedCount;
-		sysWidth = width;
-		sysHeight = height;
-	}
-
-	void Start()
-	{
-		// restore the original resolution, same as "vid_restart"
-		glConfig.nativeScreenWidth = sysWidth;
-		glConfig.nativeScreenHeight = sysHeight;
-		R_SetNewMode( false );
-
-		common->Printf( "0%%  10   20   30   40   50   60   70   80   90   100%%\n" );
-		common->Printf( "|----|----|----|----|----|----|----|----|----|----|\n" );
-
-		session->UpdateScreen( false );
-	}
-
-	void Increment( bool updateScreen )
-	{
-		if( ( count + 1 ) >= nextTicCount )
-		{
-			if( updateScreen )
-			{
-				// restore the original resolution, same as "vid_restart"
-				glConfig.nativeScreenWidth = sysWidth;
-				glConfig.nativeScreenHeight = sysHeight;
-				R_SetNewMode( false );
-
-				// resize frame buffers (this triggers SwapBuffers)
-				tr.SwapCommandBuffers( NULL, NULL, NULL, NULL, NULL, NULL );
-			}
-
-			size_t ticsNeeded = ( size_t )( ( ( double )( count + 1 ) / expectedCount ) * 50.0 );
-
-			do
-			{
-				common->Printf( "*" );
-			}
-			while( ++tics < ticsNeeded );
-
-			nextTicCount = ( size_t )( ( tics / 50.0 ) * expectedCount );
-			if( count == ( expectedCount - 1 ) )
-			{
-				if( tics < 51 )
-				{
-					common->Printf( "*" );
-				}
-				common->Printf( "\n" );
-			}
-
-			if( updateScreen )
-			{
-				session->UpdateScreen( false );
-
-				// swap front / back buffers
-				tr.SwapCommandBuffers( NULL, NULL, NULL, NULL, NULL, NULL );
-			}
-		}
-
-		count++;
-	}
-
-	void Reset()
-	{
-		count = 0;
-		tics = 0;
-		nextTicCount = 0;
-	}
-
-	void Reset( int expected )
-	{
-		expectedCount = expected;
-		count = 0;
-		tics = 0;
-		nextTicCount = 0;
-	}
-};
-
 /*
 ====================================================================
 
@@ -1565,6 +1469,8 @@ TR_FRONTEND_DEFORM
 */
 
 drawSurf_t* R_DeformDrawSurf( drawSurf_t* drawSurf );
+
+drawSurf_t* R_DeformDrawSurf( drawSurf_t* drawSurf, deform_t deformType );
 
 /*
 =============================================================

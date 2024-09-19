@@ -180,6 +180,7 @@ void idGuiModel::EmitSurfaces( float modelMatrix[16], float modelViewMatrix[16],
 			drawSurf->shaderRegisters = regs;
 			shader->EvaluateRegisters( regs, shaderParms, tr.viewDef->renderView.shaderParms, tr.viewDef->renderView.time[1] * 0.001f, NULL );
 		}
+
 		R_LinkDrawSurfToView( drawSurf, tr.viewDef );
 		if( allowFullScreenStereoDepth )
 		{
@@ -344,6 +345,7 @@ void idGuiModel::EmitImGui( ImDrawData* drawData )
 {
 	// NOTE: this implementation does not support scissor clipping for the indivudal draw commands
 	// but it is sufficient for things like com_showFPS
+
 	const float sysWidth = renderSystem->GetWidth();
 	const float sysHeight = renderSystem->GetHeight();
 

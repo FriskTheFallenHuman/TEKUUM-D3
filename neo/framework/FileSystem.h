@@ -325,7 +325,7 @@ public:
 	// ignore case and seperator char distinctions
 	virtual bool			FilenameCompare( const char* s1, const char* s2 ) const = 0;
 
-	// RB: from BFG
+	// This is just handy
 	ID_TIME_T				GetTimestamp( const char* relativePath )
 	{
 		ID_TIME_T timestamp = FILE_NOT_FOUND_TIMESTAMP;
@@ -336,7 +336,10 @@ public:
 		ReadFile( relativePath, NULL, &timestamp );
 		return timestamp;
 	}
-	// RB end
+
+	// resource tracking and related things
+	virtual bool			InProductionMode() = 0;
+
 };
 
 extern idFileSystem* 		fileSystem;

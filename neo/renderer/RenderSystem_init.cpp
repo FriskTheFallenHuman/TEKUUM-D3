@@ -3,7 +3,7 @@
 
 Doom 3 BFG Edition GPL Source Code
 Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2014-2016 Robert Beckebans
+Copyright (C) 2014-2021 Robert Beckebans
 Copyright (C) 2014-2016 Kot in Action Creative Artel
 
 This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
@@ -144,7 +144,6 @@ idCVar r_skipOverlays( "r_skipOverlays", "0", CVAR_RENDERER | CVAR_BOOL, "skip o
 idCVar r_skipSpecular( "r_skipSpecular", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_CHEAT | CVAR_ARCHIVE, "use black for specular1" );
 idCVar r_skipBump( "r_skipBump", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE, "uses a flat surface instead of the bump map" );
 idCVar r_skipDiffuse( "r_skipDiffuse", "0", CVAR_RENDERER | CVAR_BOOL, "use black for diffuse" );
-idCVar r_skipROQ( "r_skipROQ", "0", CVAR_RENDERER | CVAR_BOOL, "skip ROQ decoding" );
 idCVar r_skipSubviews( "r_skipSubviews", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = don't render any gui elements on surfaces" );
 idCVar r_skipGuiShaders( "r_skipGuiShaders", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = skip all gui elements on surfaces, 2 = skip drawing but still handle events, 3 = draw but skip events", 0, 3, idCmdSystem::ArgCompletion_Integer<0, 3> );
 idCVar r_skipParticles( "r_skipParticles", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = skip all particle systems", 0, 1, idCmdSystem::ArgCompletion_Integer<0, 1> );
@@ -593,7 +592,6 @@ Plays the cinematic file in a testImage
 */
 void R_TestVideo_f( const idCmdArgs& args )
 {
-#if 0
 	if( tr.testVideo )
 	{
 		delete tr.testVideo;
@@ -612,7 +610,8 @@ void R_TestVideo_f( const idCmdArgs& args )
 
 	cinData_t	cin;
 	cin = tr.testVideo->ImageForTime( 0 );
-	if( cin.imageY == NULL )
+	// SRS - Also handle ffmpeg and original RoQ decoders for test videos (using cin.image)
+	if( cin.imageY == NULL && cin.image == NULL )
 	{
 		delete tr.testVideo;
 		tr.testVideo = NULL;
@@ -625,53 +624,14 @@ void R_TestVideo_f( const idCmdArgs& args )
 	int	len = tr.testVideo->AnimationLength();
 	common->Printf( "%5.1f seconds of video\n", len * 0.001 );
 
-	tr.testVideoStartTime = tr.primaryRenderView.time[1];
+	// SRS - Not needed or used since InitFromFile() sets the correct start time automatically
+	//tr.testVideoStartTime = tr.primaryRenderView.time[1];
 
 	// try to play the matching wav file
 	idStr	wavString = args.Argv( ( args.Argc() == 2 ) ? 1 : 2 );
 	wavString.StripFileExtension();
 	wavString = wavString + ".wav";
 	session->SW()->PlayShaderDirectly( wavString.c_str() );
-#else
-	if( tr.testVideo )
-	{
-		delete tr.testVideo;
-		tr.testVideo = NULL;
-	}
-	tr.testImage = NULL;
-
-	if( args.Argc() < 2 )
-	{
-		return;
-	}
-
-	tr.testImage = globalImages->ImageFromFile( "_scratch", TF_DEFAULT, TR_REPEAT, TD_DEFAULT );
-	tr.testVideo = idCinematic::Alloc();
-	tr.testVideo->InitFromFile( args.Argv( 1 ), true );
-
-	cinData_t	cin;
-	cin = tr.testVideo->ImageForTime( 0 );
-	if( cin.image == NULL )
-	{
-		delete tr.testVideo;
-		tr.testVideo = NULL;
-		tr.testImage = NULL;
-		return;
-	}
-
-	common->Printf( "%i x %i images\n", cin.imageWidth, cin.imageHeight );
-
-	int	len = tr.testVideo->AnimationLength();
-	common->Printf( "%5.1f seconds of video\n", len * 0.001 );
-
-	tr.testVideoStartTime = tr.primaryRenderView.time[1];
-
-	// try to play the matching wav file
-	idStr	wavString = args.Argv( ( args.Argc() == 2 ) ? 1 : 2 );
-	wavString.StripFileExtension();
-	wavString = wavString + ".wav";
-	session->SW()->PlayShaderDirectly( wavString.c_str() );
-#endif
 }
 
 static int R_QsortSurfaceAreas( const void* a, const void* b )

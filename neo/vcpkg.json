@@ -5,6 +5,7 @@
 		"stb",
 		"openal-soft",
 		"freetype",
-		"glew"
+		"glew",
+		"ffmpeg"
 	]
 }

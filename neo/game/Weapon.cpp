@@ -112,7 +112,8 @@ END_CLASS
 
 idCVar g_useWeaponDepthHack( "g_useWeaponDepthHack", "1", CVAR_BOOL, "Crunch z depth on weapons" );
 
-idCVar g_weaponShadows( "g_weaponShadows", "0", CVAR_BOOL | CVAR_ARCHIVE, "Cast shadows from weapons" );
+idCVar g_weaponShadows( "g_weaponShadows", "1", CVAR_BOOL | CVAR_ARCHIVE, "Cast shadows from weapons" );
+
 /***********************************************************************
 
 	init

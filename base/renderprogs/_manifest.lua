@@ -9,10 +9,10 @@ return
 	-- shaders
 	"builtin/debug/debug_shadowmap.ps.hlsl",
 	"builtin/debug/debug_shadowmap.vs.hlsl",
-	--"builtin/debug/shadowDebug.ps.hlsl",
-	--"builtin/debug/shadowDebug.vs.hlsl",
-	--"builtin/debug/shadowDebug_skinned.ps.hlsl",
-	--"builtin/debug/shadowDebug_skinned.vs.hlsl",
+	"builtin/debug/shadowDebug.ps.hlsl",
+	"builtin/debug/shadowDebug.vs.hlsl",
+	"builtin/debug/shadowDebug_skinned.ps.hlsl",
+	"builtin/debug/shadowDebug_skinned.vs.hlsl",
 	"builtin/debug/octahedron.ps.hlsl",
 	"builtin/debug/octahedron.vs.hlsl",
 	"builtin/debug/lightgrid.ps.hlsl",
@@ -92,8 +92,6 @@ return
 	"builtin/video/bink.vs.hlsl",
 	"builtin/video/bink_gui.ps.hlsl",
 	"builtin/video/bink_gui.vs.hlsl",
-	"builtin/video/roq.ps.hlsl",
-	"builtin/video/roq.vs.hlsl",
 	
 	"builtin/VR/stereoDeGhost.ps.hlsl",
 	"builtin/VR/stereoDeGhost.vs.hlsl",

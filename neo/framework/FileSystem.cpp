@@ -422,6 +422,8 @@ public:
 	virtual void			FindMapScreenshot( const char* path, char* buf, int len );
 	virtual bool			FilenameCompare( const char* s1, const char* s2 ) const;
 
+	virtual bool			InProductionMode();
+
 	static void				Dir_f( const idCmdArgs& args );
 	static void				DirTree_f( const idCmdArgs& args );
 	static void				Path_f( const idCmdArgs& args );
@@ -850,6 +852,19 @@ void idFileSystemLocal::CreateOSPath( const char* OSPath )
 			*ofs = PATHSEPARATOR_CHAR;
 		}
 	}
+}
+
+/*
+=================
+idFileSystemLocal::InProductionMode
+=================
+*/
+bool idFileSystemLocal::InProductionMode()
+{
+	// Only enable production mode if:
+	return ( com_productionMode.GetInteger() != 0 ||	/* We explicty enable through com_productionMode cvar */
+			 com_editors < 0 ||							/* If in tools mode, use source files */
+			 fs_basepath.GetString() != BASE_GAMEDIR );	/* Mods don't use production mode */
 }
 
 /*

@@ -81,6 +81,36 @@ If you have questions concerning this license or the applicable additional terms
 #include "efxlib.h"
 #include "sound.h"
 
+/*
+========================
+MsecToSamples
+SamplesToMsec
+========================
+*/
+ID_INLINE_EXTERN uint32_t MsecToSamples( uint32_t msec, uint32_t sampleRate )
+{
+	return ( msec * ( sampleRate / 100 ) ) / 10;
+}
+ID_INLINE_EXTERN uint32_t SamplesToMsec( uint32_t samples, uint32_t sampleRate )
+{
+	return sampleRate < 100 ? 0 : ( samples * 10 ) / ( sampleRate / 100 );
+}
+
+/*
+========================
+DBtoLinear
+LinearToDB
+========================
+*/
+ID_INLINE_EXTERN float DBtoLinear( float db )
+{
+	return idMath::Pow( 2.0f, db * ( 1.0f / 6.0f ) );
+}
+ID_INLINE_EXTERN float LinearToDB( float linear )
+{
+	return ( linear > 0.0f ) ? ( idMath::Log( linear ) * ( 6.0f / 0.693147181f ) ) : -999.0f;
+}
+
 // demo sound commands
 typedef enum
 {
@@ -1052,5 +1082,24 @@ private:
 	bool					insideLevelLoad;
 	idList<idSoundSample*>	listCache;
 };
+
+/*
+===================================================================================
+
+  Cinematic Audio.
+
+===================================================================================
+*/
+
+class idCinematicAudio
+{
+public:
+	virtual void InitAudio( void* audioContext ) = 0;
+	virtual void PlayAudio( uint8_t* data, int size ) = 0;
+	virtual void ResetAudio() = 0;
+	virtual void ShutdownAudio() = 0;
+};
+
+#include "snd_cinematic.h"
 
 #endif /* !__SND_LOCAL_H__ */

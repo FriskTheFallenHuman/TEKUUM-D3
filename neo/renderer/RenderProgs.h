@@ -548,12 +548,12 @@ public:
 
 	void	BindShader_ShadowDebug()
 	{
-		//BindShader_Builtin( BUILTIN_SHADOW_DEBUG );
+		BindShader_Builtin( BUILTIN_SHADOW_DEBUG );
 	}
 
 	void	BindShader_ShadowDebugSkinned()
 	{
-		//BindShader_Builtin( BUILTIN_SHADOW_DEBUG_SKINNED );
+		BindShader_Builtin( BUILTIN_SHADOW_DEBUG_SKINNED );
 	}
 
 	void	BindShader_BlendLight()
@@ -692,22 +692,23 @@ public:
 		BindShader_Builtin( BUILTIN_ZCULL_RECONSTRUCT );
 	}
 #endif
-#if 0
+
 	void	BindShader_Bink()
 	{
 		BindShader_Builtin( BUILTIN_BINK );
+	}
+
+	// SRS - Added Bink shader without sRGB to linear conversion for testVideo cmd
+	void	BindShader_Bink_sRGB()
+	{
+		BindShader_Builtin( BUILTIN_BINK_SRGB );
 	}
 
 	void	BindShader_BinkGUI()
 	{
 		BindShader_Builtin( BUILTIN_BINK_GUI );
 	}
-#else
-	void	BindShader_RoQ()
-	{
-		BindShader_Builtin( BUILTIN_ROQ );
-	}
-#endif
+
 	void	BindShader_MotionBlur()
 	{
 		BindShader_Builtin( BUILTIN_MOTION_BLUR );
@@ -831,8 +832,8 @@ private:
 		BUILTIN_DEPTH_SKINNED,
 		BUILTIN_SHADOW,
 		BUILTIN_SHADOW_SKINNED,
-		//BUILTIN_SHADOW_DEBUG,
-		//BUILTIN_SHADOW_DEBUG_SKINNED,
+		BUILTIN_SHADOW_DEBUG,
+		BUILTIN_SHADOW_DEBUG_SKINNED,
 
 		BUILTIN_BLENDLIGHT,
 		BUILTIN_FOG,
@@ -864,12 +865,9 @@ private:
 		// RB end
 		BUILTIN_STEREO_DEGHOST,
 		BUILTIN_STEREO_WARP,
-#if 0
 		BUILTIN_BINK,
+		BUILTIN_BINK_SRGB,	// SRS - Added Bink shader without sRGB to linear conversion for testVideo cmd
 		BUILTIN_BINK_GUI,
-#else
-		BUILTIN_ROQ,
-#endif
 		BUILTIN_STEREO_INTERLACE,
 		BUILTIN_MOTION_BLUR,
 

@@ -3241,6 +3241,8 @@ Display a single image over most of the screen
 void idRenderBackend::DBG_TestImage()
 {
 	idImage*	image = NULL;
+	idImage* imageCr = NULL;
+	idImage* imageCb = NULL;
 	int		max;
 	float	w, h;
 
@@ -3254,10 +3256,19 @@ void idRenderBackend::DBG_TestImage()
 	{
 		cinData_t	cin;
 
-		cin = tr.testVideo->ImageForTime( viewDef->renderView.time[1] - tr.testVideoStartTime );
-		if( cin.image != NULL )
+		// SRS - Don't need calibrated time for testing cinematics, so just call ImageForTime( 0 ) for current system time
+		// This simplification allows cinematic test playback to work over both 2D and 3D background scenes
+		cin = tr.testVideo->ImageForTime( 0 /*viewDef->renderView.time[1] - tr.testVideoStartTime*/ );
+		if( cin.imageY != NULL )
 		{
-			image->UploadScratch( cin.image, cin.imageWidth, cin.imageHeight );
+			image = cin.imageY;
+			imageCr = cin.imageCr;
+			imageCb = cin.imageCb;
+		}
+		// SRS - Also handle ffmpeg and original RoQ decoders for test videos (using cin.image)
+		else if( cin.image != NULL )
+		{
+			image = cin.image;
 		}
 		else
 		{
@@ -3298,9 +3309,9 @@ void idRenderBackend::DBG_TestImage()
 
 	float scale[16] = { 0 };
 	scale[0] = w; // scale
-	scale[5] = -h; // scale
+	scale[5] = h; // scale			(SRS - changed h from -ve to +ve so video plays right side up)
 	scale[12] = halfScreenWidth - ( halfScreenWidth * w ); // translate
-	scale[13] = halfScreenHeight - ( halfScreenHeight * h ); // translate
+	scale[13] = halfScreenHeight - ( halfScreenHeight * h ) - h; // translate (SRS - moved up by h)
 	scale[10] = 1.0f;
 	scale[15] = 1.0f;
 
@@ -3328,19 +3339,17 @@ void idRenderBackend::DBG_TestImage()
 	GL_Color( 1, 1, 1, 1 );
 
 	// Bind the Texture
-	//if( ( imageCr != NULL ) && ( imageCb != NULL ) )
-	if( tr.testVideo )
+	if( ( imageCr != NULL ) && ( imageCb != NULL ) )
 	{
 		GL_SelectTexture( 0 );
 		image->Bind();
 		GL_SelectTexture( 1 );
-		/*
 		imageCr->Bind();
 		GL_SelectTexture( 2 );
 		imageCb->Bind();
-		*/
-		//renderProgManager.BindShader_Bink();
-		renderProgManager.BindShader_RoQ();
+		// SRS - Use Bink shader without sRGB to linear conversion, otherwise cinematic colours may be wrong
+		// BindShader_BinkGUI() does not seem to work here - perhaps due to vertex shader input dependencies?
+		renderProgManager.BindShader_Bink_sRGB();
 	}
 	else
 	{

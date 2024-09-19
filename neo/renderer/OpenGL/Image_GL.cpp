@@ -53,6 +53,7 @@ idImage::idImage( const char* name ) : imgName( name )
 	repeat = TR_REPEAT;
 	usage = TD_DEFAULT;
 	cubeFiles = CF_2D;
+	cubeMapSize = 0;
 
 	referencedOutsideLevelLoad = false;
 	levelLoadReferenced = false;
@@ -359,7 +360,7 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 #endif
 	}
 
-#if defined(_DEBUG) || defined(__ANDROID__)
+#if defined(DEBUG) || defined(__ANDROID__)
 	GL_CheckErrors();
 #endif
 	if( IsCompressed() )
@@ -385,7 +386,7 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 		glTexSubImage2D( uploadTarget, mipLevel, x, y, width, height, dataFormat, dataType, pic );
 	}
 
-#if defined(_DEBUG) || defined(__ANDROID__)
+#if defined(DEBUG) || defined(__ANDROID__)
 	GL_CheckErrors();
 #endif
 
@@ -414,16 +415,6 @@ void idImage::SetSamplerState( textureFilter_t tf, textureRepeat_t tr )
 	repeat = tr;
 	glBindTexture( ( opts.textureType == TT_CUBIC ) ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, texnum );
 	SetTexParameters();
-}
-
-/*
-========================
-idImage::SetPixel
-========================
-*/
-void idImage::SetPixel( int mipLevel, int x, int y, const void* data, int dataSize )
-{
-	SubImageUpload( mipLevel, x, y, 0, 1, 1, data );
 }
 
 /*
@@ -675,6 +666,12 @@ void idImage::AllocImage()
 			internalFormat = GL_DEPTH_COMPONENT;
 			dataFormat = GL_DEPTH_COMPONENT;
 			dataType = GL_UNSIGNED_BYTE;
+			break;
+
+		case FMT_DEPTH_STENCIL:
+			internalFormat = GL_DEPTH24_STENCIL8;
+			dataFormat = GL_DEPTH_STENCIL;
+			dataType = GL_UNSIGNED_INT_24_8;
 			break;
 
 		case FMT_SHADOW_ARRAY:

@@ -2,10 +2,9 @@
 ===========================================================================
 
 Doom 3 BFG Edition GPL Source Code
-Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company. 
-Copyright (C) 2013 Robert Beckebans
+Copyright (C) 2018-2022 Robert Beckebans
 
-This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").  
+This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
 
 Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,24 +26,34 @@ If you have questions concerning this license or the applicable additional terms
 ===========================================================================
 */
 
-#include "renderprogs/global.inc.hlsl"
+#ifndef __CMDLINE_PROGRESSBAR_H__
+#define __CMDLINE_PROGRESSBAR_H__
 
-uniform sampler2D samp0 : register(s0); // RGB8
+// CommandlineProgressBar draws a nice progressbar in the console like you would get with boost
+class CommandlineProgressBar
+{
+private:
+	size_t tics = 0;
+	size_t nextTicCount = 0;
+	int	count = 0;
+	int expectedCount = 0;
 
-struct PS_IN {
-	float4 position : VPOS;
-	float2 texcoord0 : TEXCOORD0_centroid;
+	int sysWidth = 1280;
+	int sysHeight = 720;
+
+public:
+	CommandlineProgressBar( int _expectedCount, int width, int height )
+	{
+		expectedCount = _expectedCount;
+		sysWidth = width;
+		sysHeight = height;
+	}
+
+	void Start();
+	void Increment( bool updateScreen );
+
+	void Reset();
+	void Reset( int expected );
 };
 
-struct PS_OUT {
-	float4 color : COLOR;
-};
-
-void main( PS_IN fragment, out PS_OUT result ) {
-
-	float3 Crgb = tex2D( samp0, fragment.texcoord0.xy ).rgb;
-
-	result.color.xyz = Crgb;
-	result.color.w = 1.0;
-	//result.color *= rpColor;
-}
+#endif /* !__CMDLINE_PROGRESSBAR_H__ */
