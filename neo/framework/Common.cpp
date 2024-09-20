@@ -1,27 +1,17 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+KROOM 3 GPL Source Code
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the KROOM 3 Source Code, originally based
+on the Doom 3 with bits and pieces from Doom 3 BFG edition GPL Source Codes both published in 2011 and 2012.
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+KROOM 3 Source Code is free software: you can redistribute it
+and/or modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version. For details, see LICENSE.TXT.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
-
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
-
-If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
+Extra attributions can be found on the CREDITS.txt file
 
 ===========================================================================
 */
@@ -300,10 +290,7 @@ be after execing the config and default.
 */
 void idCommonLocal::StartupVariable( const char* match, bool once )
 {
-	int			i;
-	const char* s;
-
-	i = 0;
+	int i = 0;
 	while(	i < com_numConsoleLines )
 	{
 		if( strcmp( com_consoleLines[ i ].Argv( 0 ), "set" ) )
@@ -311,8 +298,7 @@ void idCommonLocal::StartupVariable( const char* match, bool once )
 			i++;
 			continue;
 		}
-
-		s = com_consoleLines[ i ].Argv( 1 );
+		const char* s = com_consoleLines[ i ].Argv( 1 );
 
 		if( !match || !idStr::Icmp( s, match ) )
 		{
@@ -736,7 +722,7 @@ Com_Error_f
 Just throw a fatal error to test error shutdown procedures.
 ==================
 */
-static void Com_Error_f( const idCmdArgs& args )
+CONSOLE_COMMAND( error, "causes an error", NULL )
 {
 	if( !com_developer.GetBool() )
 	{
@@ -761,7 +747,7 @@ Com_Freeze_f
 Just freeze in place for a given number of seconds to test error recovery.
 ==================
 */
-static void Com_Freeze_f( const idCmdArgs& args )
+CONSOLE_COMMAND( freeze, "freezes the game for a number of seconds", NULL )
 {
 	float	s;
 	int		start, now;
@@ -799,14 +785,13 @@ Com_Crash_f
 A way to force a bus error for development reasons
 =================
 */
-static void Com_Crash_f( const idCmdArgs& args )
+CONSOLE_COMMAND( crash, "causes a crash", NULL )
 {
 	if( !com_developer.GetBool() )
 	{
 		commonLocal.Printf( "crash may only be used in developer mode\n" );
 		return;
 	}
-
 #ifdef __GNUC__
 	__builtin_trap();
 #else
@@ -819,7 +804,11 @@ static void Com_Crash_f( const idCmdArgs& args )
 Com_Quit_f
 =================
 */
-static void Com_Quit_f( const idCmdArgs& args )
+CONSOLE_COMMAND_SHIP( quit, "quits the game", NULL )
+{
+	commonLocal.Quit();
+}
+CONSOLE_COMMAND_SHIP( exit, "exits the game", NULL )
 {
 	commonLocal.Quit();
 }
@@ -831,7 +820,7 @@ Com_WriteConfig_f
 Write the config file to a specific name
 ===============
 */
-void Com_WriteConfig_f( const idCmdArgs& args )
+CONSOLE_COMMAND( writeConfig, "writes a config file", NULL )
 {
 	idStr	filename;
 
@@ -1226,12 +1215,6 @@ idCommonLocal::InitCommands
 */
 void idCommonLocal::InitCommands()
 {
-	cmdSystem->AddCommand( "error", Com_Error_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "causes an error" );
-	cmdSystem->AddCommand( "crash", Com_Crash_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "causes a crash" );
-	cmdSystem->AddCommand( "freeze", Com_Freeze_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "freezes the game for a number of seconds" );
-	cmdSystem->AddCommand( "quit", Com_Quit_f, CMD_FL_SYSTEM, "quits the game" );
-	cmdSystem->AddCommand( "exit", Com_Quit_f, CMD_FL_SYSTEM, "exits the game" );
-	cmdSystem->AddCommand( "writeConfig", Com_WriteConfig_f, CMD_FL_SYSTEM, "writes a config file" );
 	cmdSystem->AddCommand( "reloadEngine", Com_ReloadEngine_f, CMD_FL_SYSTEM, "reloads the engine down to including the file system" );
 	cmdSystem->AddCommand( "setMachineSpec", Com_SetMachineSpec_f, CMD_FL_SYSTEM, "detects system capabilities and sets com_machineSpec to appropriate value" );
 	cmdSystem->AddCommand( "execMachineSpec", Com_ExecMachineSpec_f, CMD_FL_SYSTEM, "execs the appropriate config files and sets cvars based on com_machineSpec" );
@@ -1744,27 +1727,40 @@ idCommonLocal::Shutdown
 */
 void idCommonLocal::Shutdown()
 {
+
+	if( com_shuttingDown )
+	{
+		return;
+	}
 	com_shuttingDown = true;
 
 	idAsyncNetwork::server.Kill();
 	idAsyncNetwork::client.Shutdown();
 
+	//printf( "ImGuiHook::Destroy();\n" );
+	//ImGuiHook::Destroy();
+
 	// game specific shut down
 	ShutdownGame( false );
 
 	// shut down non-portable system services
+	printf( "Sys_Shutdown();\n" );
 	Sys_Shutdown();
 
 	// shut down the console
+	printf( "console->Shutdown();\n" );
 	console->Shutdown();
 
 	// shut down the key system
+	printf( "idKeyInput::Shutdown();\n" );
 	idKeyInput::Shutdown();
 
 	// shut down the cvar system
+	printf( "cvarSystem->Shutdown();\n" );
 	cvarSystem->Shutdown();
 
 	// shut down the console command system
+	printf( "cmdSystem->Shutdown();\n" );
 	cmdSystem->Shutdown();
 
 #ifdef ID_WRITE_VERSION
@@ -1773,8 +1769,11 @@ void idCommonLocal::Shutdown()
 #endif
 
 	// free any buffered warning messages
+	printf( "ClearWarnings( GAME_NAME \" shutdown\" );\n" );
 	ClearWarnings( GAME_NAME " shutdown" );
+	printf( "warningCaption.Clear();\n" );
 	warningCaption.Clear();
+	printf( "errorList.Clear();\n" );
 	errorList.Clear();
 
 	// free language dictionary
@@ -1784,6 +1783,7 @@ void idCommonLocal::Shutdown()
 //	Mem_EnableLeakTest( "doom" );
 
 	// shutdown idLib
+	printf( "idLib::ShutDown();\n" );
 	idLib::ShutDown();
 }
 
@@ -1957,34 +1957,42 @@ void idCommonLocal::ShutdownGame( bool reloading )
 	idAsyncNetwork::client.Shutdown();
 
 	// shut down the session
+	printf( "session->Shutdown();\n" );
 	session->Shutdown();
 
 	// shut down the user interfaces
+	printf( "uiManager->Shutdown();\n" );
 	uiManager->Shutdown();
 
 	// shut down the sound system
+	printf( "soundSystem->Shutdown();\n" );
 	soundSystem->Shutdown();
 
 	// shut down async networking
 	idAsyncNetwork::Shutdown();
 
 	// shut down the user command input code
+	printf( "usercmdGen->Shutdown();\n" );
 	usercmdGen->Shutdown();
 
 	// shut down the event loop
+	printf( "eventLoop->Shutdown();\n" );
 	eventLoop->Shutdown();
 
-// RB begin
+	// shut down the parallel jobs
+	printf( "parallelJobManager->Shutdown();\n" );
 	parallelJobManager->Shutdown();
-// RB end
 
 	// shut down the renderSystem
+	printf( "renderSystem->Shutdown();\n" );
 	renderSystem->Shutdown();
 
 	// shutdown the decl manager
+	printf( "declManager->Shutdown();\n" );
 	declManager->Shutdown();
 
 	// unload the game dll
+	printf( "UnloadGameDLL();\n" );
 	UnloadGameDLL();
 
 	// dump warnings to "warnings.txt"
@@ -1992,10 +2000,12 @@ void idCommonLocal::ShutdownGame( bool reloading )
 	DumpWarnings();
 #endif
 	// only shut down the log file after all output is done
+	printf( "CloseLogFile();\n" );
 	CloseLogFile();
 
 	// shut down the file system
-	fileSystem->Shutdown( reloading );
+	printf( "fileSystem->Shutdown( false );\n" );
+	fileSystem->Shutdown( false );
 }
 
 /*

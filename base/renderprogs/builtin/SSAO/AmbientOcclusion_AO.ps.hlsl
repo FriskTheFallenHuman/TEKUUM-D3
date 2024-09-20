@@ -64,7 +64,7 @@ const float DOOM_TO_METERS = 0.0254;					// doom to meters
 const float METERS_TO_DOOM = ( 1.0 / DOOM_TO_METERS );	// meters to doom
 
 /** Used for preventing AO computation on the sky (at infinite depth) and defining the CS Z to bilateral depth key scaling.
-    This need not match the real far plane but should not be much more than it.*/
+	This need not match the real far plane but should not be much more than it.*/
 //const float FAR_PLANE_Z = -4000.0;
 
 /** World-space AO radius in scene units (r).  e.g., 1.0m */
@@ -80,9 +80,9 @@ const float intensity = 0.6;
 const float intensityDivR6 = intensity / ( radius* radius* radius* radius* radius* radius );
 
 /** The height in pixels of a 1m object if viewed from 1m away.
-    You can compute it from your projection matrix.  The actual value is just
-    a scale factor on radius; you can simply hardcode this to a constant (~500)
-    and make your radius value unitless (...but resolution dependent.)  */
+	You can compute it from your projection matrix.  The actual value is just
+	a scale factor on radius; you can simply hardcode this to a constant (~500)
+	and make your radius value unitless (...but resolution dependent.)  */
 const float projScale = 500.0;
 
 //#expect NUM_SAMPLES "Integer number of samples to take at each pixels"
@@ -187,7 +187,7 @@ float3 sampleNormal( sampler2D normalBuffer, int2 ssC, int mipLevel )
 }
 
 /** Returns a unit vector and a screen-space radius for the tap on a unit disk
-    (the caller should scale by the actual disk radius) */
+	(the caller should scale by the actual disk radius) */
 float2 tapLocation( int sampleNumber, float spinAngle, out float ssR )
 {
 	// Radius relative to ssR
@@ -231,7 +231,7 @@ void computeMipInfo( float ssR, int2 ssP, sampler2D cszBuffer, out int mipLevel,
 }
 
 /** Read the camera-space position of the point at screen-space pixel ssP + unitOffset * ssR.  Assumes length(unitOffset) == 1.
-    Use cszBufferScale if reading from the peeled depth buffer, which has been scaled by (1 / invCszBufferScale) from the original */
+	Use cszBufferScale if reading from the peeled depth buffer, which has been scaled by (1 / invCszBufferScale) from the original */
 float3 getOffsetPosition( int2 issC, float2 unitOffset, float ssR, sampler2D cszBuffer, float invCszBufferScale )
 {
 	int2 ssP = int2( ssR * unitOffset ) + issC;
@@ -302,15 +302,15 @@ float aoValueFromPositionsAndNormal( float3 C, float3 n_C, float3 Q )
 
 
 /** Compute the occlusion due to sample with index \a i about the pixel at \a ssC that corresponds
-    to camera-space point \a C with unit normal \a n_C, using maximum screen-space sampling radius \a ssDiskRadius
+	to camera-space point \a C with unit normal \a n_C, using maximum screen-space sampling radius \a ssDiskRadius
 
-    Note that units of H() in the HPG12 paper are meters, not
-    unitless.  The whole falloff/sampling function is therefore
-    unitless.  In this implementation, we factor out (9 / radius).
+	Note that units of H() in the HPG12 paper are meters, not
+	unitless.  The whole falloff/sampling function is therefore
+	unitless.  In this implementation, we factor out (9 / radius).
 
-    Four versions of the falloff function are implemented below
+	Four versions of the falloff function are implemented below
 
-    When sampling from the peeled depth buffer, make sure ssDiskRadius has been premultiplied by cszBufferScale
+	When sampling from the peeled depth buffer, make sure ssDiskRadius has been premultiplied by cszBufferScale
 */
 float sampleAO( int2 issC, in float3 C, in float3 n_C, in float ssDiskRadius, in int tapIndex, in float randomPatternRotationAngle, in sampler2D cszBuffer, in float invCszBufferScale )
 {

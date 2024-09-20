@@ -1,30 +1,17 @@
 /*
 ===========================================================================
 
-Doom 3 BFG Edition GPL Source Code
-Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2014-2020 Robert Beckebans
-Copyright (C) 2014-2016 Kot in Action Creative Artel
-Copyright (C) 2022 Stephen Pridham
+KROOM 3 GPL Source Code
 
-This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
+This file is part of the KROOM 3 Source Code, originally based
+on the Doom 3 with bits and pieces from Doom 3 BFG edition GPL Source Codes both published in 2011 and 2012.
 
-Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+KROOM 3 Source Code is free software: you can redistribute it
+and/or modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version. For details, see LICENSE.TXT.
 
-Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
-
-In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
-
-If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
+Extra attributions can be found on the CREDITS.txt file
 
 ===========================================================================
 */
@@ -366,7 +353,6 @@ typedef enum
 	MF_LOD_PERSISTENT			= BIT( 11 ), // motorsep 11-24-2014; material flag for persistent LOD iteration
 	MF_GUITARGET				= BIT( 12 ), // Admer: this GUI surface is used to compute a GUI render map, but a GUI should NOT be drawn on it
 	MF_AUTOGEN_TEMPLATE			= BIT( 13 ), // Admer: this material is a template for auto-generated templates
-	MF_ORIGIN					= BIT( 14 ), // Admer: for origin brushes
 } materialFlags_t;
 
 // contents flags, NOTE: make sure to keep the defines in doom_defs.script up to date with these!

@@ -6,6 +6,8 @@
 		"openal-soft",
 		"freetype",
 		"glew",
-		"ffmpeg"
+		"ffmpeg",
+		"tinyexr",
+		"mikktspace"
 	]
 }

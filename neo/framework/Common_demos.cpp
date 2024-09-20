@@ -1,27 +1,17 @@
 /*
 ===========================================================================
 
-Doom 3 GPL Source Code
-Copyright (C) 1999-2011 id Software LLC, a ZeniMax Media company.
+KROOM 3 GPL Source Code
 
-This file is part of the Doom 3 GPL Source Code ("Doom 3 Source Code").
+This file is part of the KROOM 3 Source Code, originally based
+on the Doom 3 with bits and pieces from Doom 3 BFG edition GPL Source Codes both published in 2011 and 2012.
 
-Doom 3 Source Code is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+KROOM 3 Source Code is free software: you can redistribute it
+and/or modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version. For details, see LICENSE.TXT.
 
-Doom 3 Source Code is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
-
-In addition, the Doom 3 Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 Source Code.  If not, please request a copy in writing from id Software at the address below.
-
-If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
+Extra attributions can be found on the CREDITS.txt file
 
 ===========================================================================
 */
@@ -38,12 +28,11 @@ FindUnusedFileName
 */
 static idStr FindUnusedFileName( const char* format )
 {
-	int i;
-	char	filename[1024];
+	idStr filename;
 
-	for( i = 0 ; i < 999 ; i++ )
+	for( int i = 0 ; i < 999 ; i++ )
 	{
-		sprintf( filename, format, i );
+		filename.Format( format, i );
 		int len = fileSystem->ReadFile( filename, NULL, NULL );
 		if( len <= 0 )
 		{
@@ -146,7 +135,6 @@ void idSessionLocal::StopRecordingRenderDemo()
 	delete writeDemo;
 	writeDemo = NULL;
 //	com_smp.SetInteger( 1 ); // motorsep 12-30-2014; turn multithreading back on;  SRS - No longer require non-smp mode for demos
-
 }
 
 /*
@@ -312,7 +300,7 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName )
 	declManager->BeginLevelLoad();          // SRS - Clear declaration manager data before loading demo assets
 	uiManager->BeginLevelLoad();            // SRS - Clear gui manager data before loading demo assets
 
-	AdvanceRenderDemo( true );
+	AdvanceRenderDemo( true );              // SRS - Call AdvanceRenderDemo() once to load map and initial assets (like level load)
 
 	renderSystem->EndLevelLoad();           // SRS - Define static data for use by RB_StencilShadowPass if stencil shadows enabled
 	soundSystem->EndLevelLoad( "" );

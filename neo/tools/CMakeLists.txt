@@ -64,7 +64,7 @@ source_group("Particle" FILES ${EDITOR_PARTICLE_SOURCES})
 source_group("PDA" FILES ${EDITOR_PDA_INCLUDES})
 source_group("PDA" FILES ${EDITOR_PDA_SOURCES})
 source_group("Radiant" FILES ${EDITOR_RADIANT_INCLUDES})
-source_group("Radiant	" FILES ${EDITOR_RADIANT_SOURCES})
+source_group("Radiant" FILES ${EDITOR_RADIANT_SOURCES})
 source_group("Script" FILES ${EDITOR_SCRIPT_INCLUDES})
 source_group("Script" FILES ${EDITOR_SCRIPT_SOURCES})
 source_group("Sound" FILES ${EDITOR_SOUND_INCLUDES})
@@ -102,7 +102,26 @@ set(TOOL_SOURCES
 	${EDITOR_SOUND_SOURCES})
 
 if( MSVC )
+	if( USE_PRECOMPILED_HEADERS )
+		set( TOOLS_PRECOMPILED_SOURCES ${TOOL_SOURCES} )
+
+		set_source_files_properties(
+			${TEKUUM_PRECOMPILED_SOURCES}
+			PROPERTIES
+			COMPILE_FLAGS "/Yuprecompiled.h"
+			OBJECT_DEPENDS "precompiled.pch"
+		)
+
+		set_source_files_properties(
+			${CMAKE_SOURCE_DIR}/idlib/precompiled.cpp
+			PROPERTIES
+			COMPILE_FLAGS "/Ycprecompiled.h"
+			OBJECT_OUTPUTS "precompiled.pch"
+		)
+	endif()
+
 	add_library( ${PROJECT_NAME} ${TOOL_SOURCES} ${TOOL_INCLUDES} )
+
 	set_target_properties( ${PROJECT_NAME} PROPERTIES FOLDER "libs" )
 else()
 	if ( USE_PRECOMPILED_HEADERS )

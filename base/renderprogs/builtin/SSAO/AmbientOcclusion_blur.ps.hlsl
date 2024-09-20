@@ -56,13 +56,13 @@ struct PS_OUT
 #define EDGE_SHARPNESS     (1.0)
 
 /** Step in 2-pixel intervals since we already blurred against neighbors in the
-    first AO pass.  This constant can be increased while R decreases to improve
-    performance at the expense of some dithering artifacts.
+	first AO pass.  This constant can be increased while R decreases to improve
+	performance at the expense of some dithering artifacts.
 
-    Morgan found that a scale of 3 left a 1-pixel checkerboard grid that was
-    unobjectionable after shading was applied but eliminated most temporal incoherence
-    from using small numbers of sample taps.
-    */
+	Morgan found that a scale of 3 left a 1-pixel checkerboard grid that was
+	unobjectionable after shading was applied but eliminated most temporal incoherence
+	from using small numbers of sample taps.
+	*/
 #define SCALE               (2)
 
 /** Filter radius in pixels. This will be multiplied by SCALE. */
@@ -72,11 +72,11 @@ struct PS_OUT
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 /** Type of data to read from source.  This macro allows
-    the same blur shader to be used on different kinds of input data. */
+	the same blur shader to be used on different kinds of input data. */
 #define VALUE_TYPE        float
 
 /** Swizzle to use to extract the channels of source. This macro allows
-    the same blur shader to be used on different kinds of input data. */
+	the same blur shader to be used on different kinds of input data. */
 #define VALUE_COMPONENTS   r
 
 #define VALUE_IS_KEY       0
@@ -107,7 +107,7 @@ float3 sampleNormal( sampler2D normalBuffer, int2 ssC, int mipLevel )
 
 
 /** Used for preventing AO computation on the sky (at infinite depth) and defining the CS Z to bilateral depth key scaling.
-    This need not match the real far plane but should not be much more than it.*/
+	This need not match the real far plane but should not be much more than it.*/
 const float FAR_PLANE_Z = -16000.0;
 
 float CSZToKey( float z )

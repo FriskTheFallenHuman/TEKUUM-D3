@@ -1,28 +1,17 @@
 /*
 ===========================================================================
 
-Doom 3 BFG Edition GPL Source Code
-Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2012 Robert Beckebans
+KROOM 3 GPL Source Code
 
-This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
+This file is part of the KROOM 3 Source Code, originally based
+on the Doom 3 with bits and pieces from Doom 3 BFG edition GPL Source Codes both published in 2011 and 2012.
 
-Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+KROOM 3 Source Code is free software: you can redistribute it
+and/or modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version. For details, see LICENSE.TXT.
 
-Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
-
-In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
-
-If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
+Extra attributions can be found on the CREDITS.txt file
 
 ===========================================================================
 */
@@ -248,6 +237,18 @@ bulk of the codebase, so it is the best place for analyze pragmas.
 	#pragma warning( disable: 6540 )	// warning C6540: The use of attribute annotations on this function will invalidate all of its existing __declspec annotations [D:\tech5\engine\engine-10.vcxproj]
 
 	#pragma warning( disable: 4467 )	// .. Include\CodeAnalysis\SourceAnnotations.h(68): warning C4467: usage of ATL attributes is deprecated
+
+	#pragma warning( disable: 4458 )	// warning C4458:  declaration of 'data' hides class member
+	#pragma warning( disable: 4456 )	// warning C4456 : declaration of 'm2' hides previous local declaration
+	#pragma warning( disable: 4457 )	// warning C4457 : declaration of 'start' hides function parameter
+	#pragma warning( disable: 4459 )	// warning C4459:  declaration of 'vertexCache' hides global declaration
+
+	#pragma warning( disable: 4595 )	// warning C4595:  'operator delete[]': non-member operator new or delete functions may not be declared inline (compiling source file doom\doomlib.cpp)
+	#pragma warning( disable: 4499 )	// warning C4499:  'extern': an explicit specialization cannot have a storage class (ignored)
+
+	#pragma warning( disable: 4644 )	// warning C4644:  usage of the macro-based offsetof pattern in constant expressions is non-standard; use offsetof defined in the C++ standard library instead
+	#pragma warning( disable: 5208 )	// warning C5208: unnamed class used in typedef name cannot declare members other than non - static data members, member enumerations, or member classes
+
 
 	#if !defined(VERIFY_FORMAT_STRING)
 		// checking format strings catches a LOT of errors

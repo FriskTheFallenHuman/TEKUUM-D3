@@ -33,6 +33,24 @@ set(CMDTOOLS_SOURCES
 	${COMPILER_ROQVQ_SOURCES})
 
 if( MSVC )
+	if( USE_PRECOMPILED_HEADERS )
+		set( CMDTOOLS_PRECOMPILED_SOURCES ${CMDTOOLS_SOURCES} )
+
+		set_source_files_properties(
+			${TEKUUM_PRECOMPILED_SOURCES}
+			PROPERTIES
+			COMPILE_FLAGS "/Yuprecompiled.h"
+			OBJECT_DEPENDS "precompiled.pch"
+		)
+
+		set_source_files_properties(
+			${CMAKE_SOURCE_DIR}/idlib/precompiled.cpp
+			PROPERTIES
+			COMPILE_FLAGS "/Ycprecompiled.h"
+			OBJECT_OUTPUTS "precompiled.pch"
+		)
+	endif()
+
 	add_library( ${PROJECT_NAME} ${CMDTOOLS_SOURCES} ${CMDTOOLS_INCLUDES} )
 	set_target_properties( ${PROJECT_NAME} PROPERTIES FOLDER "libs" )
 else()
@@ -43,7 +61,7 @@ else()
 			set_source_files_properties(
 				${src_file}
 				PROPERTIES
-				COMPILE_FLAGS "-include ${CMAKE_CURRENT_SOURCE_DIR}/precompiled.h"
+				COMPILE_FLAGS "-include ${CMAKE_SOURCE_DIR}/idlib/precompiled.h"
 			)
 		endforeach()
 

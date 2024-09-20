@@ -1,29 +1,17 @@
 /*
 ===========================================================================
 
-Doom 3 BFG Edition GPL Source Code
-Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013-2014 Robert Beckebans
-Copyright (C) 2014 Carl Kenner
+KROOM 3 GPL Source Code
 
-This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
+This file is part of the KROOM 3 Source Code, originally based
+on the Doom 3 with bits and pieces from Doom 3 BFG edition GPL Source Codes both published in 2011 and 2012.
 
-Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+KROOM 3 Source Code is free software: you can redistribute it
+and/or modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version. For details, see LICENSE.TXT.
 
-Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
-
-In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
-
-If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
+Extra attributions can be found on the CREDITS.txt file
 
 ===========================================================================
 */
@@ -916,11 +904,7 @@ bool idCinematicLocal::InitFromBinkDecFile( const char* qpath, bool amilooping )
 		trackIndex = 0;														// SRS - Use the first audio track - is this reasonable?
 		binkInfo = Bink_GetAudioTrackDetails( binkHandle, trackIndex );
 		common->Printf( "Cinematic audio stream found: Sample Rate=%d Hz, Channels=%d, Format=16-bit\n", binkInfo.sampleRate, binkInfo.nChannels );
-#if defined(_MSC_VER) && !defined(USE_OPENAL)
-		cinematicAudio = new( TAG_AUDIO ) CinematicAudio_XAudio2;
-#else
-		cinematicAudio = new( TAG_AUDIO ) CinematicAudio_OpenAL;
-#endif
+		cinematicAudio = new idCinematicAudioLocal;
 		cinematicAudio->InitAudio( &binkInfo );
 	}
 
@@ -935,7 +919,7 @@ bool idCinematicLocal::InitFromBinkDecFile( const char* qpath, bool amilooping )
 	status = FMV_PLAY;
 	hasFrame = false;                               // SRS - Implemented hasFrame for BinkDec behaviour consistency with FFMPEG
 	framePos = -1;
-	ImageForTime( 0, commandList );                 // SRS - Was missing initial call to ImageForTime() - fixes validation errors when using Vulkan renderer
+	ImageForTime( 0 );                 // SRS - Was missing initial call to ImageForTime() - fixes validation errors when using Vulkan renderer
 	status = ( looping ) ? FMV_PLAY : FMV_IDLE;     // SRS - Update status based on looping flag
 
 	return true;
@@ -1260,7 +1244,7 @@ cinData_t idCinematicLocal::ImageForTime( int thisTime )
 #elif defined(USE_BINKDEC) // DG: libbinkdec support
 	if( !isRoQ )
 	{
-		return ImageForTimeBinkDec( thisTime, commandList );
+		return ImageForTimeBinkDec( thisTime );
 	}
 #endif
 
@@ -1707,7 +1691,7 @@ cinData_t idCinematicLocal::ImageForTimeBinkDec( int thisTime )
 
 	if( cinematicAudio )
 	{
-		audioBuffer = ( int16_t* )Mem_Alloc( binkInfo.idealBufferSize, TAG_AUDIO );
+		audioBuffer = ( int16_t* )Mem_Alloc( binkInfo.idealBufferSize );
 		num_bytes = Bink_GetAudioData( binkHandle, trackIndex, audioBuffer );
 
 		// SRS - If we have cinematic audio data, start playing it now

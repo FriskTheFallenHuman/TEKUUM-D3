@@ -211,32 +211,37 @@ if ( USE_INTRINSICS_SSE )
 endif()
 
 if( RETAIL )
+	set(REPRODUCIBLE_BUILD ON)
 	add_definitions( -DID_RETAIL )
 endif()
 
 find_package( Stb REQUIRED )
-include_directories( ${Stb_INCLUDE_DIR} )
+include_directories( ${Stb_INCLUDE_DIR} PUBLIC )
 
 find_package( OpenAL REQUIRED )
-include_directories( ${OPENAL_INCLUDE_DIR} )
+include_directories( ${OPENAL_INCLUDE_DIR} PUBLIC )
 
 find_package( GLEW REQUIRED )
-include_directories( ${GLEW_INCLUDE_DIRS} )
+include_directories( ${GLEW_INCLUDE_DIRS} PUBLIC )
 
 find_package( Freetype REQUIRED )
 find_path( FREETYPE_INCLUDE_DIR "fttypes.h" PATH_SUFFIXES "freetype" )
-include_directories( ${FREETYPE_INCLUDE_DIR} )
+include_directories( ${FREETYPE_INCLUDE_DIR} PUBLIC )
 set( FREETYPE_LIBRARY Freetype::Freetype )
+
+find_package( mikktspace CONFIG REQUIRED )
+set( MIKKTSPACE_LIBRARY  mikktspace::mikktspace )
 
 if( FFMPEG )
 	find_package( FFMPEG REQUIRED )
 	include_directories( ${FFMPEG_INCLUDE_DIRS} )
-	link_directories( ${FFMPEG_LIBRARY_DIRS} )
-	add_definitions(-DUSE_FFMPEG)		
+	link_directories( ${FFMPEG_LIBRARY_DIRS} PUBLIC )
+	add_definitions( -DUSE_FFMPEG )		
 endif()
 
 if( BINKDEC )
-	add_definitions(-DUSE_BINKDEC)
+	add_definitions( -DUSE_BINKDEC )
+	include_directories( libs/libbinkdec/include PUBLIC )
 endif()
 
 add_subdirectory(game)
@@ -456,7 +461,8 @@ include_directories(
 			idlib
 			libs/miniz
 			libs/minizip
-			libs/freetype/include)
+			libs/freetype/include
+			PUBLIC)
 if(MSVC)
 	# if(MSVC_VERSION EQUAL 1700)
 		 set(DirectX_LIBRARIES
@@ -534,6 +540,7 @@ if(MSVC)
 		${FREETYPE_LIBRARY}
 		${DirectX_LIBRARIES}
 		${FFMPEG_LIBRARIES}
+		${MIKKTSPACE_LIBRARY}
 		opengl32
 		glu32
 		dbghelp
@@ -655,6 +662,7 @@ elseif( UNIX )
 		${OPENAL_LIBRARY}
 		${FREETYPE_LIBRARY}
 		${FFMPEG_LIBRARIES}
+		${MIKKTSPACE_LIBRARY}
 		GL
 		pthread
 		dl

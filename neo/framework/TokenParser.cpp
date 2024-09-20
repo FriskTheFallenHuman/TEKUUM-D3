@@ -1,28 +1,17 @@
 /*
 ===========================================================================
 
-Doom 3 BFG Edition GPL Source Code
-Copyright (C) 1993-2012 id Software LLC, a ZeniMax Media company.
-Copyright (C) 2013 Robert Beckebans
+KROOM 3 GPL Source Code
 
-This file is part of the Doom 3 BFG Edition GPL Source Code ("Doom 3 BFG Edition Source Code").
+This file is part of the KROOM 3 Source Code, originally based
+on the Doom 3 with bits and pieces from Doom 3 BFG edition GPL Source Codes both published in 2011 and 2012.
 
-Doom 3 BFG Edition Source Code is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+KROOM 3 Source Code is free software: you can redistribute it
+and/or modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version. For details, see LICENSE.TXT.
 
-Doom 3 BFG Edition Source Code is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with Doom 3 BFG Edition Source Code.  If not, see <http://www.gnu.org/licenses/>.
-
-In addition, the Doom 3 BFG Edition Source Code is also subject to certain additional terms. You should have received a copy of these additional terms immediately following the terms and conditions of the GNU General Public License which accompanied the Doom 3 BFG Edition Source Code.  If not, please request a copy in writing from id Software at the address below.
-
-If you have questions concerning this license or the applicable additional terms, you may contact in writing id Software LLC, c/o ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
+Extra attributions can be found on the CREDITS.txt file
 
 ===========================================================================
 */
@@ -30,25 +19,11 @@ If you have questions concerning this license or the applicable additional terms
 #include "precompiled.h"
 #pragma hdrstop
 
-void idTokenParser::LoadFromParser( idParser& parser, const char* sourceName )
+void idTokenParser::LoadFromParser( idParser& parser, const char* guiName )
 {
 	idToken tok;
 	idTokenIndexes tokIdxs;
-	tokIdxs.SetName( sourceName );
-	while( parser.ReadToken( &tok ) )
-	{
-		tokIdxs.Append( tokens.AddUnique( idBinaryToken( tok ) ) );
-	}
-	guiTokenIndexes.Append( tokIdxs );
-	currentToken = 0;
-}
-
-// RB begin
-void idTokenParser::LoadFromLexer( idLexer& parser, const char* sourceName )
-{
-	idToken tok;
-	idTokenIndexes tokIdxs;
-	tokIdxs.SetName( sourceName );
+	tokIdxs.SetName( guiName );
 	while( parser.ReadToken( &tok ) )
 	{
 		tokIdxs.Append( tokens.AddUnique( idBinaryToken( tok ) ) );
@@ -61,16 +36,6 @@ void idTokenParser::LoadFromFile( const char* filename )
 {
 	Clear();
 	idFile* inFile = fileSystem->OpenFileReadMemory( filename );
-	if( inFile != NULL )
-	{
-		LoadFromFile( inFile );
-	}
-	delete inFile;
-}
-
-void idTokenParser::LoadFromFile( idFile* inFile )
-{
-	Clear();
 	if( inFile != NULL )
 	{
 		int num;
@@ -87,30 +52,17 @@ void idTokenParser::LoadFromFile( idFile* inFile )
 			tokens[ i ].Read( inFile );
 		}
 	}
+	delete inFile;
 	preloaded = ( tokens.Num() > 0 );
 }
 
 void idTokenParser::WriteToFile( const char* filename )
 {
-	//if( preloaded )
-	//{
-	//	return;
-	//}
-	idFile* outFile = fileSystem->OpenFileWrite( filename, "fs_basepath" );
-	if( outFile != NULL )
+	if( preloaded )
 	{
-		WriteToFile( outFile );
+		return;
 	}
-	delete outFile;
-}
-
-void idTokenParser::WriteToFile( idFile* outFile )
-{
-	//if( preloaded )
-	//{
-	//	return;
-	//}
-
+	idFile* outFile = fileSystem->OpenFileWrite( filename, "fs_basepath" );
 	if( outFile != NULL )
 	{
 		outFile->WriteBig( ( int )guiTokenIndexes.Num() );
@@ -124,8 +76,8 @@ void idTokenParser::WriteToFile( idFile* outFile )
 			tokens[ i ].Write( outFile );
 		}
 	}
+	delete outFile;
 }
-// RB end
 
 bool idTokenParser::StartParsing( const char* filename )
 {
@@ -151,75 +103,11 @@ bool idTokenParser::ReadToken( idToken* tok )
 		*tok = btok.token;
 		tok->type = btok.tokenType;
 		tok->subtype = btok.tokenSubType;
-		// RB begin
-		tok->linesCrossed = btok.linesCrossed;
-		// RB end
 		currentToken++;
 		return true;
 	}
 	return false;
 }
-
-// RB begin
-int idTokenParser::ReadTokenOnLine( idToken* token )
-{
-	idToken tok;
-
-	if( !ReadToken( &tok ) )
-	{
-		return false;
-	}
-
-	// if no lines were crossed before this token
-	if( !tok.linesCrossed )
-	{
-		*token = tok;
-		return true;
-	}
-
-	//
-	UnreadToken( &tok );
-	token->Clear();
-	return false;
-}
-
-int idTokenParser::SkipRestOfLine()
-{
-	idToken token;
-
-	while( ReadToken( &token ) )
-	{
-		if( token.linesCrossed )
-		{
-			UnreadToken( &token );
-			return true;
-		}
-	}
-	return false;
-}
-
-const char* idTokenParser::ParseRestOfLine( idStr& out )
-{
-	idToken token;
-
-	out.Empty();
-	while( ReadToken( &token ) )
-	{
-		if( token.linesCrossed )
-		{
-			UnreadToken( &token );
-			break;
-		}
-		if( out.Length() )
-		{
-			out += " ";
-		}
-		out += token;
-	}
-	return out.c_str();
-}
-// RB end
-
 int	idTokenParser::ExpectTokenString( const char* string )
 {
 	idToken token;
@@ -342,7 +230,7 @@ int idTokenParser::ExpectAnyToken( idToken* token )
 
 void idTokenParser::UnreadToken( const idToken* token )
 {
-	if( currentToken == 0 )//|| currentToken >= guiTokenIndexes[ currentTokenList ].Num() )
+	if( currentToken == 0 || currentToken >=  guiTokenIndexes[ currentTokenList ].Num() )
 	{
 		idLib::common->FatalError( "idTokenParser::unreadToken, unread token twice\n" );
 	}
@@ -441,26 +329,3 @@ float idTokenParser::ParseFloat( bool* errorFlag )
 	}
 	return token.GetFloatValue();
 }
-
-// RB begin
-int idTokenParser::Parse1DMatrix( int x, float* m )
-{
-	int i;
-
-	if( !ExpectTokenString( "(" ) )
-	{
-		return false;
-	}
-
-	for( i = 0; i < x; i++ )
-	{
-		m[i] = ParseFloat();
-	}
-
-	if( !ExpectTokenString( ")" ) )
-	{
-		return false;
-	}
-	return true;
-}
-// RB end
