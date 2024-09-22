@@ -323,8 +323,6 @@ void idSessionLocal::SetMainMenuGuiVars()
 	guiMainMenu->SetStateString( "serverlist_sel_0", "-1" );
 	guiMainMenu->SetStateString( "serverlist_selid_0", "-1" );
 
-	guiMainMenu->SetStateInt( "com_machineSpec", com_machineSpec.GetInteger() );
-
 	// "inetGame" will hold a hand-typed inet address, which is not archived to a cvar
 	guiMainMenu->SetStateString( "inetGame", "" );
 
@@ -1083,53 +1081,6 @@ void idSessionLocal::HandleMainMenuCommands( const char* menuCommand )
 			continue;
 		}
 
-		if( !idStr::Icmp( cmd, "video" ) )
-		{
-			idStr vcmd;
-			if( args.Argc() - icmd >= 1 )
-			{
-				vcmd = args.Argv( icmd++ );
-			}
-
-			int oldSpec = com_machineSpec.GetInteger();
-
-			if( idStr::Icmp( vcmd, "low" ) == 0 )
-			{
-				com_machineSpec.SetInteger( 0 );
-			}
-			else if( idStr::Icmp( vcmd, "medium" ) == 0 )
-			{
-				com_machineSpec.SetInteger( 1 );
-			}
-			else  if( idStr::Icmp( vcmd, "high" ) == 0 )
-			{
-				com_machineSpec.SetInteger( 2 );
-			}
-			else  if( idStr::Icmp( vcmd, "ultra" ) == 0 )
-			{
-				com_machineSpec.SetInteger( 3 );
-			}
-			else if( idStr::Icmp( vcmd, "recommended" ) == 0 )
-			{
-				cmdSystem->BufferCommandText( CMD_EXEC_NOW, "setMachineSpec\n" );
-			}
-
-			if( oldSpec != com_machineSpec.GetInteger() )
-			{
-				guiActive->SetStateInt( "com_machineSpec", com_machineSpec.GetInteger() );
-				guiActive->StateChanged( com_frameTime );
-				cmdSystem->BufferCommandText( CMD_EXEC_NOW, "execMachineSpec\n" );
-			}
-
-			if( idStr::Icmp( vcmd, "restart" )  == 0 )
-			{
-				guiActive->HandleNamedEvent( "cvar write render" );
-				cmdSystem->BufferCommandText( CMD_EXEC_NOW, "vid_restart\n" );
-			}
-
-			continue;
-		}
-
 		if( !idStr::Icmp( cmd, "clearBind" ) )
 		{
 			if( args.Argc() - icmd >= 1 )
@@ -1159,7 +1110,6 @@ void idSessionLocal::HandleMainMenuCommands( const char* menuCommand )
 			if( idStr::Icmp( "cvar_restart", args.Argv( icmd - 1 ) ) == 0 )
 			{
 				cmdSystem->BufferCommandText( CMD_EXEC_NOW, "exec default.cfg" );
-				cmdSystem->BufferCommandText( CMD_EXEC_NOW, "setMachineSpec\n" );
 
 				//Make sure that any r_brightness changes take effect
 				float bright = cvarSystem->GetCVarFloat( "r_brightness" );
@@ -1168,8 +1118,6 @@ void idSessionLocal::HandleMainMenuCommands( const char* menuCommand )
 
 				//Force user info modified after a reset to defaults
 				cvarSystem->SetModifiedFlags( CVAR_USERINFO );
-
-				guiActive->SetStateInt( "com_machineSpec", com_machineSpec.GetInteger() );
 
 				//Restore the language
 				cvarSystem->SetCVarString( "sys_lang", lang );

@@ -78,7 +78,6 @@ typedef enum
 extern idCVar		com_version;
 extern idCVar		com_skipRenderer;
 extern idCVar		com_asyncInput;
-extern idCVar		com_machineSpec;
 extern idCVar		com_purgeAll;
 extern idCVar		com_developer;
 extern idCVar		com_allowConsole;

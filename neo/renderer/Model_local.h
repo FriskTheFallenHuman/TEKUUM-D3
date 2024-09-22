@@ -49,10 +49,6 @@ public:
 		return true;
 	}
 
-	// RB begin
-	virtual void				ExportOBJ( idFile* objFile, idFile* mtlFile, ID_TIME_T* _timeStamp = NULL );
-	// RB end
-
 	virtual void				PartialInitFromFile( const char* fileName );
 	virtual void				PurgeModel();
 	virtual void				Reset() {};
@@ -224,10 +220,6 @@ public:
 	{
 		return true;
 	}
-
-	// RB begin
-	virtual void				ExportOBJ( idFile* objFile, idFile* mtlFile, ID_TIME_T* _timeStamp = NULL );
-	// RB end
 
 private:
 	idList<idMD5Joint>	joints;

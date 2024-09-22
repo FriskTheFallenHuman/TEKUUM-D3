@@ -554,7 +554,7 @@ static void WriteNode_r( node_t* node )
 	}
 }
 
-static int NumberNodes_r( node_t* node, int nextNumber )
+int NumberNodes_r( node_t* node, int nextNumber )
 {
 	if( node->planenum == PLANENUM_LEAF )
 	{
@@ -604,12 +604,22 @@ static void WriteOutputPortals( uEntity_t* e )
 	idWinding*			w;
 
 	procFile->WriteFloatString( "interAreaPortals { /* numAreas = */ %i /* numIAP = */ %i\n\n",
-								e->numAreas, numInterAreaPortals );
+								e->numAreas, interAreaPortals.Num() );
 	procFile->WriteFloatString( "/* interAreaPortal format is: numPoints positiveSideArea negativeSideArea ( point) ... */\n" );
-	for( i = 0 ; i < numInterAreaPortals ; i++ )
+	for( i = 0 ; i < interAreaPortals.Num() ; i++ )
 	{
 		iap = &interAreaPortals[i];
-		w = iap->side->winding;
+
+		// RB: support new area portals
+		if( iap->side )
+		{
+			w = iap->side->winding;
+		}
+		else
+		{
+			w = & iap->w;
+		}
+
 		procFile->WriteFloatString( "/* iap %i */ %i %i %i ", i, w->GetNumPoints(), iap->area0, iap->area1 );
 		for( j = 0 ; j < w->GetNumPoints() ; j++ )
 		{

@@ -45,10 +45,20 @@ bool ProcessModel( uEntity_t* e, bool floodFill )
 	MakeTreePortals( e->tree );
 	dmapGlobals.timingMakeTreePortals.Stop();
 
+	// RB: calculate node numbers for split plane analysis
+	dmapGlobals.timingNumberNodes.Start();
+	NumberNodes_r( e->tree->headnode, 0 );
+	dmapGlobals.timingNumberNodes.Stop();
+
 	// classify the leafs as opaque or areaportal
 	dmapGlobals.timingFilterBrushesIntoTree.Start();
 	FilterBrushesIntoTree( e );
 	dmapGlobals.timingFilterBrushesIntoTree.Stop();
+
+	// RB: use mapTri_t by MapPolygonMesh primitives in case we don't use brushes
+	dmapGlobals.timingFilterMeshesIntoTree.Start();
+	FilterMeshesIntoTree( e );
+	dmapGlobals.timingFilterMeshesIntoTree.Stop();
 
 	// see if the bsp is completely enclosed
 	dmapGlobals.timingFloodAndFill.Start();
@@ -489,7 +499,9 @@ void Dmap_f( const idCmdArgs& args )
 		// Reset the timers
 		dmapGlobals.timingMakeStructural.Reset();
 		dmapGlobals.timingMakeTreePortals.Reset();
+		dmapGlobals.timingNumberNodes.Reset();
 		dmapGlobals.timingFilterBrushesIntoTree.Reset();
+		dmapGlobals.timingFilterMeshesIntoTree.Reset();
 		dmapGlobals.timingFloodAndFill.Reset();
 		dmapGlobals.timingClipSidesByTree.Reset();
 		dmapGlobals.timingFloodAreas.Reset();
@@ -514,7 +526,9 @@ void Dmap_f( const idCmdArgs& args )
 		// Print the timing stats
 		printTimingsStats( dmapGlobals.timingMakeStructural,        "Make Structural  " );
 		printTimingsStats( dmapGlobals.timingMakeTreePortals,       "Make Tree Portals" );
+		printTimingsStats( dmapGlobals.timingNumberNodes,			"Number of Nodes  " );
 		printTimingsStats( dmapGlobals.timingFilterBrushesIntoTree, "Filter Brushes   " );
+		printTimingsStats( dmapGlobals.timingFilterMeshesIntoTree,	"Filter Meshes    " );
 		printTimingsStats( dmapGlobals.timingFloodAndFill,          "Flood and Fill   " );
 		printTimingsStats( dmapGlobals.timingClipSidesByTree,       "Clip Sides       " );
 		printTimingsStats( dmapGlobals.timingFloodAreas,            "Flood Areas      " );

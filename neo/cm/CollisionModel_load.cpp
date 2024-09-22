@@ -3170,7 +3170,11 @@ void idCollisionModelManagerLocal::ConvertBrush( cm_model_t* model, const idMapB
 	AddBrushToNode( model, model->node, brush );
 }
 
-// RB begin
+/*
+================
+idCollisionModelManagerLocal::ConvertMesh
+================
+*/
 void idCollisionModelManagerLocal::ConvertMesh( cm_model_t* model, const MapPolygonMesh* mesh, int primitiveNum )
 {
 	const idList<idDrawVert>& verts = mesh->GetDrawVerts();
@@ -3207,7 +3211,6 @@ void idCollisionModelManagerLocal::ConvertMesh( cm_model_t* model, const MapPoly
 		}
 	}
 }
-// RB end
 
 /*
 ================
@@ -3841,8 +3844,8 @@ cm_model_t* idCollisionModelManagerLocal::LoadRenderModel( const char* fileName 
 	// only load ASE and LWO models
 	idStr( fileName ).ExtractFileExtension( extension );
 
-	// RB: DAE and OBJ support
-	if( ( extension.Icmp( "ase" ) != 0 ) && ( extension.Icmp( "lwo" ) != 0 ) && ( extension.Icmp( "ma" ) != 0 ) && ( extension.Icmp( "dae" ) != 0 ) && ( extension.Icmp( "obj" ) != 0 ) )
+	// RB: OBJ support
+	if( ( extension.Icmp( "ase" ) != 0 ) && ( extension.Icmp( "lwo" ) != 0 ) && ( extension.Icmp( "ma" ) != 0 ) && ( extension.Icmp( "md3" ) != 0 ) && ( extension.Icmp( "obj" ) != 0 ) )
 	{
 		return NULL;
 	}

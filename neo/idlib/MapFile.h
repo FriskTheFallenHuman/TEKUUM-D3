@@ -33,6 +33,33 @@ Extra attributions can be found on the CREDITS.txt file
 ===============================================================================
 */
 
+/*
+===============
+FloatCRC
+===============
+*/
+ID_INLINE unsigned int FloatCRC( float f )
+{
+	return *( unsigned int* )&f;
+}
+
+/*
+===============
+StringCRC
+===============
+*/
+ID_INLINE unsigned int StringCRC( const char* str )
+{
+	unsigned int i, crc;
+
+	crc = 0;
+	for( i = 0; str[i]; i++ )
+	{
+		crc ^= str[i] << ( i & 3 );
+	}
+	return crc;
+}
+
 const int OLD_MAP_VERSION					= 1;
 const int CURRENT_MAP_VERSION				= 2;
 const int DEFAULT_CURVE_SUBDIVISION			= 4;
@@ -224,147 +251,6 @@ ID_INLINE idMapPatch::idMapPatch( int maxPatchWidth, int maxPatchHeight )
 	expanded = false;
 }
 
-
-// RB begin
-class MapPolygon
-{
-	friend class MapPolygonMesh;
-
-public:
-	MapPolygon();
-	MapPolygon( int numIndexes );
-	~MapPolygon() { }
-
-	const char* 			GetMaterial() const
-	{
-		return material;
-	}
-
-	void					SetMaterial( const char* p )
-	{
-		material = p;
-	}
-
-	void					AddIndex( int index )
-	{
-		indexes.Append( index );
-	}
-
-	void					SetIndexes( const idTempArray<int>& _indexes )
-	{
-		indexes.Resize( _indexes.Num() );
-
-		for( unsigned int i = 0; i < _indexes.Num(); i++ )
-		{
-			indexes[i] = _indexes[i];
-		}
-	}
-
-	const idList<int>&		GetIndexes() const
-	{
-		return indexes;
-	}
-
-
-protected:
-	idStr					material;
-	idList<int>				indexes;		// [3..n] references to vertices for each face
-};
-
-ID_INLINE MapPolygon::MapPolygon()
-{
-}
-
-ID_INLINE MapPolygon::MapPolygon( int numIndexes )
-{
-	//indexes.AssureSize( 3 );
-}
-
-
-class MapPolygonMesh : public idMapPrimitive
-{
-public:
-	MapPolygonMesh();
-	~MapPolygonMesh()
-	{
-		//verts.DeleteContents();
-		//polygons.DeleteContents( true );
-	}
-
-	void					ConvertFromBrush( const idMapBrush* brush, int entityNum, int primitiveNum );
-	void					ConvertFromPatch( const idMapPatch* patch, int entityNum, int primitiveNum );
-
-	static MapPolygonMesh*	Parse( idLexer& src, const idVec3& origin, float version = CURRENT_MAP_VERSION );
-	bool					Write( idFile* fp, int primitiveNum, const idVec3& origin ) const;
-
-	static MapPolygonMesh*	ParseJSON( idLexer& src );
-	bool					WriteJSON( idFile* fp, int primitiveNum, const idVec3& origin ) const;
-
-
-
-	int						GetNumVertices() const
-	{
-		return verts.Num();
-	}
-
-	int						AddVertex( const idDrawVert& v )
-	{
-		return verts.Append( v );
-	}
-
-
-	int						GetNumPolygons() const
-	{
-		return polygons.Num();
-	}
-
-	//int						AddPolygon( MapPolygon* face )
-	//{
-	//	return polygons.Append( face );
-	//}
-
-	const MapPolygon& 			GetFace( int i ) const
-	{
-		return polygons[i];
-	}
-
-	unsigned int			GetGeometryCRC() const;
-
-	const idList<idDrawVert>&	GetDrawVerts() const
-	{
-		return verts;
-	}
-
-	bool					IsOpaque() const
-	{
-		return opaque;
-	}
-
-	bool					IsAreaportal() const;
-
-	void					GetBounds( idBounds& bounds ) const;
-
-private:
-	void					SetContents();
-
-	int						originalType;
-
-protected:
-
-	idList<idDrawVert>		verts;			// vertices can be shared between polygons
-	idList<MapPolygon>		polygons;
-
-	// derived data after parsing
-
-	// material surface flags
-	int						contents;
-	bool					opaque;
-};
-// RB end
-
-
-
-
 class idMapEntity
 {
 	friend class			idMapFile;
@@ -383,10 +269,6 @@ public:
 	}
 	static idMapEntity* 	Parse( idLexer& src, bool worldSpawn = false, float version = CURRENT_MAP_VERSION );
 	bool					Write( idFile* fp, int entityNum ) const;
-	// RB begin
-	static idMapEntity* 	ParseJSON( idLexer& src );
-	bool					WriteJSON( idFile* fp, int entityNum, int numEntities ) const;
-	// RB end
 	int						GetNumPrimitives() const
 	{
 		return primitives.Num();
@@ -424,7 +306,6 @@ public:
 	bool					Write( const char* fileName, const char* ext, bool fromBasePath = true );
 
 	// RB begin
-	bool					WriteJSON( const char* fileName, const char* ext, bool fromBasePath = true );
 	bool					ConvertToPolygonMeshFormat();
 	// RB end
 

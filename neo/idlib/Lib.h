@@ -321,6 +321,7 @@ public:
 #include "DataQueue.h"
 #include "BitMsg.h"
 #include "MapFile.h"
+#include "MapFilePolygon.h"
 #include "Timer.h"
 #include "Thread.h"
 #include "Swap.h"

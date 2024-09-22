@@ -390,6 +390,82 @@ static void ParsePatch( const idMapPatch* patch, int primitiveNum )
 
 /*
 ================
+ParsePolygonMesh
+================
+*/
+static int ParsePolygonMesh( const MapPolygonMesh* mesh, int primitiveNum, int numPolygons )
+{
+	primitive_t* prim = ( primitive_t* )Mem_Alloc( sizeof( *prim ) );
+	memset( prim, 0, sizeof( *prim ) );
+	prim->next = uEntity->primitives;
+	uEntity->primitives = prim;
+
+	const idList<idDrawVert>& verts = mesh->GetDrawVerts();
+
+	for( int i = 0; i < mesh->GetNumPolygons(); i++ )
+	{
+		const MapPolygon& poly = mesh->GetFace( i );
+
+		const idMaterial* mat = declManager->FindMaterial( poly.GetMaterial() );
+
+		const idList<int>& indexes = poly.GetIndexes();
+
+		//idList<int> unique;
+		//for( int j = 0; j < indexes.Num(); j++ )
+		//{
+		//	unique.AddUnique( indexes[j] );
+		//}
+
+		// FIXME: avoid triangulization and use polygons
+
+		// TODO use WindingToTriList instead ?
+
+		for( int j = 1; j < indexes.Num() - 1; j++ )
+			//for( int j = indexes.Num() -2; j >= 1; j-- )
+		{
+			mapTri_t* tri = AllocTri();
+
+#if 1
+			tri->v[0] = verts[ indexes[ j + 1] ];
+			tri->v[1] = verts[ indexes[ j + 0] ];
+			tri->v[2] = verts[ indexes[ 0 ] ];
+#else
+			tri->v[2] = verts[ indexes[ j + 1] ];
+			tri->v[1] = verts[ indexes[ j + 0] ];
+			tri->v[0] = verts[ indexes[ 0 ] ];
+#endif
+
+			idPlane plane;
+			plane.FromPoints( tri->v[0].xyz, tri->v[1].xyz, tri->v[2].xyz );
+
+			bool fixedDegeneracies = false;
+			tri->planeNum = FindFloatPlane( plane, &fixedDegeneracies );
+
+			tri->polygonId = numPolygons + i;
+
+			tri->material = mat;
+			tri->next = prim->bsptris;
+			prim->bsptris = tri;
+
+			tri->originalMapMesh = mesh;
+
+			// set merge groups if needed, to prevent multiple sides from being
+			// merged into a single surface in the case of gui shaders, mirrors, and autosprites
+			if( mat->IsDiscrete() )
+			{
+				for( tri = prim->bsptris ; tri ; tri = tri->next )
+				{
+					tri->mergeGroup = ( void* )mesh;
+				}
+			}
+		}
+	}
+
+	return mesh->GetNumPolygons();
+}
+
+/*
+================
 ProcessMapEntity
 ================
 */
@@ -402,6 +478,8 @@ static bool	ProcessMapEntity( idMapEntity* mapEnt )
 	uEntity->mapEntity = mapEnt;
 	dmapGlobals.num_entities++;
 
+	int numPolygons = 0;
+
 	for( entityPrimitive = 0; entityPrimitive < mapEnt->GetNumPrimitives(); entityPrimitive++ )
 	{
 		prim = mapEnt->GetPrimitive( entityPrimitive );
@@ -413,6 +491,10 @@ static bool	ProcessMapEntity( idMapEntity* mapEnt )
 		else if( prim->GetType() == idMapPrimitive::TYPE_PATCH )
 		{
 			ParsePatch( static_cast<idMapPatch*>( prim ), entityPrimitive );
+		}
+		else if( prim->GetType() == idMapPrimitive::TYPE_MESH )
+		{
+			numPolygons += ParsePolygonMesh( static_cast<MapPolygonMesh*>( prim ), entityPrimitive, numPolygons );
 		}
 	}
 
@@ -566,6 +648,17 @@ bool LoadDMapFile( const char* filename )
 		{
 			triSurfs++;
 		}
+		else if( prim->bsptris )
+		{
+			for( mapTri_t* tri = prim->bsptris ; tri ; tri = tri->next )
+			{
+				mapBounds.AddPoint( tri->v[0].xyz );
+				mapBounds.AddPoint( tri->v[1].xyz );
+				mapBounds.AddPoint( tri->v[2].xyz );
+			}
+
+			triSurfs++;
+		}
 	}
 
 	idLib::Printf( "%5i total world brushes\n", brushes );
@@ -633,6 +726,12 @@ void FreeDMapFile()
 			{
 				FreeTriList( prim->tris );
 			}
+
+			if( prim->bsptris )
+			{
+				FreeTriList( prim->bsptris );
+			}
+
 			Mem_Free( prim );
 		}
 

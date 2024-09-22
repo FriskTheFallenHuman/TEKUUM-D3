@@ -71,25 +71,6 @@ uint64_t Sys_Microseconds()
 
 /*
 ================
-Sys_GetSystemRam
-
-	returns amount of physical memory in MB
-================
-*/
-int Sys_GetSystemRam()
-{
-	MEMORYSTATUSEX statex;
-	statex.dwLength = sizeof( statex );
-	GlobalMemoryStatusEx( &statex );
-	int physRam = statex.ullTotalPhys / ( 1024 * 1024 );
-	// HACK: For some reason, ullTotalPhys is sometimes off by a meg or two, so we round up to the nearest 16 megs
-	physRam = ( physRam + 8 ) & ~15;
-	return physRam;
-}
-
-
-/*
-================
 Sys_GetDriveFreeSpace
 returns in megabytes
 ================

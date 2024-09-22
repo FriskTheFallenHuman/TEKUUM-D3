@@ -179,10 +179,7 @@ ID_INLINE void idImage::DeriveOpts()
 				opts.gammaMips = true;
 				break;
 			case TD_LIGHT:
-				// RB: TODO check binary format version
-				// D3 BFG assets require RGB565 but it introduces color banding
-				// mods would prefer FMT_RGBA8
-				opts.format = FMT_RGB565; //FMT_RGBA8;
+				opts.format = FMT_RGBA8;
 				opts.gammaMips = true;
 				break;
 			case TD_LOOKUP_TABLE_MONO:
@@ -352,51 +349,6 @@ void idImage::ActuallyLoadImage( bool fromBackEnd )
 	idBinaryImage im( generatedName );
 	binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
 
-	// BFHACK, do not want to tweak on buildgame so catch these images here
-#if 0
-	if( binaryFileTime == FILE_NOT_FOUND_TIMESTAMP /* && fileSystem->UsingResourceFiles()*/ )
-	{
-		int c = 1;
-		while( c-- > 0 )
-		{
-			if( generatedName.Find( "guis/assets/white#__0000", false ) >= 0 )
-			{
-				generatedName.Replace( "white#__0000", "white#__0200" );
-				im.SetName( generatedName );
-				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
-				break;
-			}
-			if( generatedName.Find( "guis/assets/white#__0100", false ) >= 0 )
-			{
-				generatedName.Replace( "white#__0100", "white#__0200" );
-				im.SetName( generatedName );
-				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
-				break;
-			}
-			if( generatedName.Find( "textures/black#__0100", false ) >= 0 )
-			{
-				generatedName.Replace( "black#__0100", "black#__0200" );
-				im.SetName( generatedName );
-				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
-				break;
-			}
-			if( generatedName.Find( "textures/decals/bulletglass1_d#__0100", false ) >= 0 )
-			{
-				generatedName.Replace( "bulletglass1_d#__0100", "bulletglass1_d#__0200" );
-				im.SetName( generatedName );
-				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
-				break;
-			}
-			if( generatedName.Find( "models/monsters/skeleton/skeleton01_d#__1000", false ) >= 0 )
-			{
-				generatedName.Replace( "skeleton01_d#__1000", "skeleton01_d#__0100" );
-				im.SetName( generatedName );
-				binaryFileTime = im.LoadFromGeneratedFile( sourceFileTime );
-				break;
-			}
-		}
-	}
-#endif
 	const bimageFile_t& header = im.GetFileHeader();
 
 	if( ( fileSystem->InProductionMode() && binaryFileTime != FILE_NOT_FOUND_TIMESTAMP ) || ( ( binaryFileTime != FILE_NOT_FOUND_TIMESTAMP )

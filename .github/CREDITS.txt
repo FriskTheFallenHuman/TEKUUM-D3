@@ -1,0 +1,2 @@
+Renderering/HLSL shaders and bits of engine changes comes from RBDOOM3 BFG made by Robert Beckebans
+Game.dll fixes idlib fixes and miscellaneous fixes comes from Dhewm3 made by DanielGibson

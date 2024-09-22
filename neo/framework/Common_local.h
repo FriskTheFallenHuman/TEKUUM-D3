@@ -76,8 +76,6 @@ public:
 	void						LocalizeMapData( const char* fileName, idLangDict& langDict );
 	void						LocalizeSpecificMapData( const char* fileName, idLangDict& langDict, const idLangDict& replaceArgs );
 
-	void						SetMachineSpec();
-
 	bool						IsShuttingDown()
 	{
 		return com_shuttingDown;

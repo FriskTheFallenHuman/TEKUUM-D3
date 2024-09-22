@@ -694,6 +694,19 @@ void PutPrimitivesInAreas( uEntity_t* e )
 			{
 				AddMapTriToAreas( tri, e );
 			}
+
+			// RB: add new polygon mesh
+			for( tri = prim->bsptris ; tri ; tri = tri->next )
+			{
+#if 1
+				// FIXME reverse vertex order for drawing
+				idDrawVert tmp = tri->v[0];
+				tri->v[0] = tri->v[2];
+				tri->v[2] = tmp;
+#endif
+
+				AddMapTriToAreas( tri, e );
+			}
 			continue;
 		}
 
@@ -782,6 +795,103 @@ void PutPrimitivesInAreas( uEntity_t* e )
 			}
 		}
 	}
+}
+
+//============================================================================
+
+
+/*
+=====================
+FilterMeshesIntoTree_r
+=====================
+*/
+int FilterMeshesIntoTree_r( idWinding* w, mapTri_t* originalTri, node_t* node )
+{
+	idWinding*		front, *back;
+	int				c;
+
+	if( !w )
+	{
+		return 0;
+	}
+
+	if( node->planenum == PLANENUM_LEAF )
+	{
+		// add it to the leaf list
+		if( originalTri->material->GetContentFlags() & CONTENTS_AREAPORTAL )
+		{
+			mapTri_t* list = CopyMapTri( originalTri );
+			list->next = NULL;
+
+			node->areaPortalTris = MergeTriLists( node->areaPortalTris, list );
+		}
+
+		const MapPolygonMesh* mapMesh = originalTri->originalMapMesh;
+
+		// classify the leaf by the structural brush
+		if( mapMesh->IsOpaque() )
+		{
+			node->opaque = true;
+		}
+
+		delete w;
+		return 1;
+	}
+
+	// split it by the node plane
+	w->Split( dmapGlobals.mapPlanes[ node->planenum ], ON_EPSILON, &front, &back );
+	delete w;
+
+	c = 0;
+	c += FilterMeshesIntoTree_r( front, originalTri, node->children[0] );
+	c += FilterMeshesIntoTree_r( back, originalTri, node->children[1] );
+
+	return c;
+}
+
+
+/*
+=====================
+FilterMeshesIntoTree
+
+Mark the leafs as opaque and areaportals and put mesh
+fragments in each leaf so portal surfaces can be matched
+to materials
+=====================
+*/
+void FilterMeshesIntoTree( uEntity_t* e )
+{
+	uBrush_t*		b;
+	primitive_t*	prim;
+	mapTri_t*		tri;
+	int				r;
+	int				c_unique, c_clusters;
+
+	VerbosePrintf( "----- FilterMeshesIntoTree -----\n" );
+
+	c_unique = 0;
+	c_clusters = 0;
+	for( prim = e->primitives ; prim ; prim = prim->next )
+	{
+		b = prim->brush;
+
+		if( !b )
+		{
+			// add BSP triangles
+			for( tri = prim->bsptris ; tri ; tri = tri->next )
+			{
+				idWinding* w = WindingForTri( tri );
+
+				c_unique++;
+				r = FilterMeshesIntoTree_r( w, tri, e->tree->headnode );
+				c_clusters += r;
+			}
+			continue;
+		}
+	}
+
+	VerbosePrintf( "%5i total BSP triangles\n", c_unique );
+	VerbosePrintf( "%5i cluster references\n", c_clusters );
 }
 
 //============================================================================

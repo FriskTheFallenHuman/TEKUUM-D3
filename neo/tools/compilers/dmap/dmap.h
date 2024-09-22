@@ -26,6 +26,7 @@ typedef struct primitive_s
 	// only one of these will be non-NULL
 	struct bspbrush_s* 	brush;
 	struct mapTri_s* 	tris;
+	struct mapTri_s*	bsptris;
 } primitive_t;
 
 
@@ -55,6 +56,9 @@ typedef struct mapTri_s
 
 	const idMaterial* 	material;
 	void* 				mergeGroup;		// we want to avoid merging triangles
+	int					polygonId;		// n-gon number from original face used for area portal construction
+	const MapPolygonMesh*	originalMapMesh;
+//	idWinding* 			visibleHull;	// also clipped to the solid parts of the world
 	// from different fixed groups, like guiSurfs and mirrors
 	int					planeNum;			// not set universally, just in some areas
 
@@ -149,7 +153,10 @@ typedef struct node_s
 	// leafs only
 	bool				opaque;		// view can never be inside
 
+	// RB: needed for areaportal construction
 	uBrush_t* 			brushlist;	// fragments of all brushes in this leaf
+	mapTri_t*			areaPortalTris;
+
 	// needed for FindSideForPortal
 
 	int					area;		// determined by flood filling up to areaportals
@@ -356,7 +363,9 @@ typedef struct
 	// Time stats
 	dmapTimingStats timingMakeStructural;
 	dmapTimingStats timingMakeTreePortals;
+	dmapTimingStats timingNumberNodes;
 	dmapTimingStats timingFilterBrushesIntoTree;
+	dmapTimingStats timingFilterMeshesIntoTree;
 	dmapTimingStats timingFloodAndFill;
 	dmapTimingStats timingClipSidesByTree;
 	dmapTimingStats timingFloodAreas;
@@ -418,14 +427,16 @@ void		FreeDMapFile();
 
 #define	MAX_INTER_AREA_PORTALS	1024
 
-typedef struct
+struct interAreaPortal_t
 {
-	int		area0, area1;
-	side_t*	side;
-} interAreaPortal_t;
+	int				area0, area1;
+	side_t*			side = NULL;
 
-extern	interAreaPortal_t interAreaPortals[MAX_INTER_AREA_PORTALS];
-extern	int					numInterAreaPortals;
+	int				polygonId;
+	idFixedWinding	w;
+};
+
+extern idList<interAreaPortal_t> interAreaPortals;
 
 bool FloodEntities( tree_t* tree );
 void FillOutside( uEntity_t* e );
@@ -461,6 +472,7 @@ tree_t*		FaceBSP( bspface_t* list );
 void	ClipSidesByTree( uEntity_t* e );
 void	PutPrimitivesInAreas( uEntity_t* e );
 void	Prelight( uEntity_t* e );
+void	FilterMeshesIntoTree( uEntity_t* e );
 
 //=============================================================================
 
@@ -548,6 +560,7 @@ void		ClipTriList( const mapTri_t* list, const idPlane& plane, float epsilon, ma
 
 // output.cpp
 
+int			NumberNodes_r( node_t* node, int nextNumber );
 srfTriangles_t*	ShareMapTriVerts( const mapTri_t* tris );
 void WriteOutputFile();
 

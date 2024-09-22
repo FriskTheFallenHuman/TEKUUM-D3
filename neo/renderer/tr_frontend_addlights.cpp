@@ -398,10 +398,12 @@ static void R_AddSingleLight( viewLight_t* vLight )
 			// A more general solution would be to have an allowLightOnEntityID field.
 			// HACK: the armor-mounted flashlight is a private spot light, which is probably
 			// wrong -- you would expect to see them in multiplayer.
-			//	if( light->parms.allowLightInViewID && light->parms.pointLight && !eParms.weaponDepthHack )
-			//	{
-			//		continue;
-			//	}
+#ifndef ID_PC
+			if( light->parms.allowLightInViewID && light->parms.pointLight && !eParms.weaponDepthHack )
+			{
+					continue;
+			}
+#endif
 
 			// non-shadow casting entities don't need to be added if they aren't
 			// directly visible
@@ -552,13 +554,6 @@ static void R_AddSingleLight( viewLight_t* vLight )
 			shadowParms->shadowZMin = & shadowDrawSurf->scissorRect.zmin;
 			shadowParms->shadowZMax = & shadowDrawSurf->scissorRect.zmax;
 			shadowParms->shadowVolumeState = & shadowDrawSurf->shadowVolumeState;
-
-			// the pre-light shadow volume "_prelight_light_3297" in "d3xpdm2" is malformed in that it contains the light origin so the precise inside test always fails
-			if( tr.primaryWorld->mapName.IcmpPath( "maps/game/mp/d3xpdm2.map" ) == 0 && idStr::Icmp( light->parms.prelightModel->Name(), "_prelight_light_3297" ) == 0 )
-			{
-				shadowParms->useShadowPreciseInsideTest = false;
-			}
-
 			shadowDrawSurf->shadowVolumeState = SHADOWVOLUME_UNFINISHED;
 
 			shadowParms->next = vLight->preLightShadowVolumes;

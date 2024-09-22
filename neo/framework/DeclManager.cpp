@@ -249,9 +249,6 @@ private:
 	static void					ListDecls_f( const idCmdArgs& args );
 	static void					ReloadDecls_f( const idCmdArgs& args );
 	static void					TouchDecl_f( const idCmdArgs& args );
-	// RB begin
-	static void                 ExportDecls_f( const idCmdArgs& args );
-	// RB end
 };
 
 idCVar idDeclManagerLocal::decl_show( "decl_show", "0", CVAR_SYSTEM, "set to 1 to print parses, 2 to also print references", 0, 2, idCmdSystem::ArgCompletion_Integer<0, 2> );
@@ -946,10 +943,6 @@ void idDeclManagerLocal::Init()
 	cmdSystem->AddCommand( "listHuffmanFrequencies", ListHuffmanFrequencies_f, CMD_FL_SYSTEM, "lists decl text character frequencies" );
 
 	cmdSystem->AddCommand( "convertPDAsToStrings", ConvertPDAsToStrings_f, CMD_FL_SYSTEM, "Converts *.pda files to text which can be plugged into *.lang files." );
-
-	// RB begin
-	cmdSystem->AddCommand( "exportDeclsToJSON", ExportDecls_f, CMD_FL_SYSTEM, "exports all entity and model defs to exported/entities.json" );
-	// RB end
 
 	common->Printf( "------------------------------\n" );
 }
@@ -1952,59 +1945,6 @@ void idDeclManagerLocal::TouchDecl_f( const idCmdArgs& args )
 		common->Printf( "%s '%s' not found\n", declManagerLocal.declTypes[i]->typeName.c_str(), args.Argv( 2 ) );
 	}
 }
-
-// RB begin
-void idDeclManagerLocal::ExportDecls_f( const idCmdArgs& args )
-{
-	idStr jsonStringsFileName = "exported/entities.json";
-	idFileLocal file( fileSystem->OpenFileWrite( jsonStringsFileName, "fs_basepath" ) );
-
-	if( file == NULL )
-	{
-		idLib::Printf( "Failed to entity declarations data to JSON.\n" );
-	}
-
-	int totalEntitiesCount = 0;
-	int totalModelsCount = 0;
-
-	// avoid media cache
-	com_editors |= EDITOR_AAS;
-
-	file->Printf( "{\n\t\"entities\": {" );
-
-	int count = declManagerLocal.linearLists[ DECL_ENTITYDEF ].Num();
-	for( int i = 0; i < count; i++ )
-	{
-		const idDeclEntityDef* decl = static_cast< const idDeclEntityDef* >( declManagerLocal.FindType( DECL_ENTITYDEF, declManagerLocal.linearLists[ DECL_ENTITYDEF ][ i ]->GetName(), false ) );
-
-		totalEntitiesCount++;
-
-		file->Printf( "\n\t\t\"%s\": {\n", decl->GetName() );
-		decl->dict.WriteJSON( file, "\t\t" );
-
-		if( i == ( count - 1 ) )
-		{
-			file->Printf( "\t\t}\n" );
-		}
-		else
-		{
-			file->Printf( "\t\t},\n" );
-		}
-	}
-
-	file->Printf( "\t}\n" );
-	file->Printf( "}\n" );
-
-	file->Flush();
-
-	com_editors &= ~EDITOR_AAS;
-
-	idLib::Printf( "\nData written to %s\n", jsonStringsFileName.c_str() );
-	idLib::Printf( "----------------------------\n" );
-	idLib::Printf( "Wrote %d Entities.\n", totalEntitiesCount );
-	idLib::Printf( "Wrote %d Models.\n", totalModelsCount );
-}
-// RB  end
 
 /*
 ===================
