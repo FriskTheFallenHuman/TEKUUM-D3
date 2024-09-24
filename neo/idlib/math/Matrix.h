@@ -953,6 +953,7 @@ public:
 // jmarshall
 	idMat3			ToMat3( void ) const;
 // jmarshall end
+	idVec3			GetTranslation() const;
 private:
 	idVec4			mat[ 4 ];
 };
@@ -966,19 +967,33 @@ ID_INLINE idMat3 idMat4::ToMat3( void ) const
 {
 	idMat3 m;
 
+	// RB - NOTE: idMat3 is transposed because it is column-major
 	m[0][0] = mat[0][0];
-	m[0][1] = mat[0][1];
-	m[0][2] = mat[0][2];
-	m[1][0] = mat[1][0];
+	m[0][1] = mat[1][0];
+	m[0][2] = mat[2][0];
+	m[1][0] = mat[0][1];
 	m[1][1] = mat[1][1];
-	m[1][2] = mat[1][2];
-	m[2][0] = mat[2][0];
-	m[2][1] = mat[2][1];
+	m[1][2] = mat[2][1];
+	m[2][0] = mat[0][2];
+	m[2][1] = mat[1][2];
 	m[2][2] = mat[2][2];
 
 	return m;
 }
 // jmarshall end
+
+// RB begin
+ID_INLINE idVec3 idMat4::GetTranslation() const
+{
+	idVec3 pos;
+
+	pos.x = mat[ 0 ][ 3 ];
+	pos.y = mat[ 1 ][ 3 ];
+	pos.z = mat[ 2 ][ 3 ];
+
+	return pos;
+}
+// RB end
 
 ID_INLINE idMat4::idMat4()
 {

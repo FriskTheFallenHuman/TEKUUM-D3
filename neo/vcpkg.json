@@ -1,10 +1,15 @@
 {
-	"name": "rbdoom3",
-	"version": "0.4.0",
+	"name": "kroom3",
+	"version": "0.5.0",
 	"dependencies": [
 		"stb",
 		"openal-soft",
 		"freetype",
+		{
+		  "name": "freetype",
+		  "default-features": false,
+		  "features": ["error-strings","subpixel-rendering"]
+		},
 		"glew",
 		"ffmpeg",
 		"tinyexr",

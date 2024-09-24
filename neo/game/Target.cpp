@@ -754,7 +754,7 @@ void idTarget_SetModel::Spawn()
 		// precache the render model
 		renderModelManager->FindModel( model );
 		// precache .cm files only
-		collisionModelManager->LoadModel( model );
+		collisionModelManager->LoadModel( model, true );
 	}
 }
 

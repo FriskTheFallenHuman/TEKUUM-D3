@@ -19,6 +19,10 @@ Extra attributions can be found on the CREDITS.txt file
 #include "precompiled.h"
 #pragma hdrstop
 
+idVec2 vec2_one( 1.0f, 1.0f );
+idVec3 vec3_one( 1.0f, 1.0f, 1.0f );
+idVec4 vec4_one( 1.0f, 1.0f, 1.0f, 1.0f );
+
 idVec2 vec2_origin( 0.0f, 0.0f );
 idVec3 vec3_origin( 0.0f, 0.0f, 0.0f );
 idVec4 vec4_origin( 0.0f, 0.0f, 0.0f, 0.0f );

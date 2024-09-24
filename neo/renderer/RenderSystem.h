@@ -66,7 +66,6 @@ enum stereoDepthType_t
 	STEREO_DEPTH_TYPE_FAR
 };
 
-
 enum graphicsVendor_t
 {
 	VENDOR_NVIDIA,

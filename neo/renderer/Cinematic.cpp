@@ -58,7 +58,6 @@ extern "C"
 #include <libswresample/swresample.h>
 #include <libavutil/imgutils.h>
 }
-#include <queue>
 #define NUM_LAG_FRAMES 15	// SRS - Lag audio by 15 frames (~1/2 sec at 30 fps) for ffmpeg bik decoder AV sync
 #endif
 
@@ -118,8 +117,9 @@ private:
 	cinData_t				ImageForTimeFFMPEG( int milliseconds );
 	bool					InitFromFFMPEGFile( const char* qpath, bool looping );
 	void					FFMPEGReset();
-	std::queue<uint8_t*>	lagBuffer;
-	std::queue<int>			lagBufSize;
+	uint8_t*				lagBuffer[NUM_LAG_FRAMES] = {};
+	int						lagBufSize[NUM_LAG_FRAMES] = {};
+	int						lagIndex;
 	bool					skipLag;
 #endif
 #ifdef USE_BINKDEC
@@ -411,6 +411,17 @@ bool idCinematic::IsPlaying() const
 }
 // RB end
 
+// SRS begin
+/*
+==============
+CinematicAudio::~CinematicAudio
+==============
+*/
+idCinematicAudio::~idCinematicAudio()
+{
+}
+// SRS end
+
 //===========================================
 
 /*
@@ -445,6 +456,7 @@ idCinematicLocal::idCinematicLocal()
 	img_convert_ctx = NULL;
 	hasFrame = false;
 	framePos = -1;
+	lagIndex = 0;
 	skipLag = false;
 #endif
 
@@ -813,11 +825,14 @@ void idCinematicLocal::FFMPEGReset()
 	{
 		cinematicAudio->ResetAudio();
 
-		while( !lagBuffer.empty() )
+		lagIndex = 0;
+		for( int i = 0; i < NUM_LAG_FRAMES; i++ )
 		{
-			av_freep( &lagBuffer.front() );
-			lagBuffer.pop();
-			lagBufSize.pop();
+			lagBufSize[ i ] = 0;
+			if( lagBuffer[ i ] )
+			{
+				av_freep( &lagBuffer[ i ] );
+			}
 		}
 	}
 
@@ -878,7 +893,7 @@ bool idCinematicLocal::InitFromBinkDecFile( const char* qpath, bool amilooping )
 		}
 		else
 		{
-			common->Warning( "idCinematic: Cannot open Bink video file: '%s', %d\n", qpath, looping );
+			common->Warning( "idCinematic: Cannot open BinkDec video file: '%s', %d\n", qpath, looping );
 			return false;
 		}
 	}
@@ -886,7 +901,7 @@ bool idCinematicLocal::InitFromBinkDecFile( const char* qpath, bool amilooping )
 	binkHandle = Bink_Open( fullpath );
 	if( !binkHandle.isValid )
 	{
-		common->Warning( "idCinematic: Cannot open Bink video file: '%s', %d\n", qpath, looping );
+		common->Warning( "idCinematic: Cannot open BinkDec video file: '%s', %d\n", qpath, looping );
 		return false;
 	}
 
@@ -912,7 +927,7 @@ bool idCinematicLocal::InitFromBinkDecFile( const char* qpath, bool amilooping )
 	numFrames = Bink_GetNumFrames( binkHandle );
 	float durationSec = numFrames / frameRate;      // SRS - fixed Bink durationSec calculation
 	animationLength = durationSec * 1000;           // SRS - animationLength is in milliseconds
-	common->Printf( "Loaded Bink file: '%s', looping=%d, %dx%d, %3.2f FPS, %4.1f sec\n", qpath, looping, CIN_WIDTH, CIN_HEIGHT, frameRate, durationSec );
+	common->Printf( "Loaded BinkDec file: '%s', looping=%d, %dx%d, %3.2f FPS, %4.1f sec\n", qpath, looping, CIN_WIDTH, CIN_HEIGHT, frameRate, durationSec );
 
 	memset( yuvBuffer, 0, sizeof( yuvBuffer ) );
 
@@ -1138,11 +1153,14 @@ void idCinematicLocal::Close()
 				swr_free( &swr_ctx );
 			}
 
-			while( !lagBuffer.empty() )
+			lagIndex = 0;
+			for( int i = 0; i < NUM_LAG_FRAMES; i++ )
 			{
-				av_freep( &lagBuffer.front() );
-				lagBuffer.pop();
-				lagBufSize.pop();
+				lagBufSize[ i ] = 0;
+				if( lagBuffer[ i ] )
+				{
+					av_freep( &lagBuffer[ i ] );
+				}
 			}
 		}
 
@@ -1338,7 +1356,6 @@ cinData_t idCinematicLocal::ImageForTimeFFMPEG( int thisTime )
 	char		error[64];
 	uint8_t*	audioBuffer = NULL;
 	int			num_bytes = 0;
-	bool		syncLost = false;
 
 	memset( &cinData, 0, sizeof( cinData ) );
 	if( !fmt_ctx )
@@ -1452,8 +1469,8 @@ cinData_t idCinematicLocal::ImageForTimeFFMPEG( int thisTime )
 							common->Warning( "idCinematic: Failed to receive audio frame from decoding with error: %s\n", error );
 						}
 					}
-					// SRS - Allocate audio buffer, convert to packed format, save in queue, and play synced audio for desired frame
-					else
+					// SRS - For the final (desired) frame only: allocate audio buffers, convert to packed format, and play the synced audio frames
+					else if( framePos + 1 == desiredFrame )
 					{
 						// SRS - Since destination sample format is packed (non-planar), returned bufflinesize equals num_bytes
 #if	LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(59,37,100)
@@ -1482,47 +1499,27 @@ cinData_t idCinematicLocal::ImageForTimeFFMPEG( int thisTime )
 								memcpy( audioBuffer, frame3->extended_data[0], num_bytes );
 							}
 						}
-
-						// SRS - If we have cinematic audio data, save the current frame onto the back of the queue
+						// SRS - If we have cinematic audio data, play a lagged frame (for bik video sync) and save the current frame
 						if( num_bytes > 0 )
 						{
-							// SRS - If queue is at max size we have lost a/v sync: drop frame and set syncLost flag
-							if( lagBuffer.size() == ( skipLag ? 1 : NUM_LAG_FRAMES ) )
+							// SRS - If we have a lagged cinematic audio frame, then play it now
+							if( lagBufSize[ lagIndex ] > 0 )
 							{
-								av_freep( &lagBuffer.front() );
-								lagBuffer.pop();
-								lagBufSize.pop();
-
-								syncLost = true;
+								// SRS - Note that PlayAudio() is responsible for releasing any audio buffers sent to it
+								cinematicAudio->PlayAudio( lagBuffer[ lagIndex ], lagBufSize[ lagIndex ] );
 							}
 
-							// SRS - Save the current (new) audio buffer and its size to play during the desired frame
-							lagBuffer.push( audioBuffer );
-							lagBufSize.push( num_bytes );
+							// SRS - Save the current (new) audio buffer and its size to play in the future
+							lagBuffer[ lagIndex ] = audioBuffer;
+							lagBufSize[ lagIndex ] = num_bytes;
+
+							// SRS - If skipLag is true (e.g. RoQ, mp4, webm), reduce lag to 1 frame since AV playback is already synced
+							lagIndex = ( lagIndex + 1 ) % ( skipLag ? 1 : NUM_LAG_FRAMES );
 						}
 						// SRS - Not sure if an audioBuffer can ever be allocated on failure, but check and free just in case
 						else if( audioBuffer )
 						{
 							av_freep( &audioBuffer );
-						}
-
-						// SRS - If we have any synced audio frames available for the desired frame, play now and drain queue
-						if( framePos + 1 == desiredFrame )
-						{
-							if( syncLost )
-							{
-								// SRS - If we have lost sync, reset / resync audio stream before starting to play again
-								cinematicAudio->ResetAudio();
-								syncLost = false;
-							}
-
-							while( !lagBuffer.empty() )
-							{
-								// SRS - Note that PlayAudio() is responsible for releasing any audio buffers sent to it
-								cinematicAudio->PlayAudio( lagBuffer.front(), lagBufSize.front() );
-								lagBuffer.pop();
-								lagBufSize.pop();
-							}
 						}
 						//common->Printf( "idCinematic: video pts = %7.3f, audio pts = %7.3f, samples = %4d, num_bytes = %5d\n", static_cast<double>( frame->pts ) * av_q2d( dec_ctx->pkt_timebase ), static_cast<double>( frame3->pts ) * av_q2d( dec_ctx2->pkt_timebase ), frame3->nb_samples, num_bytes );
 					}
@@ -1658,11 +1655,6 @@ cinData_t idCinematicLocal::ImageForTimeBinkDec( int thisTime )
 		}
 		else if( h < CIN_HEIGHT )
 		{
-#if defined(__APPLE__) && defined(USE_VULKAN)
-			// SRS - For U and V channels on OSX Vulkan use full height image to work around stall that occurs with half-height chroma planes
-			// when exiting levels or returning from demo playback - depends on OSX-specific logic inside Vulkan version of SubImageUpload()
-			h = CIN_HEIGHT;
-#else
 			// the U and V channels have a lower resolution than the Y channel
 			// (or the logical video resolution), so use the aspect ratio to
 			// calculate the real height
@@ -1671,9 +1663,11 @@ cinData_t idCinematicLocal::ImageForTimeBinkDec( int thisTime )
 			{
 				h = hExp;
 			}
-#endif
 		}
 
+#if defined( USE_NVRHI )
+		img->UploadScratch( yuvBuffer[i].data, w, h, commandList );
+#else
 		if( img->GetUploadWidth() != w || img->GetUploadHeight() != h )
 		{
 			idImageOpts opts = img->GetOpts();
@@ -1681,7 +1675,8 @@ cinData_t idCinematicLocal::ImageForTimeBinkDec( int thisTime )
 			opts.height = h;
 			img->AllocImage( opts, TF_LINEAR, TR_REPEAT );
 		}
-		img->SubImageUpload( 0, 0, 0, 0, w, h, yuvBuffer[i].data );
+		img->SubImageUpload( 0, 0, 0, 0, w, h, yuvBuffer[i].data, commandList );
+#endif
 	}
 
 	hasFrame = true;

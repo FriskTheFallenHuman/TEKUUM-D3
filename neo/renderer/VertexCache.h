@@ -18,7 +18,7 @@ Extra attributions can be found on the CREDITS.txt file
 #ifndef __VERTEXCACHE_H__
 #define __VERTEXCACHE_H__
 
-#if 1
+#if 0
 
 	// RB: increased some static memory limits for custom modder content
 

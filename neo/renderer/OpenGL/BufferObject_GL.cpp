@@ -15,10 +15,8 @@ Extra attributions can be found on the CREDITS.txt file
 
 ===========================================================================
 */
-
 #include "precompiled.h"
 #pragma hdrstop
-
 #include "../RenderCommon.h"
 
 extern idCVar r_showBuffers;

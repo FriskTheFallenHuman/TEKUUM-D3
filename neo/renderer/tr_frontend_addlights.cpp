@@ -401,7 +401,7 @@ static void R_AddSingleLight( viewLight_t* vLight )
 #ifndef ID_PC
 			if( light->parms.allowLightInViewID && light->parms.pointLight && !eParms.weaponDepthHack )
 			{
-					continue;
+				continue;
 			}
 #endif
 

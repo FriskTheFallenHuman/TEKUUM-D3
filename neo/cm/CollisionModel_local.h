@@ -320,7 +320,7 @@ public:
 	void			FreeMap();
 
 	// get clip handle for model
-	cmHandle_t		LoadModel( const char* modelName );
+	cmHandle_t		LoadModel( const char* modelName, const bool precache );
 	// sets up a trace model for collision with other trace models
 	cmHandle_t		SetupTrmModel( const idTraceModel& trm, const idMaterial* material );
 	// create trace model from a collision model, returns true if succesfull

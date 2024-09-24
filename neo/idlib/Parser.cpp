@@ -1139,11 +1139,18 @@ int idParser::Directive_include( idToken* token, bool supressWarning )
 		// try relative to the current file
 		path = scriptstack->GetFileName();
 		path.StripFilename();
-		path += "/";
-		path += *token;
-		if( !script->LoadFile( path, OSPath ) )
+		// first remove any trailing path overlap with token
+		idStr token_path = *token;
+		if( !path.StripTrailingOnce( token_path.StripFilename() ) )
 		{
-			// try absolute path
+			// if no path overlap add separator before token
+			path += "/";
+		}
+		path += *token;
+		// try assuming a full os path from GetFileName()
+		if( !script->LoadFile( path, true ) )
+		{
+			// try from the token path
 			path = *token;
 			if( !script->LoadFile( path, OSPath ) )
 			{
@@ -1198,6 +1205,7 @@ int idParser::Directive_include( idToken* token, bool supressWarning )
 		idParser::Error( "#include without file name" );
 		return false;
 	}
+
 	if( !script )
 	{
 		if( !supressWarning )

@@ -36,7 +36,7 @@ Extra attributions can be found on the CREDITS.txt file
 #include "../RenderBackend.h"
 #include "../../framework/Common_local.h"
 
-//#include "../../imgui/imgui.h"
+//#include "../../imgui/BFGimgui.h"
 
 idCVar r_drawFlickerBox( "r_drawFlickerBox", "0", CVAR_RENDERER | CVAR_BOOL, "visual test for dropping frames" );
 idCVar stereoRender_warp( "stereoRender_warp", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "use the optical warping renderprog instead of stereoDeGhost" );
@@ -875,9 +875,9 @@ void idRenderBackend::GL_SetDefaultState()
 	polyOfsBias = 0.0f;
 	glStateBits = 0;
 
-	hdrAverageLuminance = 0;
-	hdrMaxLuminance = 0;
-	hdrTime = 0;
+	//hdrAverageLuminance = 0;
+	//hdrMaxLuminance = 0;
+	//hdrTime = 0;
 	hdrKey = 0;
 
 	GL_State( 0, true );

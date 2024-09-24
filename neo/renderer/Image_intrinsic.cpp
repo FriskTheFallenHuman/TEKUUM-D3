@@ -319,15 +319,19 @@ static void R_FlatNormalImage( idImage* image )
 {
 	byte	data[DEFAULT_SIZE][DEFAULT_SIZE][4];
 
-	// flat normal map for default bunp mapping
-	for( int i = 0 ; i < 4 ; i++ )
+	// flat normal map for default bump mapping
+	for( int i = 0; i < DEFAULT_SIZE; i++ )
 	{
-		data[0][i][0] = 128;
-		data[0][i][1] = 128;
-		data[0][i][2] = 255;
-		data[0][i][3] = 255;
+		for( int j = 0; j < DEFAULT_SIZE; j++ )
+		{
+			data[j][i][0] = 128;
+			data[j][i][1] = 128;
+			data[j][i][2] = 255;
+			data[j][i][3] = 255;
+		}
 	}
-	image->GenerateImage( ( byte* )data, 2, 2, TF_DEFAULT, TR_REPEAT, TD_BUMP );
+
+	image->GenerateImage( ( byte* )data, 16, 16, TF_DEFAULT, TR_REPEAT, TD_BUMP );
 }
 
 /*

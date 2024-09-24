@@ -652,6 +652,7 @@ void idRenderSystemLocal::SwapCommandBuffers_FinishRendering(
 	// and only update the screen when we update the progress bar in the console
 	if( !takingEnvprobe )
 	{
+
 #if !IMGUI_BFGUI
 		ImGuiHook::Render();
 #endif

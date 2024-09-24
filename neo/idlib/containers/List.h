@@ -20,6 +20,8 @@ Extra attributions can be found on the CREDITS.txt file
 #define __LIST_H__
 
 #include <new>
+#include <initializer_list>
+#include <algorithm>	// SRS - Needed for clang 14 so std::copy() is defined
 
 /*
 ===============================================================================
@@ -86,7 +88,8 @@ ID_INLINE void* idListArrayResize( void* voldptr, int oldNum, int newNum, bool z
 		int overlap = Min( oldNum, newNum );
 		for( int i = 0; i < overlap; i++ )
 		{
-			newptr[i] = oldptr[i];
+			//newptr[i] = oldptr[i];
+			newptr[i] = std::move( oldptr[i] );
 		}
 	}
 	idListArrayDelete<_type_>( voldptr, oldNum );
@@ -113,7 +116,9 @@ public:
 	typedef _type_	new_t();
 
 	idList( int newgranularity = 16 );
+	idList( idList&& other );
 	idList( const idList& other );
+	idList( std::initializer_list<_type_> initializerList );
 	~idList();
 
 	void			Clear();											// clear the list
@@ -159,6 +164,82 @@ public:
 	void			Swap( idList& other );								// swap the contents of the lists
 	void			DeleteContents( bool clear = true );				// delete the contents of the list
 
+	template<typename T>
+	struct Iterator
+	{
+		T* p;
+		T& operator*()
+		{
+			return *p;
+		}
+		bool operator != ( const Iterator& rhs )
+		{
+			return p != rhs.p;
+		}
+		void operator ++()
+		{
+			++p;
+		}
+	};
+
+	auto begin() const   // const version
+	{
+		return Iterator<_type_> {list};
+	};
+	auto end() const   // const version
+	{
+		return Iterator<_type_> {list + Num()};
+	};
+
+
+	/*
+	// Begin/End methods for range-based for loops.
+	_type_* begin()
+	{
+		if( num > 0 )
+		{
+			return &list[0];
+		}
+		else
+		{
+			return nullptr;
+		}
+	}
+	_type_* end()
+	{
+		if( num > 0 )
+		{
+			return &list[num - 1];
+		}
+		else
+		{
+			return nullptr;
+		}
+	}
+
+	const _type_* begin() const
+	{
+		if( num > 0 )
+		{
+			return &list[0];
+		}
+		else
+		{
+			return nullptr;
+		}
+	}
+	const _type_* end() const
+	{
+		if( num > 0 )
+		{
+			return &list[num - 1];
+		}
+		else
+		{
+			return nullptr;
+		}
+	}
+	*/
 private:
 	int				num;
 	int				size;
@@ -183,6 +264,18 @@ ID_INLINE idList<_type_>::idList( int newgranularity )
 
 /*
 ================
+idList<_type_>::idList( idList< _type_ >&& other )
+================
+*/
+template< typename _type_ >
+ID_INLINE idList<_type_>::idList( idList&& other )
+{
+	list = NULL;
+	*this = std::move( other );
+}
+
+/*
+================
 idList<_type_>::idList( const idList< _type_ > &other )
 ================
 */
@@ -191,6 +284,14 @@ ID_INLINE idList<_type_>::idList( const idList& other )
 {
 	list = NULL;
 	*this = other;
+}
+
+template< typename _type_ >
+ID_INLINE idList<_type_>::idList( std::initializer_list<_type_> initializerList )
+	: idList( 16 )
+{
+	SetNum( initializerList.size() );
+	std::copy( initializerList.begin(), initializerList.end(), list );
 }
 
 /*
@@ -243,7 +344,10 @@ ID_INLINE void idList<_type_>::DeleteContents( bool clear )
 
 	for( i = 0; i < num; i++ )
 	{
-		delete list[ i ];
+		if( list[i] )
+		{
+			delete list[i];
+		}
 		list[ i ] = NULL;
 	}
 
@@ -479,7 +583,6 @@ ID_INLINE void idList<_type_>::AssureSize( int newSize )
 
 	if( newSize > size )
 	{
-
 		if( granularity == 0 )  	// this is a hack to fix our memset classes
 		{
 			granularity = 16;
@@ -488,9 +591,9 @@ ID_INLINE void idList<_type_>::AssureSize( int newSize )
 		newSize += granularity - 1;
 		newSize -= newSize % granularity;
 		Resize( newSize );
-	}
 
-	num = newNum;
+		num = newNum;
+	}
 }
 
 /*

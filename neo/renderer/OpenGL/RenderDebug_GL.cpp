@@ -3243,9 +3243,9 @@ void idRenderBackend::DBG_TestImage()
 	{
 		cinData_t	cin;
 
-		// SRS - Don't need calibrated time for testing cinematics, so just call ImageForTime( 0 ) for current system time
+		// SRS - Don't need calibrated time for testing cinematics, so just call ImageForTime() with current system time
 		// This simplification allows cinematic test playback to work over both 2D and 3D background scenes
-		cin = tr.testVideo->ImageForTime( 0 /*viewDef->renderView.time[1] - tr.testVideoStartTime*/ );
+		cin = tr.testVideo->ImageForTime( Sys_Milliseconds() /*viewDef->renderView.time[1] - tr.testVideoStartTime*/ );
 		if( cin.imageY != NULL )
 		{
 			image = cin.imageY;
@@ -3298,7 +3298,7 @@ void idRenderBackend::DBG_TestImage()
 	scale[0] = w; // scale
 	scale[5] = h; // scale			(SRS - changed h from -ve to +ve so video plays right side up)
 	scale[12] = halfScreenWidth - ( halfScreenWidth * w ); // translate
-	scale[13] = halfScreenHeight - ( halfScreenHeight * h ) - h; // translate (SRS - moved up by h)
+	scale[13] = halfScreenHeight / 2 - ( halfScreenHeight * h ); // translate (SRS - center of console dropdown)
 	scale[10] = 1.0f;
 	scale[15] = 1.0f;
 
@@ -3330,8 +3330,10 @@ void idRenderBackend::DBG_TestImage()
 	{
 		GL_SelectTexture( 0 );
 		image->Bind();
+
 		GL_SelectTexture( 1 );
 		imageCr->Bind();
+
 		GL_SelectTexture( 2 );
 		imageCb->Bind();
 		// SRS - Use Bink shader without sRGB to linear conversion, otherwise cinematic colours may be wrong
@@ -3342,13 +3344,12 @@ void idRenderBackend::DBG_TestImage()
 	{
 		GL_SelectTexture( 0 );
 		image->Bind();
-		// Set Shader
+
 		renderProgManager.BindShader_Texture();
 	}
 
 	// Draw!
 	DrawElementsWithCounters( &testImageSurface );
-	//DrawElementsWithCounters( &unitSquareSurface );
 }
 
 // RB begin
