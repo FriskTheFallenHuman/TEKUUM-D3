@@ -1,5 +1,7 @@
 project(external C CXX)
 
+add_subdirectory( moc )
+
 file(GLOB BINKDEC_INCLUDES libbinkdec/includes/*.h)
 file(GLOB BINKDEC_SOURCES libbinkdec/src/*.cpp libbinkdec/src/*.c)
 

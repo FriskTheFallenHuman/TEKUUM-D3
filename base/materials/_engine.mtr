@@ -1,0 +1,8 @@
+// if an ASE/LWO/OBJ/GLTF model has a surface that uses this material that surface will
+// be used for occlusion culling instead of the visual surface(s)
+textures/common/occlusion
+{
+	qer_editorimage textures/common/occlusion.tga
+	noshadows
+	occlusion
+}

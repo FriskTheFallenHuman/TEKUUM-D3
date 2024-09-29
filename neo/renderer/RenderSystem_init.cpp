@@ -23,6 +23,14 @@ Extra attributions can be found on the CREDITS.txt file
 
 #include "RenderCommon.h"
 
+#if defined( USE_INTRINSICS_SSE )
+	#if MOC_MULTITHREADED
+		#include "CullingThreadPool.h"
+	#else
+		#include "../libs/moc/MaskedOcclusionCulling.h"
+	#endif
+#endif
+
 // RB begin
 #if defined(_WIN32)
 
@@ -37,6 +45,7 @@ Extra attributions can be found on the CREDITS.txt file
 	#include "../framework/Common_local.h"
 	#include "../framework/Session_local.h"
 #endif
+
 
 // DeviceContext bypasses RenderSystem to work directly with this
 idGuiModel* tr_guiModel;
@@ -299,6 +308,8 @@ idCVar r_showLightGrid( "r_showLightGrid", "0", CVAR_RENDERER | CVAR_INTEGER, "s
 idCVar r_useLightGrid( "r_useLightGrid", "1", CVAR_RENDERER | CVAR_BOOL, "" );
 
 idCVar r_exposure( "r_exposure", "0.5", CVAR_ARCHIVE | CVAR_RENDERER | CVAR_FLOAT, "HDR exposure or LDR brightness [0.0 .. 1.0]", 0.0f, 1.0f );
+
+idCVar r_useMaskedOcclusionCulling( "r_useMaskedOcclusionCulling", "1", CVAR_RENDERER | CVAR_BOOL, "SIMD optimized software culling by Intel" );
 // RB end
 
 const char* fileExten[4] = { "tga", "png", "jpg", "exr" };
@@ -1755,6 +1766,20 @@ void idRenderSystemLocal::Clear()
 	envprobeJobList = NULL;
 	envprobeJobs.Clear();
 	lightGridJobs.Clear();
+
+#if defined(USE_INTRINSICS_SSE)
+	// destroy occlusion culling object and free hierarchical z-buffer
+	if( maskedOcclusionCulling != NULL )
+	{
+#if MOC_MULTITHREADED
+		delete maskedOcclusionThreaded;
+		maskedOcclusionThreaded = NULL;
+#endif
+		MaskedOcclusionCulling::Destroy( maskedOcclusionCulling );
+
+		maskedOcclusionCulling = NULL;
+	}
+#endif
 }
 
 /*
@@ -1902,6 +1927,121 @@ static srfTriangles_t* R_MakeZeroOneCubeTris()
 }
 
 // RB begin
+#if defined(USE_INTRINSICS_SSE)
+static void R_MakeZeroOneCubeTrisForMaskedOcclusionCulling()
+{
+	const float low = 0.0f;
+	const float high = 1.0f;
+
+	idVec3 center( 0.0f );
+	idVec3 mx( low, 0.0f, 0.0f );
+	idVec3 px( high, 0.0f, 0.0f );
+	idVec3 my( 0.0f,  low, 0.0f );
+	idVec3 py( 0.0f, high, 0.0f );
+	idVec3 mz( 0.0f, 0.0f,  low );
+	idVec3 pz( 0.0f, 0.0f, high );
+
+	idVec4* verts = tr.maskedZeroOneCubeVerts;
+
+	verts[0].ToVec3() = center + mx + my + mz;
+	verts[1].ToVec3() = center + px + my + mz;
+	verts[2].ToVec3() = center + px + py + mz;
+	verts[3].ToVec3() = center + mx + py + mz;
+	verts[4].ToVec3() = center + mx + my + pz;
+	verts[5].ToVec3() = center + px + my + pz;
+	verts[6].ToVec3() = center + px + py + pz;
+	verts[7].ToVec3() = center + mx + py + pz;
+
+	verts[0].w = 1;
+	verts[1].w = 1;
+	verts[2].w = 1;
+	verts[3].w = 1;
+	verts[4].w = 1;
+	verts[5].w = 1;
+	verts[6].w = 1;
+	verts[7].w = 1;
+
+	unsigned int* indexes = tr.maskedZeroOneCubeIndexes;
+
+	// bottom
+	indexes[ 0 * 3 + 0] = 2;
+	indexes[ 0 * 3 + 1] = 3;
+	indexes[ 0 * 3 + 2] = 0;
+	indexes[ 1 * 3 + 0] = 1;
+	indexes[ 1 * 3 + 1] = 2;
+	indexes[ 1 * 3 + 2] = 0;
+	// back
+	indexes[ 2 * 3 + 0] = 5;
+	indexes[ 2 * 3 + 1] = 1;
+	indexes[ 2 * 3 + 2] = 0;
+	indexes[ 3 * 3 + 0] = 4;
+	indexes[ 3 * 3 + 1] = 5;
+	indexes[ 3 * 3 + 2] = 0;
+	// left
+	indexes[ 4 * 3 + 0] = 7;
+	indexes[ 4 * 3 + 1] = 4;
+	indexes[ 4 * 3 + 2] = 0;
+	indexes[ 5 * 3 + 0] = 3;
+	indexes[ 5 * 3 + 1] = 7;
+	indexes[ 5 * 3 + 2] = 0;
+	// right
+	indexes[ 6 * 3 + 0] = 1;
+	indexes[ 6 * 3 + 1] = 5;
+	indexes[ 6 * 3 + 2] = 6;
+	indexes[ 7 * 3 + 0] = 2;
+	indexes[ 7 * 3 + 1] = 1;
+	indexes[ 7 * 3 + 2] = 6;
+	// front
+	indexes[ 8 * 3 + 0] = 3;
+	indexes[ 8 * 3 + 1] = 2;
+	indexes[ 8 * 3 + 2] = 6;
+	indexes[ 9 * 3 + 0] = 7;
+	indexes[ 9 * 3 + 1] = 3;
+	indexes[ 9 * 3 + 2] = 6;
+	// top
+	indexes[10 * 3 + 0] = 4;
+	indexes[10 * 3 + 1] = 7;
+	indexes[10 * 3 + 2] = 6;
+	indexes[11 * 3 + 0] = 5;
+	indexes[11 * 3 + 1] = 4;
+	indexes[11 * 3 + 2] = 6;
+}
+
+static void R_MakeUnitCubeTrisForMaskedOcclusionCulling()
+{
+	const float low = -1.0f;
+	const float high = 1.0f;
+
+	idVec3 center( 0.0f );
+	idVec3 mx( low, 0.0f, 0.0f );
+	idVec3 px( high, 0.0f, 0.0f );
+	idVec3 my( 0.0f,  low, 0.0f );
+	idVec3 py( 0.0f, high, 0.0f );
+	idVec3 mz( 0.0f, 0.0f,  low );
+	idVec3 pz( 0.0f, 0.0f, high );
+
+	idVec4* verts = tr.maskedUnitCubeVerts;
+
+	verts[0].ToVec3() = center + mx + my + mz;
+	verts[1].ToVec3() = center + px + my + mz;
+	verts[2].ToVec3() = center + px + py + mz;
+	verts[3].ToVec3() = center + mx + py + mz;
+	verts[4].ToVec3() = center + mx + my + pz;
+	verts[5].ToVec3() = center + px + my + pz;
+	verts[6].ToVec3() = center + px + py + pz;
+	verts[7].ToVec3() = center + mx + py + pz;
+
+	verts[0].w = 1;
+	verts[1].w = 1;
+	verts[2].w = 1;
+	verts[3].w = 1;
+	verts[4].w = 1;
+	verts[5].w = 1;
+	verts[6].w = 1;
+	verts[7].w = 1;
+}
+#endif
+
 static srfTriangles_t* R_MakeZeroOneSphereTris()
 {
 	srfTriangles_t* tri = ( srfTriangles_t* )Mem_ClearedAlloc( sizeof( *tri ) );
@@ -2134,6 +2274,22 @@ void idRenderSystemLocal::Init()
 	envprobeJobList = parallelJobManager->AllocJobList( JOBLIST_UTILITY, JOBLIST_PRIORITY_MEDIUM, 2048, 0, NULL ); // RB
 
 	bInitialized = true;
+
+#if defined(USE_INTRINSICS_SSE)
+	// Flush denorms to zero to avoid performance issues with small values
+	_mm_setcsr( _mm_getcsr() | 0x8040 );
+
+	maskedOcclusionCulling = MaskedOcclusionCulling::Create();
+
+#if MOC_MULTITHREADED
+	maskedOcclusionThreaded = new CullingThreadpool( 2, 10, 6, 128 );
+	maskedOcclusionThreaded->SetBuffer( maskedOcclusionCulling );
+	maskedOcclusionThreaded->WakeThreads();
+#endif
+
+	R_MakeZeroOneCubeTrisForMaskedOcclusionCulling();
+	R_MakeUnitCubeTrisForMaskedOcclusionCulling();
+#endif
 
 	// make sure the command buffers are ready to accept the first screen update
 	SwapCommandBuffers( NULL, NULL, NULL, NULL, NULL, NULL );

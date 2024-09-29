@@ -607,10 +607,12 @@ void idRenderBackend::DBG_RenderDrawSurfListWithFunction( drawSurf_t** drawSurfs
 
 		if( drawSurf->jointCache )
 		{
+			GL_Color( colorRed );
 			renderProgManager.BindShader_ColorSkinned();
 		}
 		else
 		{
+			GL_Color( colorCyan );
 			renderProgManager.BindShader_Color();
 		}
 		// RB end

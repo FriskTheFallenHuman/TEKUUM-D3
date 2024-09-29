@@ -2817,7 +2817,7 @@ void idRenderBackend::DrawStencilShadowPass( const drawSurf_t* drawSurf, const b
 	{
 		// Z-pass
 		uint64_t stencil = GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_KEEP | GLS_STENCIL_OP_PASS_INCR
-						 | GLS_BACK_STENCIL_OP_FAIL_KEEP | GLS_BACK_STENCIL_OP_ZFAIL_KEEP | GLS_BACK_STENCIL_OP_PASS_DECR;
+						   | GLS_BACK_STENCIL_OP_FAIL_KEEP | GLS_BACK_STENCIL_OP_ZFAIL_KEEP | GLS_BACK_STENCIL_OP_PASS_DECR;
 
 		GL_State( ( glStateBits & ~GLS_STENCIL_OP_BITS ) | stencil );
 	}
@@ -2825,7 +2825,7 @@ void idRenderBackend::DrawStencilShadowPass( const drawSurf_t* drawSurf, const b
 	{
 		// preload + Z-pass
 		uint64_t stencil = GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_DECR | GLS_STENCIL_OP_PASS_DECR
-						 | GLS_BACK_STENCIL_OP_FAIL_KEEP | GLS_BACK_STENCIL_OP_ZFAIL_INCR | GLS_BACK_STENCIL_OP_PASS_INCR;
+						   | GLS_BACK_STENCIL_OP_FAIL_KEEP | GLS_BACK_STENCIL_OP_ZFAIL_INCR | GLS_BACK_STENCIL_OP_PASS_INCR;
 
 		GL_State( ( glStateBits & ~GLS_STENCIL_OP_BITS ) | stencil );
 	}
@@ -2833,7 +2833,7 @@ void idRenderBackend::DrawStencilShadowPass( const drawSurf_t* drawSurf, const b
 	{
 		// Z-fail (Carmack's Reverse)
 		uint64_t stencil = GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_DECR | GLS_STENCIL_OP_PASS_KEEP
-						 | GLS_BACK_STENCIL_OP_FAIL_KEEP | GLS_BACK_STENCIL_OP_ZFAIL_INCR | GLS_BACK_STENCIL_OP_PASS_KEEP;
+						   | GLS_BACK_STENCIL_OP_FAIL_KEEP | GLS_BACK_STENCIL_OP_ZFAIL_INCR | GLS_BACK_STENCIL_OP_PASS_KEEP;
 
 		GL_State( ( glStateBits & ~GLS_STENCIL_OP_BITS ) | stencil );
 	}
@@ -2904,7 +2904,7 @@ void idRenderBackend::DrawStencilShadowPass( const drawSurf_t* drawSurf, const b
 	{
 		// render again with Z-pass
 		uint64_t stencil = GLS_STENCIL_OP_FAIL_KEEP | GLS_STENCIL_OP_ZFAIL_KEEP | GLS_STENCIL_OP_PASS_INCR
-						 | GLS_BACK_STENCIL_OP_FAIL_KEEP | GLS_BACK_STENCIL_OP_ZFAIL_KEEP | GLS_BACK_STENCIL_OP_PASS_DECR;
+						   | GLS_BACK_STENCIL_OP_FAIL_KEEP | GLS_BACK_STENCIL_OP_ZFAIL_KEEP | GLS_BACK_STENCIL_OP_PASS_DECR;
 
 		GL_State( ( glStateBits & ~GLS_STENCIL_OP_BITS ) | stencil );
 

@@ -79,6 +79,15 @@ SURFACES
 #include "ModelOverlay.h"
 #include "Interaction.h"
 
+// RB begin
+#define MOC_MULTITHREADED 0
+
+#if MOC_MULTITHREADED
+	class CullingThreadpool;
+#endif
+class MaskedOcclusionCulling;
+// RB end
+
 class idRenderWorldLocal;
 struct viewEntity_t;
 struct viewLight_t;
@@ -309,7 +318,6 @@ public:
 	int						dynamicModelFrameCount;	// continuously animating dynamic models will recreate
 	// dynamicModel if this doesn't == tr.viewCount
 	idRenderModel* 			cachedDynamicModel;
-
 
 	// the local bounds used to place entityRefs, either from parms for dynamic entities, or a model bounds
 	idBounds				localReferenceBounds;
@@ -983,6 +991,17 @@ public:
 
 	idRenderBackend			backend;
 
+#if defined(USE_INTRINSICS_SSE)
+
+#if MOC_MULTITHREADED
+	CullingThreadpool*		maskedOcclusionThreaded;
+#endif
+	MaskedOcclusionCulling*	maskedOcclusionCulling;
+	idVec4					maskedUnitCubeVerts[8];
+	idVec4					maskedZeroOneCubeVerts[8];
+	unsigned int			maskedZeroOneCubeIndexes[36];
+#endif
+
 private:
 	bool					bInitialized;
 };
@@ -1200,6 +1219,8 @@ extern idCVar r_showLightGrid;				// show Quake 3 style light grid points
 extern idCVar r_useLightGrid;
 
 extern idCVar r_exposure;
+
+extern idCVar r_useMaskedOcclusionCulling;
 // RB end
 
 /*
@@ -1447,6 +1468,16 @@ void R_LinkDrawSurfToView( drawSurf_t* drawSurf, viewDef_t* viewDef );
 void R_AddModels();
 
 /*
+============================================================
+
+TR_FRONTEND_MASKED_OCCLUSION_CULLING
+
+============================================================
+*/
+
+void R_FillMaskedOcclusionBufferWithModels( viewDef_t* viewDef );
+
+/*
 =============================================================
 
 TR_FRONTEND_DEFORM
@@ -1514,6 +1545,7 @@ int					R_TriSurfMemory( const srfTriangles_t* tri );
 void				R_BoundTriSurf( srfTriangles_t* tri );
 void				R_RemoveDuplicatedTriangles( srfTriangles_t* tri );
 void				R_CreateSilIndexes( srfTriangles_t* tri );
+void				R_CreateMaskedOcclusionCullingTris( srfTriangles_t* tri ); // RB
 void				R_RemoveDegenerateTriangles( srfTriangles_t* tri );
 void				R_RemoveUnusedVerts( srfTriangles_t* tri );
 void				R_RangeCheckIndexes( const srfTriangles_t* tri );

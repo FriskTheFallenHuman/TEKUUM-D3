@@ -29,7 +29,6 @@ Extra attributions can be found on the CREDITS.txt file
 
 class idJointMat;
 struct deformInfo_t;
-class ColladaParser;	// RB: Collada support
 struct objModel_t;		// RB: Wavefront OBJ support
 
 class idRenderModelStatic : public idRenderModel

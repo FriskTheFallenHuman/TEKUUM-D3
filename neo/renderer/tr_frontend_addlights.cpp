@@ -21,6 +21,14 @@ Extra attributions can be found on the CREDITS.txt file
 
 #include "RenderCommon.h"
 
+#if defined( USE_INTRINSICS_SSE )
+	#if MOC_MULTITHREADED
+		#include "CullingThreadPool.h"
+	#else
+		#include "../libs/moc/MaskedOcclusionCulling.h"
+	#endif
+#endif
+
 extern idCVar r_useAreasConnectedForShadowCulling;
 extern idCVar r_useParallelAddShadows;
 extern idCVar r_forceShadowCaps;
@@ -253,6 +261,96 @@ static void R_AddSingleLight( viewLight_t* vLight )
 		vLight->scissorRect.Intersect( lightScissorRect );
 		vLight->scissorRect.zmin = projected[0][2];
 		vLight->scissorRect.zmax = projected[1][2];
+
+		const bool viewInsideLight = !idRenderMatrix::CullPointToMVP( light->baseLightProject, viewDef->renderView.vieworg, true );
+
+		// RB: test surface visibility by drawing the triangles of the bounds
+#if defined(USE_INTRINSICS_SSE)
+
+		// FIXME spot light projections are too short
+		if( r_useMaskedOcclusionCulling.GetBool() && !viewInsideLight && !viewDef->isMirror && !viewDef->isSubview )
+		{
+			idVec4 triVerts[8];
+			unsigned int triIndices[] = { 0, 1, 2 };
+
+			tr.pc.c_mocIndexes += 36;
+			tr.pc.c_mocVerts += 8;
+
+			idRenderMatrix invProjectMVPMatrix;
+			idRenderMatrix::Multiply( viewDef->worldSpace.mvp, light->inverseBaseLightProject, invProjectMVPMatrix );
+			//idRenderMatrix::Multiply( viewDef->worldSpace.unjitteredMVP, light->inverseBaseLightProject, invProjectMVPMatrix );
+
+			tr.pc.c_mocTests += 1;
+
+			float wmin = idMath::INFINITUM;
+
+			// NOTE: zeroToOne cube is only for lights and models need the unit cube
+			idVec4* verts = tr.maskedZeroOneCubeVerts;
+			for( int i = 0; i < 8; i++ )
+			{
+				// transform to clip space
+				invProjectMVPMatrix.TransformPoint( verts[i], triVerts[i] );
+
+				float w = triVerts[i].w;
+				if( i == 0 )
+				{
+					wmin = w;
+				}
+				else if( w < wmin )
+				{
+					wmin = w;
+				}
+			}
+
+			if( vLight->pointLight || vLight->parallel )
+			{
+#if 1
+				// backface none so objects are still visible where we run into
+#if MOC_MULTITHREADED
+				tr.maskedOcclusionThreaded->SetMatrix( NULL );
+				MaskedOcclusionCulling::CullingResult result = tr.maskedOcclusionThreaded->TestTriangles( ( float* )triVerts, tr.maskedZeroOneCubeIndexes, 12, MaskedOcclusionCulling::BACKFACE_NONE );
+#else
+				MaskedOcclusionCulling::CullingResult result = tr.maskedOcclusionCulling->TestTriangles( ( float* )triVerts, tr.maskedZeroOneCubeIndexes, 12, NULL, MaskedOcclusionCulling::BACKFACE_NONE );
+#endif
+				if( result != MaskedOcclusionCulling::VISIBLE )
+				{
+					tr.pc.c_mocCulledLights += 1;
+					return;
+				}
+#else
+				// draw for debugging
+				tr.maskedOcclusionCulling->RenderTriangles( ( float* )triVerts, triIndices, 1, NULL, MaskedOcclusionCulling::BACKFACE_NONE );
+				maskVisible = true;
+#endif
+			}
+			else
+			{
+				// scissor test alternative
+
+				// source scissor rectangle has GL convention and starts in the lower left corner
+				// convert to NDC values
+				float x1 = -1.0f + ( float( vLight->scissorRect.x1 ) / screenWidth ) * 2.0f;
+				float x2 = -1.0f + ( float( vLight->scissorRect.x2 ) / screenWidth ) * 2.0f;
+				float y1 = -1.0f + ( float( vLight->scissorRect.y1 ) / screenHeight ) * 2.0f;
+				float y2 = -1.0f + ( float( vLight->scissorRect.y2 ) / screenHeight ) * 2.0f;
+
+				float zmin = vLight->scissorRect.zmin;
+				//zmin = 2.0f * zmin -1.0f;
+				zmin = 1.0 - zmin; // reverse depth
+				float wmin2 = ( 1.0 / zmin );
+				wmin2 *= wmin;
+				wmin2 = Max( wmin2, 0.0f );
+
+				MaskedOcclusionCulling::CullingResult result = tr.maskedOcclusionCulling->TestRect( x1, y1, x2, y2, wmin2 );
+				if( result != MaskedOcclusionCulling::VISIBLE )
+				{
+					tr.pc.c_mocCulledLights += 1;
+					return;
+				}
+			}
+		}
+#endif
+		// RB end
 
 		// RB: calculate shadow LOD similar to Q3A .md3 LOD code
 		vLight->shadowLOD = 0;
