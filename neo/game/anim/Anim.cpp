@@ -19,6 +19,7 @@ Extra attributions can be found on the CREDITS.txt file
 #include "precompiled.h"
 #pragma hdrstop
 
+
 #include "../Game_local.h"
 
 idCVar binaryLoadAnim( "binaryLoadAnim", "1", 0, "enable binary load/write of idMD5Anim" );
@@ -166,7 +167,6 @@ idMD5Anim::LoadAnim
 */
 bool idMD5Anim::LoadAnim( const char* filename )
 {
-
 	idLexer	parser( LEXFL_ALLOWPATHNAMES | LEXFL_NOSTRINGESCAPECHARS | LEXFL_NOSTRINGCONCAT );
 	idToken	token;
 

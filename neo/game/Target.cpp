@@ -753,6 +753,7 @@ void idTarget_SetModel::Spawn()
 	{
 		// precache the render model
 		renderModelManager->FindModel( model );
+
 		// precache .cm files only
 		collisionModelManager->LoadModel( model, true );
 	}
@@ -1197,6 +1198,7 @@ void idTarget_SetInfluence::Event_Activate( idEntity* activator )
 			continue;
 		}
 		update = false;
+
 		for( j = 0; j < MAX_RENDERENTITY_GUI; j++ )
 		{
 			if( ent->GetRenderEntity()->gui[ j ] && ent->spawnArgs.FindKey( j == 0 ? "gui_demonic" : va( "gui_demonic%d", j + 1 ) ) )

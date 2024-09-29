@@ -176,12 +176,16 @@ class idFileSystem
 {
 public:
 	virtual					~idFileSystem() {}
+
 	// Initializes the file system.
 	virtual void			Init() = 0;
+
 	// Restarts the file system.
 	virtual void			Restart() = 0;
+
 	// Shutdown the file system.
 	virtual void			Shutdown( bool reloading ) = 0;
+
 	// Returns true if the file system is initialized.
 	virtual bool			IsInitialized() const = 0;
 	// Returns true if we are doing an fs_copyfiles.
@@ -198,6 +202,7 @@ public:
 	// The extension must include a leading dot and may not contain wildcards.
 	// If extension is "/", only subdirectories will be returned.
 	virtual idFileList* 	ListFiles( const char* relativePath, const char* extension, bool sort = false, bool fullRelativePath = false, const char* gamedir = NULL ) = 0;
+
 	// Lists files in the given directory and all subdirectories with the given extension.
 	// Directory should not have either a leading or trailing '/'
 	// The returned files include a full relative path.
@@ -205,8 +210,10 @@ public:
 	virtual idFileList* 	ListFilesTree( const char* relativePath, const char* extension, bool sort = false, const char* gamedir = NULL ) = 0;
 	// Frees the given file list.
 	virtual void			FreeFileList( idFileList* fileList ) = 0;
+
 	// Converts a relative path to a full OS path.
 	virtual const char* 	OSPathToRelativePath( const char* OSPath ) = 0;
+
 	// Converts a full OS path to a relative path.
 	virtual const char* 	RelativePathToOSPath( const char* relativePath, const char* basePath = "fs_devpath" ) = 0;
 	// Builds a full OS path from the given components.
@@ -246,27 +253,34 @@ public:
 	// A 0 byte will always be appended at the end, so string ops are safe.
 	// The buffer should be considered read-only, because it may be cached for other uses.
 	virtual int				ReadFile( const char* relativePath, void** buffer, ID_TIME_T* timestamp = NULL ) = 0;
+
 	// Frees the memory allocated by ReadFile.
 	virtual void			FreeFile( void* buffer ) = 0;
+
 	// Writes a complete file, will create any needed subdirectories.
 	// Returns the length of the file, or -1 on failure.
 	virtual int				WriteFile( const char* relativePath, const void* buffer, int size, const char* basePath = "fs_savepath" ) = 0;
+
 	// Removes the given file.
 	virtual void			RemoveFile( const char* relativePath ) = 0;
 	// Opens a file for reading.
 	virtual idFile* 		OpenFileRead( const char* relativePath, bool allowCopyFiles = true, const char* gamedir = NULL ) = 0;
-	// RB: from BFG code
+
 	// Opens a file for reading, reads the file completely in memory and returns an idFile_Memory obj.
 	virtual idFile* 		OpenFileReadMemory( const char* relativePath, bool allowCopyFiles = true, const char* gamedir = NULL ) = 0;
-	// RB end
+
 	// Opens a file for writing, will create any needed subdirectories.
 	virtual idFile* 		OpenFileWrite( const char* relativePath, const char* basePath = "fs_savepath" ) = 0;
+
 	// Opens a file for writing at the end.
 	virtual idFile* 		OpenFileAppend( const char* filename, bool sync = false, const char* basePath = "fs_basepath" ) = 0;
+
 	// Opens a file for reading, writing, or appending depending on the value of mode.
 	virtual idFile* 		OpenFileByMode( const char* relativePath, fsMode_t mode ) = 0;
+
 	// Opens a file for reading from a full OS path.
 	virtual idFile* 		OpenExplicitFileRead( const char* OSPath ) = 0;
+
 	// Opens a file for writing to a full OS path.
 	virtual idFile* 		OpenExplicitFileWrite( const char* OSPath ) = 0;
 	// Closes a file.

@@ -21,10 +21,6 @@ Extra attributions can be found on the CREDITS.txt file
 
 #include "../RenderCommon.h"
 
-
-
-
-
 /*
 ================
 idRenderBackend::DBG_SimpleSurfaceSetup

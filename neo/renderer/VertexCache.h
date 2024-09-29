@@ -18,7 +18,7 @@ Extra attributions can be found on the CREDITS.txt file
 #ifndef __VERTEXCACHE_H__
 #define __VERTEXCACHE_H__
 
-#if 0
+#if 1
 
 	// RB: increased some static memory limits for custom modder content
 
@@ -29,7 +29,7 @@ Extra attributions can be found on the CREDITS.txt file
 	// there are a lot more static indexes than vertexes, because interactions are just new
 	// index lists that reference existing vertexes
 	const int STATIC_INDEX_MEMORY = 4 * 31 * 1024 * 1024;
-	const int STATIC_VERTEX_MEMORY = 4 * 31 * 1024 * 1024;	// make sure it fits in VERTCACHE_OFFSET_MASK!
+	const int STATIC_VERTEX_MEMORY = 2 * 31 * 1024 * 1024;	// make sure it fits in VERTCACHE_OFFSET_MASK!
 
 	// vertCacheHandle_t packs size, offset, and frame number into 64 bits
 	typedef uint64_t vertCacheHandle_t;
@@ -39,10 +39,10 @@ Extra attributions can be found on the CREDITS.txt file
 	const int VERTCACHE_SIZE_MASK = 0x7fffff;			// 23 bits = 8 megs
 
 	const int VERTCACHE_OFFSET_SHIFT = 24;
-	const int VERTCACHE_OFFSET_MASK = 0x1ffffff << 2;	// 27 bits = 128 megs
+	const int VERTCACHE_OFFSET_MASK = 0x3ffffff;		// 26 bits = 64 megs
 
-	const int VERTCACHE_FRAME_SHIFT = 51;
-	const int VERTCACHE_FRAME_MASK = 0x1fff;			// 13 bits = 8191 frames to wrap around
+	const int VERTCACHE_FRAME_SHIFT = 50;
+	const int VERTCACHE_FRAME_MASK = 0x3fff;			// 14 bits = 16382 frames to wrap around
 
 
 #else
@@ -66,7 +66,7 @@ Extra attributions can be found on the CREDITS.txt file
 	const int VERTCACHE_OFFSET_SHIFT = 24;
 	const int VERTCACHE_OFFSET_MASK = 0x1ffffff;	// 32 megs
 	const int VERTCACHE_FRAME_SHIFT = 49;
-	const int VERTCACHE_FRAME_MASK = 0x7fff;		// 15 bits = 32k frames to wrap around
+	const int VERTCACHE_FRAME_MASK = 0x7fff;		// 15 bits = 32k frames to wrap around, python hex( ( 1 << 15 ) - 1 )
 
 #endif
 

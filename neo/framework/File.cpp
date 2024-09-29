@@ -27,7 +27,7 @@ Extra attributions can be found on the CREDITS.txt file
 FS_WriteFloatString
 =================
 */
-int FS_WriteFloatString( char* buf, const char* fmt, va_list argPtr )
+int FS_WriteFloatString( char* buf, int bufsize, const char* fmt, va_list argPtr )
 {
 	int i;
 	unsigned int u;
@@ -65,44 +65,44 @@ int FS_WriteFloatString( char* buf, const char* fmt, va_list argPtr )
 							sprintf( tmp, "%1.10f", f );
 							tmp.StripTrailing( '0' );
 							tmp.StripTrailing( '.' );
-							index += sprintf( buf + index, "%s", tmp.c_str() );
+							index += idStr::snPrintf( buf + index, bufsize - index, "%s", tmp.c_str() );
 						}
 						else
 						{
-							index += sprintf( buf + index, format.c_str(), f );
+							index += idStr::snPrintf( buf + index, bufsize - index, format.c_str(), f );
 						}
 						break;
 					case 'd':
 					case 'i':
 						i = va_arg( argPtr, int );
-						index += sprintf( buf + index, format.c_str(), i );
+						index += idStr::snPrintf( buf + index, bufsize - index, format.c_str(), i );
 						break;
 					case 'u':
 						u = va_arg( argPtr, unsigned int );
-						index += sprintf( buf + index, format.c_str(), u );
+						index += idStr::snPrintf( buf + index, bufsize - index, format.c_str(), u );
 						break;
 					case 'o':
 						u = va_arg( argPtr, unsigned int );
-						index += sprintf( buf + index, format.c_str(), u );
+						index += idStr::snPrintf( buf + index, bufsize - index, format.c_str(), u );
 						break;
 					case 'x':
 						u = va_arg( argPtr, unsigned int );
-						index += sprintf( buf + index, format.c_str(), u );
+						index += idStr::snPrintf( buf + index, bufsize - index, format.c_str(), u );
 						break;
 					case 'X':
 						u = va_arg( argPtr, unsigned int );
-						index += sprintf( buf + index, format.c_str(), u );
+						index += idStr::snPrintf( buf + index, bufsize - index, format.c_str(), u );
 						break;
 					case 'c':
 						i = va_arg( argPtr, int );
-						index += sprintf( buf + index, format.c_str(), ( char ) i );
+						index += idStr::snPrintf( buf + index, bufsize - index, format.c_str(), ( char ) i );
 						break;
 					case 's':
 						str = va_arg( argPtr, char* );
-						index += sprintf( buf + index, format.c_str(), str );
+						index += idStr::snPrintf( buf + index, bufsize - index, format.c_str(), str );
 						break;
 					case '%':
-						index += sprintf( buf + index, "%s", format.c_str() );
+						index += idStr::snPrintf( buf + index, bufsize - index, "%s", format.c_str() );
 						break;
 					default:
 						common->Error( "FS_WriteFloatString: invalid format %s", format.c_str() );
@@ -115,16 +115,16 @@ int FS_WriteFloatString( char* buf, const char* fmt, va_list argPtr )
 				switch( *fmt )
 				{
 					case 't':
-						index += sprintf( buf + index, "\t" );
+						index += idStr::snPrintf( buf + index, bufsize - index, "\t" );
 						break;
 					case 'v':
-						index += sprintf( buf + index, "\v" );
+						index += idStr::snPrintf( buf + index, bufsize - index, "\v" );
 						break;
 					case 'n':
-						index += sprintf( buf + index, "\n" );
+						index += idStr::snPrintf( buf + index, bufsize - index, "\n" );
 						break;
 					case '\\':
-						index += sprintf( buf + index, "\\" );
+						index += idStr::snPrintf( buf + index, bufsize - index, "\\" );
 						break;
 					default:
 						common->Error( "FS_WriteFloatString: unknown escape character \'%c\'", *fmt );
@@ -133,7 +133,7 @@ int FS_WriteFloatString( char* buf, const char* fmt, va_list argPtr )
 				fmt++;
 				break;
 			default:
-				index += sprintf( buf + index, "%c", *fmt );
+				index += idStr::snPrintf( buf + index, bufsize - index, "%c", *fmt );
 				fmt++;
 				break;
 		}
@@ -268,10 +268,11 @@ idFile::Printf
 int idFile::Printf( const char* fmt, ... )
 {
 	char buf[MAX_PRINT_MSG];
+	int length;
 	va_list argptr;
 
 	va_start( argptr, fmt );
-	idStr::vsnPrintf( buf, MAX_PRINT_MSG - 1, fmt, argptr );
+	length = idStr::vsnPrintf( buf, sizeof( buf ), fmt, argptr );
 	va_end( argptr );
 
 	// so notepad formats the lines correctly
@@ -291,7 +292,11 @@ int idFile::VPrintf( const char* fmt, va_list args )
 	char buf[MAX_PRINT_MSG];
 	int length;
 
-	length = idStr::vsnPrintf( buf, MAX_PRINT_MSG - 1, fmt, args );
+	length = idStr::vsnPrintf( buf, sizeof( buf ), fmt, args );
+	if( length < 0 )
+	{
+		length = sizeof( buf ) - 1;
+	}
 	return Write( buf, length );
 }
 
@@ -307,7 +312,7 @@ int idFile::WriteFloatString( const char* fmt, ... )
 	va_list argPtr;
 
 	va_start( argPtr, fmt );
-	len = FS_WriteFloatString( buf, fmt, argPtr );
+	len = FS_WriteFloatString( buf, sizeof( buf ), fmt, argPtr );
 	va_end( argPtr );
 
 	return Write( buf, len );
@@ -1396,6 +1401,13 @@ int idFile_Permanent::Write( const void* buffer, int len )
 
 	buf = ( byte* )buffer;
 
+	// Chillax
+	if( buf == NULL )
+	{
+		common->Printf( "idFile_Permanent::Write: buffer is null, 0 bytes written to %s\n", name.c_str() );
+		return 0;
+	}
+
 	remaining = len;
 	tries = 0;
 	while( remaining )
@@ -1653,7 +1665,13 @@ idFile_InZip::Tell
 */
 int idFile_InZip::Tell() const
 {
-	return unztell( z );
+	// DG: make sure the value fits into an int
+	// it's a long after all, and there'S also unztell64 that returns ZPOS64_T
+	// OTOH idFile in general seems to assume file-length <= INT_MAX so it may be ok..
+	z_off_t ret = unztell( z );
+	assert( ret <= INT_MAX );
+	return ret;
+	// DG end
 }
 
 /*

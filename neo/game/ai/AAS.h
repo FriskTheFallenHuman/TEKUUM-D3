@@ -72,7 +72,6 @@ class idAAS
 public:
 	static idAAS* 				Alloc();
 	virtual						~idAAS() = 0;
-
 	// Initialize for the given map.
 	virtual bool				Init( const idStr& mapName, unsigned int mapFileCRC ) = 0;
 	// Print AAS stats.

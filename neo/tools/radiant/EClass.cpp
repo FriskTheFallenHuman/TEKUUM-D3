@@ -419,7 +419,7 @@ eclass_t* Eclass_ForName( const char* name, bool has_brushes )
 		return NULL;
 	}
 	e->name = Mem_CopyString( name );
-	sprintf( buff, "%s not found in def/*.def\n", name );
+	idStr::snPrintf( buff, sizeof( buff ), "%s not found in def/*.def\n", name );
 	e->comments = Mem_CopyString( buff );
 	e->color.x = 0.0f;
 	e->color.y = 0.5f;

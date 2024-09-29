@@ -34,7 +34,6 @@ class idClip;
 class idClipModel;
 class idEntity;
 
-
 //===============================================================
 //
 //	idClipModel
@@ -50,12 +49,13 @@ public:
 	idClipModel();
 	explicit idClipModel( const char* name );
 	explicit idClipModel( const idTraceModel& trm );
+	explicit idClipModel( const idTraceModel& trm, bool persistantThroughSave );
 	explicit idClipModel( const int renderModelHandle );
 	explicit idClipModel( const idClipModel* model );
 	~idClipModel();
 
 	bool					LoadModel( const char* name );
-	void					LoadModel( const idTraceModel& trm );
+	void					LoadModel( const idTraceModel& trm, bool persistantThroughSave = true );
 	void					LoadModel( const int renderModelHandle );
 
 	void					Save( idSaveGame* savefile ) const;
@@ -120,10 +120,11 @@ private:
 	void					Init();			// initialize
 	void					Link_r( struct clipSector_s* node );
 
-	static int				AllocTraceModel( const idTraceModel& trm );
+	static int				AllocTraceModel( const idTraceModel& trm, bool persistantThroughSaves = true );
 	static void				FreeTraceModel( int traceModelIndex );
 	static idTraceModel* 	GetCachedTraceModel( int traceModelIndex );
 	static int				GetTraceModelHashKey( const idTraceModel& trm );
+	static struct trmCache_s* 		GetTraceModelEntry( int traceModelIndex );
 };
 
 

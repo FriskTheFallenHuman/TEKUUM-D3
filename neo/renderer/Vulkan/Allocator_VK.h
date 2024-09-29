@@ -39,7 +39,7 @@ enum vulkanAllocationType_t
 	VULKAN_ALLOCATION_TYPES,
 };
 
-uint32 FindMemoryTypeIndex( const uint32 memoryTypeBits, const vulkanMemoryUsage_t usage );
+uint32_t FindMemoryTypeIndex( const uint32_t memoryTypeBits, const vulkanMemoryUsage_t usage );
 
 class idVulkanBlock;
 struct vulkanAllocation_t
@@ -55,7 +55,7 @@ struct vulkanAllocation_t
 	}
 
 	idVulkanBlock* block;
-	uint32			id;
+	uint32_t			id;
 	VkDeviceMemory	deviceMemory;
 	VkDeviceSize	offset;
 	VkDeviceSize	size;
@@ -74,7 +74,7 @@ class idVulkanBlock
 {
 	friend class idVulkanAllocator;
 public:
-	idVulkanBlock( const uint32 memoryTypeIndex, const VkDeviceSize size, vulkanMemoryUsage_t usage );
+	idVulkanBlock( const uint32_t memoryTypeIndex, const VkDeviceSize size, vulkanMemoryUsage_t usage );
 	~idVulkanBlock();
 
 	bool				Init();
@@ -86,8 +86,8 @@ public:
 	}
 
 	bool				Allocate(
-		const uint32 size,
-		const uint32 align,
+		const uint32_t size,
+		const uint32_t align,
 		const VkDeviceSize granularity,
 		const vulkanAllocationType_t allocType,
 		vulkanAllocation_t& allocation );
@@ -98,7 +98,7 @@ public:
 private:
 	struct chunk_t
 	{
-		uint32					id;
+		uint32_t					id;
 		VkDeviceSize			size;
 		VkDeviceSize			offset;
 		chunk_t* 				prev;
@@ -107,8 +107,8 @@ private:
 	};
 	chunk_t* 			head;
 
-	uint32				nextBlockId;
-	uint32				memoryTypeIndex;
+	uint32_t				nextBlockId;
+	uint32_t				memoryTypeIndex;
 	vulkanMemoryUsage_t	usage;
 	VkDeviceMemory		deviceMemory;
 	VkDeviceSize		size;
@@ -135,9 +135,9 @@ public:
 	void					Shutdown();
 
 	vulkanAllocation_t			Allocate(
-		const uint32 size,
-		const uint32 align,
-		const uint32 memoryTypeBits,
+		const uint32_t size,
+		const uint32_t align,
+		const uint32_t memoryTypeBits,
 		const vulkanMemoryUsage_t usage,
 		const vulkanAllocationType_t allocType );
 	void					Free( const vulkanAllocation_t allocation );

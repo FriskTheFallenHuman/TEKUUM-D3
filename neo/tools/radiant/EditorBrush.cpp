@@ -1912,28 +1912,6 @@ idEditorBrush* Brush_Parse( idVec3 origin )
 
 /*
 ================
-QERApp_MapPrintf_FILE
-
-  callback for surface properties plugin must fit a PFN_QERAPP_MAPPRINTF ( see isurfaceplugin.h )
-  carefully initialize !
-================
-*/
-FILE*	g_File;
-
-void WINAPI QERApp_MapPrintf_FILE( char* text, ... )
-{
-	va_list argptr;
-	char	buf[32768];
-
-	va_start( argptr, text );
-	vsprintf( buf, text, argptr );
-	va_end( argptr );
-
-	fprintf( g_File, buf );
-}
-
-/*
-================
 Brush_SetEpair
 
   sets an epair for the given brush

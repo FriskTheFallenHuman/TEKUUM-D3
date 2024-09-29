@@ -134,19 +134,19 @@ Box definition
 */
 
 /*
-            4----{E}---5
+			4----{E}---5
  +         /|         /|
  Z      {H} {I}    {F} |
  -     /    |     /   {J}
-      7--{G}-----6     |
-      |     |    |     |
-     {L}    0----|-{A}-1
-      |    /    {K}   /       -
-      | {D}      | {B}       Y
-      |/         |/         +
-      3---{C}----2
+	  7--{G}-----6     |
+	  |     |    |     |
+	 {L}    0----|-{A}-1
+	  |    /    {K}   /       -
+	  | {D}      | {B}       Y
+	  |/         |/         +
+	  3---{C}----2
 
-	    - X +
+		- X +
 */
 
 static const short boxPolygonVertices[6][4] =
@@ -200,7 +200,7 @@ public:
 				}
 			}
 			char buffer[1024];
-			sprintf( buffer, "{ { %d, %d, %d, %d, %d, %d, %d }, %d }, // %s = %d%s\n",
+			idStr::snPrintf( buffer, sizeof( buffer ), "{ { %d, %d, %d, %d, %d, %d, %d }, %d }, // %s = %d%s\n",
 								frontPolygons[0], frontPolygons[1], frontPolygons[2], frontPolygons[3],
 								frontPolygons[4], frontPolygons[5], frontPolygons[6],
 								numFrontPolygons, bits, i, comment );
@@ -312,7 +312,7 @@ public:
 				comment = " inside the box, every edge is considered part of the silhouette";
 			}
 			char buffer[1024];
-			sprintf( buffer, "{ { %2d, %2d, %2d, %2d, %2d, %2d, %2d, %2d, %2d, %2d, %2d, %2d }, %2d }, // %s = %d%s\n",
+			idStr::snPrintf( buffer, sizeof( buffer ), "{ { %2d, %2d, %2d, %2d, %2d, %2d, %2d, %2d, %2d, %2d, %2d, %2d }, %2d }, // %s = %d%s\n",
 								silhouetteEdges[0], silhouetteEdges[1], silhouetteEdges[2], silhouetteEdges[3],
 								silhouetteEdges[4], silhouetteEdges[5], silhouetteEdges[6], silhouetteEdges[7],
 								silhouetteEdges[8], silhouetteEdges[9], silhouetteEdges[10], silhouetteEdges[11],
@@ -452,7 +452,7 @@ public:
 				comment = " inside the box, no silhouette";
 			}
 			char buffer[1024];
-			sprintf( buffer, "{ { %d, %d, %d, %d, %d, %d, %d }, %d }, // %s = %d%s\n",
+			idStr::snPrintf( buffer, sizeof( buffer ), "{ { %d, %d, %d, %d, %d, %d, %d }, %d }, // %s = %d%s\n",
 								silhouetteVertices[0], silhouetteVertices[1], silhouetteVertices[2], silhouetteVertices[3],
 								silhouetteVertices[4], silhouetteVertices[5], silhouetteVertices[6], numSilhouetteVertices, bits, i, comment );
 			OutputDebugString( buffer );
@@ -2527,19 +2527,19 @@ completely branchless SIMD.
 void idRenderMatrix::ProjectedNearClippedBounds( idBounds& projected, const idRenderMatrix& mvp, const idBounds& bounds, bool windowSpace )
 {
 	/*
-	            4----{E}---5
+				4----{E}---5
 	 +         /|         /|
 	 Z      {H} {I}    {F} |
 	 -     /    |     /   {J}
-	      7--{G}-----6     |
-	      |     |    |     |
-	     {L}    0----|-{A}-1
-	      |    /    {K}   /       -
-	      | {D}      | {B}       Y
-	      |/         |/         +
-	      3---{C}----2
+		  7--{G}-----6     |
+		  |     |    |     |
+		 {L}    0----|-{A}-1
+		  |    /    {K}   /       -
+		  | {D}      | {B}       Y
+		  |/         |/         +
+		  3---{C}----2
 
-		    - X +
+			- X +
 	*/
 
 #if defined(USE_INTRINSICS_SSE)

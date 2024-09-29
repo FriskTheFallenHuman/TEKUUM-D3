@@ -483,7 +483,7 @@ idStr extensions_string;
 
 /*
 ==================
-R_InitOpenGL
+R_InitBackend
 
 This function is responsible for initializing a valid OpenGL subsystem
 for rendering.  This is done by calling the system specific GLimp_Init,
@@ -499,11 +499,11 @@ and model information functions.
 */
 void idRenderBackend::Init()
 {
-	common->Printf( "----- R_InitOpenGL -----\n" );
+	common->Printf( "----- R_InitBackend -----\n" );
 
 	if( tr.IsInitialized() )
 	{
-		common->FatalError( "R_InitOpenGL called while active" );
+		common->FatalError( "R_InitBackend called while active" );
 	}
 
 	// DG: make sure SDL has setup video so getting supported modes in R_SetNewMode() works

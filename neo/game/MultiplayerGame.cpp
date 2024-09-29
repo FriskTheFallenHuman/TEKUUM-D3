@@ -615,7 +615,7 @@ const char* idMultiplayerGame::GameTime()
 		}
 		else
 		{
-			sprintf( buff, "WMP %i", s );
+			idStr::snPrintf( buff, sizeof( buff ), "WMP %i", s);
 		}
 	}
 	else
@@ -641,7 +641,7 @@ const char* idMultiplayerGame::GameTime()
 		s -= t * 10; // => s < 10
 		// writing <= 5 for m + 3 bytes for ":ts" + 1 byte for \0 => 16 bytes is enough
 
-		sprintf( buff, "%i:%i%i", m, t, s );
+		idStr::snPrintf( buff, sizeof( buff ), "%i:%i%i", m, t, s );
 	}
 	return &buff[0];
 }
@@ -1787,7 +1787,14 @@ void idMultiplayerGame::UpdateMainGui()
 	if( gameLocal.gameType == GAME_TDM )
 	{
 		idPlayer* p = gameLocal.GetClientByNum( gameLocal.localClientNum );
-		mainGui->SetStateInt( "team", p->team );
+		if( p )
+		{
+			mainGui->SetStateInt( "team", p->team );
+		}
+		else
+		{
+			mainGui->SetStateInt( "team", 0 );
+		}
 	}
 	// setup vote
 	mainGui->SetStateInt( "voteon", ( vote != VOTE_NONE && !voted ) ? 1 : 0 );
@@ -2609,11 +2616,17 @@ void idMultiplayerGame::PlayGlobalSound( int to, snd_evt_t evt, const char* shad
 	{
 		if( shader )
 		{
-			gameSoundWorld->PlayShaderDirectly( shader );
+			if( gameSoundWorld )
+			{
+				gameSoundWorld->PlayShaderDirectly( shader );
+			}
 		}
 		else
 		{
-			gameSoundWorld->PlayShaderDirectly( GlobalSoundStrings[ evt ] );
+			if( gameSoundWorld )
+			{
+				gameSoundWorld->PlayShaderDirectly( GlobalSoundStrings[ evt ] );
+			}
 		}
 	}
 
@@ -3366,7 +3379,7 @@ void idMultiplayerGame::ServerCallVote( int clientNum, const idBitMsg& msg )
 			}
 			int				num = fileSystem->GetNumMaps();
 			int				i;
-			const idDict*	dict;
+			const idDict*	dict = nullptr;
 			bool			haveMap = false;
 			for( i = 0; i < num; i++ )
 			{

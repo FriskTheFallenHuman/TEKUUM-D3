@@ -327,7 +327,6 @@ public:
 #include "Swap.h"
 #include "Callback.h"
 #include "ParallelJobList.h"
-
 #include "SoftwareCache.h"
 #include "TileMap.h" // RB
 

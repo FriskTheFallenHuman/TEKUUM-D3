@@ -584,6 +584,7 @@ void idDeviceContext::DrawMaterialRect( float x, float y, float w, float h, floa
 
 void idDeviceContext::SetCursor( int n )
 {
+
 	if( n > CURSOR_ARROW && n < CURSOR_COUNT )
 	{
 
@@ -1121,9 +1122,10 @@ char* idRectangle::String() const
 
 	// use an array so that multiple toString's won't collide
 	s = str[ index ];
-	index = ( index + 1 ) & 7;
 
-	sprintf( s, "%.2f %.2f %.2f %.2f", x, y, w, h );
+	idStr::snPrintf( s, sizeof( str[ index ] ), "%.2f %.2f %.2f %.2f", x, y, w, h );
+
+	index = ( index + 1 ) & 7;
 
 	return s;
 }

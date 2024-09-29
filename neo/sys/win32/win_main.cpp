@@ -27,6 +27,7 @@ Extra attributions can be found on the CREDITS.txt file
 #include <conio.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <VersionHelpers.h>
 
 #ifndef __MRC__
 	#include <sys/types.h>
@@ -948,20 +949,9 @@ void Sys_Init()
 	//
 	// Windows version
 	//
-	win32.osversion.dwOSVersionInfoSize = sizeof( win32.osversion );
-
-	if( !GetVersionEx( ( LPOSVERSIONINFO )&win32.osversion ) )
+	if( !IsWindowsXPOrGreater() )
 	{
-		Sys_Error( "Couldn't get OS info" );
-	}
-
-	if( win32.osversion.dwMajorVersion < 4 )
-	{
-		Sys_Error( GAME_NAME " requires Windows version 4 (NT) or greater" );
-	}
-	if( win32.osversion.dwPlatformId == VER_PLATFORM_WIN32s )
-	{
-		Sys_Error( GAME_NAME " doesn't run on Win32s" );
+		Sys_Error( GAME_NAME " requires Windows XP or greater" );
 	}
 
 	//

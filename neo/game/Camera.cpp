@@ -21,6 +21,11 @@ Extra attributions can be found on the CREDITS.txt file
 
 #include "Game_local.h"
 
+
+static const byte BCANIM_VERSION = 101;
+static const unsigned int BCANIM_MAGIC = ( 'A' << 24 ) | ( 'C' << 16 ) | ( 'B' << 8 ) | BCANIM_VERSION;
+#define CAMERA_ANIM_BINARYFILE_EXT	"bcanim"
+
 /*
 ===============================================================================
 
@@ -353,6 +358,8 @@ void idCameraAnim::LoadAnim()
 	int			i;
 	idStr		filename;
 	const char*	key;
+	int			animID = -1;
+	idStr		animName;
 
 	key = spawnArgs.GetString( "anim" );
 	if( !key )
@@ -366,123 +373,103 @@ void idCameraAnim::LoadAnim()
 		gameLocal.Error( "Missing 'anim %s' key on '%s'", key, name.c_str() );
 	}
 
-	filename.SetFileExtension( MD5_CAMERA_EXT );
-	if( !parser.LoadFile( filename ) )
+
+	// check for generated file
+	idStrStatic< MAX_OSPATH > generatedFileName = "generated/cameraanim/";
+	generatedFileName.AppendPath( key );
+	generatedFileName.SetFileExtension( CAMERA_ANIM_BINARYFILE_EXT );
+
+	ID_TIME_T currentTimeStamp = FILE_NOT_FOUND_TIMESTAMP;
+	currentTimeStamp = fileSystem->GetTimestamp( key );
+
+	// if we are reloading the same map, check the timestamp
+	// and try to skip all the work
+	ID_TIME_T generatedTimeStamp = fileSystem->GetTimestamp( generatedFileName );
+	ID_TIME_T sourceTimeStamp = currentTimeStamp;
+
+
+	if( ( generatedTimeStamp != FILE_NOT_FOUND_TIMESTAMP ) && ( sourceTimeStamp != 0 ) && ( sourceTimeStamp < generatedTimeStamp ) )
 	{
-		gameLocal.Error( "Unable to load '%s' on '%s'", filename.c_str(), name.c_str() );
+		idFileLocal file( fileSystem->OpenFileReadMemory( generatedFileName ) );
+		LoadBinaryCamAnim( file, currentTimeStamp );
 	}
-
-	cameraCuts.Clear();
-	cameraCuts.SetGranularity( 1 );
-	camera.Clear();
-	camera.SetGranularity( 1 );
-
-	parser.ExpectTokenString( MD5_VERSION_STRING );
-	version = parser.ParseInt();
-	if( version != MD5_VERSION )
+	else
 	{
-		parser.Error( "Invalid version %d.  Should be version %d\n", version, MD5_VERSION );
-	}
-
-	// skip the commandline
-	parser.ExpectTokenString( "commandline" );
-	parser.ReadToken( &token );
-
-	// parse num frames
-	parser.ExpectTokenString( "numFrames" );
-	numFrames = parser.ParseInt();
-	if( numFrames <= 0 )
-	{
-		parser.Error( "Invalid number of frames: %d", numFrames );
-	}
-
-	// parse framerate
-	parser.ExpectTokenString( "frameRate" );
-	frameRate = parser.ParseInt();
-	if( frameRate <= 0 )
-	{
-		parser.Error( "Invalid framerate: %d", frameRate );
-	}
-
-	// parse num cuts
-	parser.ExpectTokenString( "numCuts" );
-	numCuts = parser.ParseInt();
-	if( ( numCuts < 0 ) || ( numCuts > numFrames ) )
-	{
-		parser.Error( "Invalid number of camera cuts: %d", numCuts );
-	}
-
-	// parse the camera cuts
-	parser.ExpectTokenString( "cuts" );
-	parser.ExpectTokenString( "{" );
-	cameraCuts.SetNum( numCuts );
-	for( i = 0; i < numCuts; i++ )
-	{
-		cameraCuts[ i ] = parser.ParseInt();
-		if( ( cameraCuts[ i ] < 1 ) || ( cameraCuts[ i ] >= numFrames ) )
+		filename.SetFileExtension( MD5_CAMERA_EXT );
+		if( !parser.LoadFile( filename ) )
 		{
-			parser.Error( "Invalid camera cut" );
+			gameLocal.Error( "Unable to load '%s' on '%s'", filename.c_str(), name.c_str() );
 		}
+
+		cameraCuts.Clear();
+		cameraCuts.SetGranularity( 1 );
+		camera.Clear();
+		camera.SetGranularity( 1 );
+
+		parser.ExpectTokenString( MD5_VERSION_STRING );
+		version = parser.ParseInt();
+		if( version != MD5_VERSION )
+		{
+			parser.Error( "Invalid version %d.  Should be version %d\n", version, MD5_VERSION );
+		}
+
+		// skip the commandline
+		parser.ExpectTokenString( "commandline" );
+		parser.ReadToken( &token );
+
+		// parse num frames
+		parser.ExpectTokenString( "numFrames" );
+		numFrames = parser.ParseInt();
+		if( numFrames <= 0 )
+		{
+			parser.Error( "Invalid number of frames: %d", numFrames );
+		}
+
+		// parse framerate
+		parser.ExpectTokenString( "frameRate" );
+		frameRate = parser.ParseInt();
+		if( frameRate <= 0 )
+		{
+			parser.Error( "Invalid framerate: %d", frameRate );
+		}
+
+		// parse num cuts
+		parser.ExpectTokenString( "numCuts" );
+		numCuts = parser.ParseInt();
+		if( ( numCuts < 0 ) || ( numCuts > numFrames ) )
+		{
+			parser.Error( "Invalid number of camera cuts: %d", numCuts );
+		}
+
+		// parse the camera cuts
+		parser.ExpectTokenString( "cuts" );
+		parser.ExpectTokenString( "{" );
+		cameraCuts.SetNum( numCuts );
+		for( i = 0; i < numCuts; i++ )
+		{
+			cameraCuts[ i ] = parser.ParseInt();
+			if( ( cameraCuts[ i ] < 1 ) || ( cameraCuts[ i ] >= numFrames ) )
+			{
+				parser.Error( "Invalid camera cut" );
+			}
+		}
+		parser.ExpectTokenString( "}" );
+
+		// parse the camera frames
+		parser.ExpectTokenString( "camera" );
+		parser.ExpectTokenString( "{" );
+		camera.SetNum( numFrames );
+		for( i = 0; i < numFrames; i++ )
+		{
+			parser.Parse1DMatrix( 3, camera[ i ].t.ToFloatPtr() );
+			parser.Parse1DMatrix( 3, camera[ i ].q.ToFloatPtr() );
+			camera[ i ].fov = parser.ParseFloat();
+		}
+		parser.ExpectTokenString( "}" );
+
+		idFileLocal file( fileSystem->OpenFileWrite( generatedFileName, "fs_devpath" ) );
+		WriteBinaryCamAnim( file );
 	}
-	parser.ExpectTokenString( "}" );
-
-	// parse the camera frames
-	parser.ExpectTokenString( "camera" );
-	parser.ExpectTokenString( "{" );
-	camera.SetNum( numFrames );
-	for( i = 0; i < numFrames; i++ )
-	{
-		parser.Parse1DMatrix( 3, camera[ i ].t.ToFloatPtr() );
-		parser.Parse1DMatrix( 3, camera[ i ].q.ToFloatPtr() );
-		camera[ i ].fov = parser.ParseFloat();
-	}
-	parser.ExpectTokenString( "}" );
-
-#if 0
-	if( !gameLocal.GetLocalPlayer() )
-	{
-		return;
-	}
-
-	idDebugGraph gGraph;
-	idDebugGraph tGraph;
-	idDebugGraph qGraph;
-	idDebugGraph dtGraph;
-	idDebugGraph dqGraph;
-	gGraph.SetNumSamples( numFrames );
-	tGraph.SetNumSamples( numFrames );
-	qGraph.SetNumSamples( numFrames );
-	dtGraph.SetNumSamples( numFrames );
-	dqGraph.SetNumSamples( numFrames );
-
-	gameLocal.Printf( "\n\ndelta vec:\n" );
-	float diff_t, last_t, t;
-	float diff_q, last_q, q;
-	diff_t = last_t = 0.0f;
-	diff_q = last_q = 0.0f;
-	for( i = 1; i < numFrames; i++ )
-	{
-		t = ( camera[ i ].t - camera[ i - 1 ].t ).Length();
-		q = ( camera[ i ].q.ToQuat() - camera[ i - 1 ].q.ToQuat() ).Length();
-		diff_t = t - last_t;
-		diff_q = q - last_q;
-		gGraph.AddValue( ( i % 10 ) == 0 );
-		tGraph.AddValue( t );
-		qGraph.AddValue( q );
-		dtGraph.AddValue( diff_t );
-		dqGraph.AddValue( diff_q );
-
-		gameLocal.Printf( "%d: %.8f  :  %.8f,     %.8f  :  %.8f\n", i, t, diff_t, q, diff_q );
-		last_t = t;
-		last_q = q;
-	}
-
-	gGraph.Draw( colorBlue, 300.0f );
-	tGraph.Draw( colorOrange, 60.0f );
-	dtGraph.Draw( colorYellow, 6000.0f );
-	qGraph.Draw( colorGreen, 60.0f );
-	dqGraph.Draw( colorCyan, 6000.0f );
-#endif
 }
 
 /*
@@ -756,6 +743,81 @@ void idCameraAnim::Event_Activate( idEntity* _activator )
 	{
 		Start();
 	}
+}
+
+/*
+===============
+idCameraAnim::WriteBinaryCamAnim
+================
+*/
+void idCameraAnim::WriteBinaryCamAnim( idFile* file, ID_TIME_T* _timeStamp /*= NULL*/ )
+{
+	if( file != NULL )
+	{
+		file->WriteBig( BCANIM_MAGIC );
+		file->WriteInt( frameRate );
+		file->WriteInt( cameraCuts.Num() );
+
+		for( auto cut : cameraCuts )
+		{
+			file->WriteInt( cut );
+		}
+
+		file->WriteInt( camera.Num() );
+
+		for( auto cam : camera )
+		{
+			file->WriteBig( cam.fov );
+			file->WriteBigArray( cam.q.ToFloatPtr(), 3 );
+			file->WriteVec3( cam.t );
+		}
+	}
+}
+
+/*
+===============
+idCameraAnim::LoadBinaryCamAnim
+================
+*/
+bool idCameraAnim::LoadBinaryCamAnim( idFile* file, const ID_TIME_T sourceTimeStamp )
+{
+	if( file != NULL )
+	{
+		unsigned int magic = 0;
+		file->ReadBig( magic );
+		if( magic != BCANIM_MAGIC )
+		{
+			return false;
+		}
+
+		file->ReadInt( frameRate );
+
+		int count = 0;
+
+		file->ReadInt( count );
+
+		for( int i = 0; i < count; i++ )
+		{
+			file->ReadInt( cameraCuts.Alloc() );
+		}
+
+		count = 0;
+
+		file->ReadInt( count );
+		int i = 0;
+		for( i = 0; i < count; i++ )
+		{
+			cameraFrame_t& cam = camera.Alloc();
+			file->ReadBig( cam.fov );
+			file->ReadBigArray( cam.q.ToFloatPtr(), 3 );
+			file->ReadVec3( cam.t );
+		}
+
+		assert( i == count );
+		return true;
+	}
+
+	return false;
 }
 
 /*

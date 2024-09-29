@@ -19,6 +19,7 @@ Extra attributions can be found on the CREDITS.txt file
 #include "precompiled.h"
 #pragma hdrstop
 
+
 #include "../Game_local.h"
 
 CLASS_DECLARATION( idForce, idForce_Drag )

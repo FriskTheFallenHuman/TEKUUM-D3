@@ -33,6 +33,7 @@ idUserInterfaceManager* 	uiManager = &uiManagerLocal;
 idDeviceContext* dc;
 
 idCVar g_useNewGuiCode(	"g_useNewGuiCode",	"1", CVAR_GAME | CVAR_INTEGER, "use optimized device context code, 2 = toggle on/off every frame" );
+//idCVar binaryLoadGuis( "binaryLoadGuis", "1", CVAR_NEW, "enable binary load/write of particle decls" );
 
 extern idCVar sys_lang;
 
@@ -96,7 +97,7 @@ void idUserInterfaceManagerLocal::WritePrecacheCommands( idFile* f )
 	for( int i = 0; i < c; i++ )
 	{
 		char	str[1024];
-		sprintf( str, "touchGui %s\n", guis[i]->Name() );
+		idStr::snPrintf( str, sizeof( str ), "touchGui %s\n", guis[i]->Name() );
 		common->Printf( "%s", str );
 		f->Printf( "%s", str );
 	}
@@ -110,6 +111,12 @@ void idUserInterfaceManagerLocal::SetSize( float width, float height )
 /*
 void idUserInterfaceManagerLocal::Preload( const char* mapName )
 {
+	// RB: allow skipping binary preloading so modders can add new .gui files
+	if( !binaryLoadGuis.GetBool() )
+	{
+		return;
+	}
+
 	if( mapName != NULL && mapName[ 0 ] != '\0' )
 	{
 		mapParser.LoadFromFile( va( "generated/guis/%s.bgui", mapName ) );

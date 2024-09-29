@@ -2736,7 +2736,7 @@ idMover_Binary::SetMoverState
 */
 void idMover_Binary::SetMoverState( moverState_t newstate, int time )
 {
-	idVec3	delta;
+	idVec3 	delta;
 
 	moverState = newstate;
 	move_thread = 0;

@@ -57,7 +57,7 @@ public:
 	void					Save( idSaveGame* savefile ) const;				// archives object for save game file
 	void					Restore( idRestoreGame* savefile );				// unarchives object from save game file
 
-	void					Spawn( );
+	void					Spawn();
 	virtual void			GetViewParms( renderView_t* view );
 	virtual void			Stop();
 
@@ -121,6 +121,9 @@ private:
 	void					Event_Stop();
 	void					Event_SetCallback();
 	void					Event_Activate( idEntity* activator );
+
+	void					WriteBinaryCamAnim( idFile* file, ID_TIME_T* _timeStamp = NULL );
+	bool					LoadBinaryCamAnim( idFile* file, const ID_TIME_T sourceTimeStamp );
 };
 
 #endif /* !__GAME_CAMERA_H__ */

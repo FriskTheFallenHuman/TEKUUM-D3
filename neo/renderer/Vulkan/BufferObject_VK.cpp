@@ -15,8 +15,8 @@ Extra attributions can be found on the CREDITS.txt file
 
 ===========================================================================
 */
-#pragma hdrstop
 #include "precompiled.h"
+#pragma hdrstop
 
 #include "../RenderCommon.h"
 #include "../RenderBackend.h"
@@ -87,7 +87,7 @@ bool idVertexBuffer::AllocBufferObject( const void* data, int allocSize, bufferU
 	}
 
 #if defined( USE_AMD_ALLOCATOR )
-	VmaMemoryRequirements vmaReq = {};
+	VmaAllocationCreateInfo vmaReq = {};
 	if( usage == BU_STATIC )
 	{
 		vmaReq.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -100,7 +100,7 @@ bool idVertexBuffer::AllocBufferObject( const void* data, int allocSize, bufferU
 #else
 		vmaReq.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 #endif
-		vmaReq.flags = VMA_MEMORY_REQUIREMENT_PERSISTENT_MAP_BIT;
+		vmaReq.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 	}
 
 	ID_VK_CHECK( vmaCreateBuffer( vmaAllocator, &bufferCreateInfo, &vmaReq, &apiObject, &vmaAllocation, &allocation ) );
@@ -349,7 +349,7 @@ bool idIndexBuffer::AllocBufferObject( const void* data, int allocSize, bufferUs
 	}
 
 #if defined( USE_AMD_ALLOCATOR )
-	VmaMemoryRequirements vmaReq = {};
+	VmaAllocationCreateInfo vmaReq = {};
 	if( usage == BU_STATIC )
 	{
 		vmaReq.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -362,7 +362,7 @@ bool idIndexBuffer::AllocBufferObject( const void* data, int allocSize, bufferUs
 #else
 		vmaReq.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 #endif
-		vmaReq.flags = VMA_MEMORY_REQUIREMENT_PERSISTENT_MAP_BIT;
+		vmaReq.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 	}
 
 	ID_VK_CHECK( vmaCreateBuffer( vmaAllocator, &bufferCreateInfo, &vmaReq, &apiObject, &vmaAllocation, &allocation ) );
@@ -612,7 +612,7 @@ bool idUniformBuffer::AllocBufferObject( const void* data, int allocSize, buffer
 	}
 
 #if defined( USE_AMD_ALLOCATOR )
-	VmaMemoryRequirements vmaReq = {};
+	VmaAllocationCreateInfo vmaReq = {};
 	if( usage == BU_STATIC )
 	{
 		vmaReq.usage = VMA_MEMORY_USAGE_GPU_ONLY;
@@ -625,7 +625,7 @@ bool idUniformBuffer::AllocBufferObject( const void* data, int allocSize, buffer
 #else
 		vmaReq.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 #endif
-		vmaReq.flags = VMA_MEMORY_REQUIREMENT_PERSISTENT_MAP_BIT;
+		vmaReq.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 	}
 
 	ID_VK_CHECK( vmaCreateBuffer( vmaAllocator, &bufferCreateInfo, &vmaReq, &apiObject, &vmaAllocation, &allocation ) );

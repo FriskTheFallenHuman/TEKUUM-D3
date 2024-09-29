@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.20)
+cmake_minimum_required(VERSION 2.25)
 
 # Check if vcpkg exist in our source folder
 if ( EXISTS "${CMAKE_SOURCE_DIR}/../vcpkg/scripts/buildsystems/vcpkg.cmake" )
@@ -12,6 +12,11 @@ set_property( GLOBAL PROPERTY USE_FOLDERS ON )
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
+#Krispy: Use 2 configurations Debug,Release
+if( NOT CMAKE_CONFIGURATION_TYPES ) 
+	set( CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE ) 
+endif()
+
 project(KROOM3 C CXX)
 
 option(USE_CMDLINE_TOOLS "Compile the built-in command line based tools" ON)
@@ -22,12 +27,20 @@ option(COMPILE_COMMANDS "Generate compile_commands.json" OFF)
 option(USE_PRECOMPILED_HEADERS "Use precompiled headers during build" ON)
 option(ONATIVE "Optimize for the host CPU" OFF)
 option(REPRODUCIBLE_BUILD "Replace __DATE__ and __TIME__ by hardcoded values for reproducible builds." OFF)
-option(FFMPEG "Use FMPEG to render Bink videos" ON)
+option(FFMPEG "Use FMPEG to render Bink videos" OFF)
 option(BINKDEC "Use included libbinkdec to render Bink videos" OFF)
 option(RETAIL "Strip certain developer features and cheats from shipping builds" OFF)
+option(FREETYPE "Enable Freetype support." OFF)
+option(USE_VULKAN "Use Vulkan instead of OpenGL" OFF)
+option(SPIRV_SHADERC "Compile SPIR-V shader byte code using shaderc instead of using Glslang directly" OFF)
+option(USE_MOLTENVK "Use MoltenVK library directly instead of Vulkan loader on macOS" OFF)
 
 if( FFMPEG AND BINKDEC )
 	message( FATAL_ERROR "Only one of FFMPEG and BINKDEC (or neither) can be enabled at a time" )
+endif()
+
+if ( WIN32 AND USE_MFC_TOOLS )
+	set( USE_MFC_TOOLS OFF )
 endif()
 
 # Define our cpu variable
@@ -72,7 +85,7 @@ if( CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang" )
 	add_definitions(-Wno-format-zero-length)
 	add_definitions(-Wno-nonnull)
 	
-	set(USE_MFC_TOOLS OFF)
+	set( USE_MFC_TOOLS OFF )
 
 	# Compiler check (needs -std=c++17 flag)
 	include( CheckCXXCompilerFlag )
@@ -114,17 +127,15 @@ if( CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID STREQUAL "Clang" )
 
 	add_compile_options( -fno-strict-aliasing )
 
-	set(C MAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -ggdb -D_DEBUG -O0" )
-	#set( CMAKE_C_FLAGS_DEBUGALL "${CMAKE_C_FLAGS_DEBUGALL} -g -ggdb -D_DEBUG" )
-	#set( CMAKE_C_FLAGS_PROFILE "${CMAKE_C_FLAGS_PROFILE} -g -ggdb -D_DEBUG -O1 -fno-omit-frame-pointer" )
-	set( CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -ffp-contract=off -fomit-frame-pointer -fno-math-errno -fno-trapping-math" )
-	set( CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} -g -O3 -ffp-contract=off -fomit-frame-pointer -fno-math-errno -fno-trapping-math" )
-	set( CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL} -Os -ffp-contract=off -fomit-frame-pointer -fno-math-errno -fno-trapping-math" )
+	set( CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -D_DEBUG -Og -rdynamic -ggdb -fno-strict-aliasing ${my_warn_flags}" )
+	if( RETAIL )
+		set( CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -s -O3 -DNDEBUG -ffast-math -fno-strict-aliasing -Werror -Wno-error=invalid-pch -Wno-error=invalid-offsetof ${my_warn_flags}" )
+	else()
+		set( CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -DNDEBUG -ffast-math -fno-unsafe-math-optimizations -fomit-frame-pointer -fno-strict-aliasing ${my_warn_flags}" )
+	endif()
 
 	set( CMAKE_CXX_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG} )
 	set( CMAKE_CXX_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE} )
-	set( CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_C_FLAGS_RELWITHDEBINFO} )
-	set( CMAKE_CXX_FLAGS_MINSIZEREL ${CMAKE_C_FLAGS_MINSIZEREL} )
 elseif( MSVC )
 	# Multiprocessor support for compiling
 	# /MP
@@ -143,22 +154,18 @@ elseif( MSVC )
 
 	# Omit Frame Pointers
 	# "/Oy",
-	set( CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D _DEBUG /MP /MDd" )
-	set( CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MP /Oi /Oy /MD" )
-	set( CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS_RELWITHDEBINFO} /MP /Oi /MDd" )
-	set( CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL} /MP /Oi /Oy /MD" )
 
-	set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MP /MDd" )
-	set( CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MP /Oi /Oy /MD" )
-	set( CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /MP /MDd" )
-	set( CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} /MP /Oi /Oy /MD" )
+	#GK: Fix performance isse on classic doom for the debug build
+	set( CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /D _DEBUG /MP /Ob2 /Oi /Oy /MDd /std:c17" )
+	set( CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MP /Oi /Oy /MD /std:c17" )
+		
+	set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MP /Ob2 /Oi /Oy /MDd /std:c++17 /std:c17 /W3" )
+	set( CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MP /Oi /Oy /MD /std:c++17 /std:c17 /W3 /sdl" )
 
 	# RB: without /SAFESEH:NO we can't link against ffmpeg libs and VS2013 or we have to build our own
 	# libs for newer compilers
-	set( CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /SAFESEH:NO" )
-	set( CMAKE_EXE_LINKER_FLAGS_MINSIZEREL "${CMAKE_EXE_LINKER_FLAGS_MINSIZEREL} /SAFESEH:NO" )
-	set( CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /SAFESEH:NO" )
-	set( CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} /SAFESEH:NO" )
+	set( CMAKE_EXE_LINKER_FLAGS_DEBUG "${CMAKE_EXE_LINKER_FLAGS_DEBUG} /SAFESEH:NO /DEBUG:FULL /STACK:16777216" )
+	set( CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /SAFESEH:NO /STACK:16777216 /OPT:REF /OPT:ICF" )
 	
 	add_definitions( -D_ALLOW_KEYWORD_MACROS ) # because of the "#define private public" and "#define protected public" in TypeInfo.cpp
 
@@ -168,6 +175,7 @@ elseif( MSVC )
 					-D_CRT_SECURE_NO_DEPRECATE
 					-D_CRT_NONSTDC_NO_DEPRECATE
 					-D_CRT_SECURE_NO_WARNINGS
+					-D_WINSOCK_DEPRECATED_NO_WARNINGS
 					-D_MBCS )
 
 	#if( WINDOWS10 ) # Windows RT
@@ -196,10 +204,14 @@ elseif( MSVC )
 			set( CMAKE_MFC_FLAG 2 )
 		endif()
 	endif()
+
+	if ( MSVC_VERSION GREATER 1919 AND NOT USE_VULKAN )
+		add_definitions( -D_ITERATOR_DEBUG_LEVEL=1 )
+	endif()
 endif()
 
 # CMake only used for desktop builds
-add_definitions(-DID_PC )
+add_definitions( -DID_PC )
 
 if( REPRODUCIBLE_BUILD )
 	# don't use __DATE__ and __TIME__ macros so builds are reproducible
@@ -211,32 +223,146 @@ if ( USE_INTRINSICS_SSE )
 endif()
 
 if( RETAIL )
-	set(REPRODUCIBLE_BUILD ON)
+	set( REPRODUCIBLE_BUILD ON )
 	add_definitions( -DID_RETAIL )
 endif()
+
+# Nicely tied our thirdparty libraries here
+set( sys_thirdparty_libs )
 
 find_package( Stb REQUIRED )
 include_directories( ${Stb_INCLUDE_DIR} PUBLIC )
 
 find_package( OpenAL REQUIRED )
 include_directories( ${OPENAL_INCLUDE_DIR} PUBLIC )
+list( APPEND sys_thirdparty_libs ${OPENAL_LIBRARY} )
 
-find_package( GLEW REQUIRED )
-include_directories( ${GLEW_INCLUDE_DIRS} PUBLIC )
+if( NOT USE_VULKAN )
+	find_package( GLEW REQUIRED )
+	include_directories( ${GLEW_INCLUDE_DIRS} PUBLIC )
+	list( APPEND sys_thirdparty_libs GLEW::GLEW )
+else()
+	# RB: moved this above the general Vulkan part so glslang does not include Vulkan SDK headers
+	# which causes all kinds of weird segmentation faults because struct sizes don't match
+	macro( SET_OPTION option value )
+	  set( ${option} ${value} CACHE "" INTERNAL FORCE )
+	endmacro()
 
-find_package( Freetype REQUIRED )
-find_path( FREETYPE_INCLUDE_DIR "fttypes.h" PATH_SUFFIXES "freetype" )
-include_directories( ${FREETYPE_INCLUDE_DIR} PUBLIC )
-set( FREETYPE_LIBRARY Freetype::Freetype )
+	# Use FindVulkan module added with CMAKE 3.7
+	if( NOT CMAKE_VERSION VERSION_LESS 3.7.0 )
+		message( STATUS "Using module to find Vulkan and components" )
+		list( APPEND VK_COMPONENTS dxc )
+		if( SPIRV_SHADERC )
+			list( APPEND VK_COMPONENTS shaderc_combined )
+		else()
+			# override Glslang build options
+		
+			# options required by November 2018 release
+			set( ENABLE_SPVREMAPPER ON CACHE BOOL "" FORCE )
+			set( ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE )
+			set( ENABLE_HLSL OFF CACHE BOOL "" FORCE )
+			set( ENABLE_OPT ON CACHE BOOL "" FORCE )
+			set( SPIRV_SKIP_EXECUTABLES ON CACHE BOOL "" FORCE )
+			
+			# options required by July 2020 release
+			set( ENABLE_PCH OFF CACHE BOOL "" FORCE )
+			set( ENABLE_CTEST OFF CACHE BOOL "" FORCE )
+			set( BUILD_EXTERNAL OFF CACHE BOOL "" FORCE )
+			set( SKIP_GLSLANG_INSTALL ON CACHE BOOL "" FORCE )
+
+			set( GLSLANG_TESTS OFF CACHE BOOL "" FORCE )
+			set( ALLOW_EXTERNAL_SPIRV_TOOLS ON CACHE BOOL "" FORCE )
+	
+			set( GLSLANG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/glslang )
+			add_subdirectory( ${GLSLANG_DIR} )
+	
+			include_directories( ${GLSLANG_DIR} )
+			list( APPEND sys_thirdparty_libs glslang )
+			set_target_properties( glslang PROPERTIES FOLDER "libs" )
+		endif()
+		if( APPLE AND USE_MOLTENVK )
+			list( APPEND VK_COMPONENTS MoltenVK )
+		endif()
+		find_package( Vulkan OPTIONAL_COMPONENTS ${VK_COMPONENTS} )
+		list( APPEND sys_thirdparty_libs Vulkan::Vulkan )
+	endif()
+
+	if( NOT Vulkan_FOUND )
+		message( FATAL_ERROR "Could not find Vulkan library!" )
+	else()
+		add_definitions( -DUSE_VULKAN )
+		include_directories( ${Vulkan_INCLUDE_DIRS} PUBLIC )
+		set( VULKAN_SDK $ENV{VULKAN_SDK} )
+		include_directories( ${VULKAN_SDK}/include PUBLIC )
+
+		if( SPIRV_SHADERC )
+			list( APPEND sys_thirdparty_libs Vulkan::shaderc_combined )
+			message( STATUS "Using Vulkan ShaderC: " ${Vulkan_shaderc_combined_LIBRARY} )
+		endif()
+
+		if( APPLE )
+			# SRS - Enable Beta extensions for Vulkan portability subset features on macOS
+			add_definitions( -DVK_ENABLE_BETA_EXTENSIONS )
+			# SRS - Optionally link directly to MoltenVK headers/library for runtime config functions on OSX
+			if( USE_MOLTENVK )
+				if( Vulkan_MoltenVK_FOUND )
+					add_definitions( -DUSE_MoltenVK )
+					list( APPEND sys_thirdparty_libs Vulkan::MoltenVK )
+					message( STATUS "Using MoltenVK: " ${Vulkan_MoltenVK_LIBRARY} )
+				else()
+					message( FATAL_ERROR "Must define VULKAN_SDK location if USE_MoltenVK option enabled!" )
+				endif()
+			else()
+				# If using Xcode and the Vulkan loader's environment variables are defined, make them available within Xcode scheme
+				if( CMAKE_GENERATOR MATCHES "Xcode" )
+					if( DEFINED ENV{VK_ADD_LAYER_PATH} )
+						set( CMAKE_XCODE_SCHEME_ENVIRONMENT "${CMAKE_XCODE_SCHEME_ENVIRONMENT};VK_ADD_LAYER_PATH=$ENV{VK_ADD_LAYER_PATH}" )
+					endif()
+					if( DEFINED ENV{VK_ICD_FILENAMES} )
+						set( CMAKE_XCODE_SCHEME_ENVIRONMENT "${CMAKE_XCODE_SCHEME_ENVIRONMENT};VK_ICD_FILENAMES=$ENV{VK_ICD_FILENAMES}" )
+					endif()
+					if( DEFINED ENV{VK_DRIVER_FILES} )
+						set( CMAKE_XCODE_SCHEME_ENVIRONMENT "${CMAKE_XCODE_SCHEME_ENVIRONMENT};VK_DRIVER_FILES=$ENV{VK_DRIVER_FILES}" )
+					endif()
+				endif()
+			endif()
+		endif()
+		message( STATUS "Using Vulkan: " ${Vulkan_LIBRARY} )
+	endif()
+	
+	# Eric: For use with SDL2/Vulkan
+	if( UNIX )
+		# SRS - For UNIX-like target OSs use the generic SDL Vulkan platform
+		add_definitions( -DVULKAN_USE_PLATFORM_SDL )
+	elseif( WIN32 )
+		add_definitions( -DVK_USE_PLATFORM_WIN32_KHR )
+	endif()
+
+	# SRS - Add support for vma allocator.
+	#find_package( VulkanMemoryAllocator CONFIG REQUIRED )
+	#find_path( VMA_INCLUDES_DIR "vk_mem_alloc.h" PATH_SUFFIXES "vma" )
+	#include_directories( ${VMA_INCLUDES_DIR} )
+	#list( APPEND sys_thirdparty_libs GPUOpen::VulkanMemoryAllocator )
+endif()
+
+if ( FREETYPE )
+	find_package( Freetype REQUIRED )
+	find_path( FREETYPE_INCLUDE_DIR "fttypes.h" PATH_SUFFIXES "freetype" )
+	include_directories( ${FREETYPE_INCLUDE_DIR} )
+	add_definitions( -DID_BUILD_FREETYPE )
+	list( APPEND sys_thirdparty_libs Freetype::Freetype )
+endif()
 
 find_package( mikktspace CONFIG REQUIRED )
 set( MIKKTSPACE_LIBRARY  mikktspace::mikktspace )
+list( APPEND sys_thirdparty_libs mikktspace::mikktspace )
 
 if( FFMPEG )
 	find_package( FFMPEG REQUIRED )
 	include_directories( ${FFMPEG_INCLUDE_DIRS} )
 	link_directories( ${FFMPEG_LIBRARY_DIRS} PUBLIC )
-	add_definitions( -DUSE_FFMPEG )		
+	add_definitions( -DUSE_FFMPEG )
+	list( APPEND sys_thirdparty_libs ${FFMPEG_LIBRARIES} )
 endif()
 
 if( BINKDEC )
@@ -322,32 +448,29 @@ if( USE_MFC_TOOLS )
 	list(REMOVE_ITEM WIN32_INCLUDES ${CMAKE_SOURCE_DIR}/sys/win32/rc/kroom3_resource.h)
 	list(REMOVE_ITEM WIN32_RESOURCES ${CMAKE_SOURCE_DIR}/sys/win32/rc/kroom3.rc)
 else()
-	set(WIN32_RESOURCES sys/win32/rc/kroom3_resource.h sys/win32/rc/kroom3.rc sys/win32/rc/res/doom3.ico)
+	set(WIN32_RESOURCES sys/win32/rc/kroom3_resource.h sys/win32/rc/kroom3.rc sys/win32/rc/res/game.ico)
 	list(REMOVE_ITEM WIN32_INCLUDES ${CMAKE_SOURCE_DIR}/sys/win32/rc/resource.h)
 endif()
 
-set(POSIX_INCLUDES
-	sys/posix/posix_public.h)
+file(GLOB POSIX_INCLUDES sys/posix/*.h)
+file(GLOB POSIX_SOURCES sys/posix/*.cpp)
 
-set(POSIX_SOURCES
-	sys/posix/posix_net.cpp
-	sys/posix/posix_main.cpp
-	sys/posix/posix_signal.cpp
-	sys/posix/posix_threads.cpp)
+file(GLOB LINUX_INCLUDES sys/linux/*.h)
+file(GLOB LINUX_SOURCES sys/linux/*.cpp)
 
-set(LINUX_INCLUDES
-	sys/linux/sound.h)
+file(GLOB SDL_INCLUDES sys/sdl/*.h)
+file(GLOB SDL_SOURCES sys/sdl/*.cpp)
 
-set(LINUX_SOURCES
-	sys/linux/linux_main.cpp
-	sys/linux/stack.cpp)
-
-set(SDL_INCLUDES
-	sys/sdl/sdl_local.h)
-
-set(SDL_SOURCES
-	sys/sdl/sdl_events.cpp
-	sys/sdl/sdl_glimp.cpp)
+# Eric: Utilize either the Vulkan or GL implementation of SDL
+if( UNIX )
+	if( USE_VULKAN )
+		get_filename_component(sdl_glimp_cpp_full_path ${CMAKE_CURRENT_SOURCE_DIR}/sys/sdl/sdl_glimp.cpp ABSOLUTE)
+		list(REMOVE_ITEM SDL_SOURCES "${sdl_glimp_cpp_full_path}")
+	else()
+		get_filename_component(sdl_vkimp_cpp_full_path ${CMAKE_CURRENT_SOURCE_DIR}/sys/sdl/sdl_vkimp.cpp ABSOLUTE)
+		list(REMOVE_ITEM SDL_SOURCES "${sdl_vkimp_cpp_full_path}")
+	endif()
+endif()
 
 source_group("AAS" FILES ${AAS_INCLUDES})
 source_group("AAS" FILES ${AAS_SOURCES})
@@ -405,7 +528,7 @@ source_group("Sys\\Win32\\Resources" FILES ${WIN32_RESOURCES})
 source_group("Sys\\Win32\\NatVis" FILES ${WIN32_NATVIS})
 source_group("Sys\\Win32\\Manifest" FILES ${WIN32_MANIFEST})
 
-set(TEKUUM_INCLUDES
+set(KROOM3_INCLUDES
 	${AAS_INCLUDES}
 	${CM_INCLUDES}
 	${FRAMEWORK_INCLUDES}
@@ -429,11 +552,10 @@ set(TEKUUM_INCLUDES
 	${SHADERS_BUILTIN_SSGI}
 	${SHADERS_BUILTIN_VIDEO}
 	${SHADERS_BUILTIN_VR}
-	${RENDERER_OPENGL_INCLUDES}
 	${SOUND_INCLUDES}
 	${UI_INCLUDES})
 
-set(TEKUUM_SOURCES
+set(KROOM3_SOURCES
 	${AAS_SOURCES}
 	${CM_SOURCES}
 	${FRAMEWORK_SOURCES}
@@ -445,13 +567,11 @@ set(TEKUUM_SOURCES
 	${RENDERER_JOBS_DYNAMICSHADOWVOLUME_SOURCES}
 	${RENDERER_JOBS_PRELIGHTSHADOWVOLUME_SOURCES}
 	${RENDERER_JOBS_STATICSHADOWVOLUME_SOURCES}
-	${RENDERER_OPENGL_SOURCES}
 	${SOUND_SOURCES}
 	${UI_SOURCES})
 
 add_definitions(-D__DOOM__
-				-D__DOOM_DLL__
-				-DBUILD_FREETYPE)
+				-D__DOOM_DLL__)
 
 if( USE_CMDLINE_TOOLS )
 	add_definitions( -DID_ALLOW_CMD_TOOLS )
@@ -461,29 +581,38 @@ include_directories(
 			idlib
 			libs/miniz
 			libs/minizip
-			libs/freetype/include
 			PUBLIC)
-if(MSVC)
-	# if(MSVC_VERSION EQUAL 1700)
-		 set(DirectX_LIBRARIES
-			 dinput8
-			 dsound
-			 dxguid
-			 #dxerr
-			 Xinput
-			)
-		# add_definitions(-DUSE_XINPUT)
-	# else()
-		#find_package(DirectX REQUIRED)
-		#include_directories(${DirectX_INCLUDE_DIR})
-		#add_definitions(-DUSE_XINPUT)
-	# endif()
+if( MSVC )
+	 set(DX_LIBRARIES
+		 dinput8
+		 dsound
+		 dxguid
+		 Xinput)
 
-	list(APPEND TEKUUM_INCLUDES
+	set (WINDOWS_LIBS
+		${DX_LIBRARIES}
+		dbghelp
+		iphlpapi
+		winmm
+		ws2_32)
+
+	if( USE_VULKAN )
+		list( APPEND KROOM3_INCLUDES ${RENDERER_VULKAN_INCLUDES} )
+		list( APPEND KROOM3_SOURCES ${RENDERER_VULKAN_SOURCES} )		
+	else()
+		list( APPEND KROOM3_INCLUDES ${RENDERER_OPENGL_INCLUDES} )
+		list( APPEND KROOM3_SOURCES ${RENDERER_OPENGL_SOURCES} )
+		
+		list(APPEND WINDOWS_LIBS
+			opengl32
+			glu32)
+	endif()
+
+	list(APPEND KROOM3_INCLUDES
 		${SYS_INCLUDES}
 		${WIN32_INCLUDES})
 
-	list(APPEND TEKUUM_SOURCES
+	list(APPEND KROOM3_SOURCES
 		${SYS_SOURCES}
 		${WIN32_SOURCES}
 		${WIN32_NATVIS}
@@ -501,21 +630,21 @@ if(MSVC)
 	set_source_files_properties( ${SHADERS_BUILTIN_VIDEO} PROPERTIES VS_TOOL_OVERRIDE "None" )
 	set_source_files_properties( ${SHADERS_BUILTIN_VR} PROPERTIES VS_TOOL_OVERRIDE "None" )
 
-	list( REMOVE_DUPLICATES TEKUUM_SOURCES )
+	list( REMOVE_DUPLICATES KROOM3_SOURCES )
 
 	if( USE_PRECOMPILED_HEADERS )
-		set( TEKUUM_PRECOMPILED_SOURCES ${TEKUUM_SOURCES} )
-		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTDecoder.cpp )
-		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder.cpp )
-		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder_SSE2.cpp )
-		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/jobs/dynamicshadowvolume/DynamicShadowVolume.cpp )
-		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/jobs/prelightshadowvolume/PreLightShadowVolume.cpp )
-		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/jobs/staticshadowvolume/StaticShadowVolume.cpp )
-		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/jobs/ShadowShared.cpp )
-		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/RenderLog.cpp )
+		set( KROOM3_PRECOMPILED_SOURCES ${KROOM3_SOURCES} )
+		list( REMOVE_ITEM KROOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTDecoder.cpp )
+		list( REMOVE_ITEM KROOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder.cpp )
+		list( REMOVE_ITEM KROOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder_SSE2.cpp )
+		list( REMOVE_ITEM KROOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/jobs/dynamicshadowvolume/DynamicShadowVolume.cpp )
+		list( REMOVE_ITEM KROOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/jobs/prelightshadowvolume/PreLightShadowVolume.cpp )
+		list( REMOVE_ITEM KROOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/jobs/staticshadowvolume/StaticShadowVolume.cpp )
+		list( REMOVE_ITEM KROOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/jobs/ShadowShared.cpp )
+		list( REMOVE_ITEM KROOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/RenderLog.cpp )
 
 		set_source_files_properties(
-			${TEKUUM_PRECOMPILED_SOURCES}
+			${KROOM3_PRECOMPILED_SOURCES}
 			PROPERTIES
 			COMPILE_FLAGS "/Yuprecompiled.h"
 			OBJECT_DEPENDS "precompiled.pch"
@@ -529,31 +658,20 @@ if(MSVC)
 		)
 	endif()
 
-	add_executable( ${PROJECT_NAME} WIN32 ${TEKUUM_INCLUDES} ${TEKUUM_SOURCES} ${WIN32_RESOURCES} )
+	add_executable( ${PROJECT_NAME} WIN32 ${KROOM3_INCLUDES} ${KROOM3_SOURCES} ${WIN32_RESOURCES} )
 
 	add_dependencies(${PROJECT_NAME} idlib Game external)
 	target_link_libraries(${PROJECT_NAME}
 		idlib
 		external
-		GLEW::GLEW
-		${OPENAL_LIBRARY}
-		${FREETYPE_LIBRARY}
-		${DirectX_LIBRARIES}
-		${FFMPEG_LIBRARIES}
-		${MIKKTSPACE_LIBRARY}
-		opengl32
-		glu32
-		dbghelp
-		#eaxguid
-		iphlpapi
-		winmm
-		ws2_32)
+		${sys_thirdparty_libs}
+		${WINDOWS_LIBS})
 
 	# set MSVC default debug directory on executable
 	set_target_properties( ${PROJECT_NAME} PROPERTIES VS_STARTUP_PROJECT ${PROJECT_NAME} )
 	set_target_properties( ${PROJECT_NAME} PROPERTIES VS_DEBUGGER_COMMAND "${CMAKE_SOURCE_DIR}/../${PROJECT_NAME}.exe" )
 	set_target_properties( ${PROJECT_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/.." )
-	set_target_properties( ${PROJECT_NAME} PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "+set developer 1" )
+	set_target_properties( ${PROJECT_NAME} PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "+set developer 1 +set r_fullscreen 0" )
 	set_target_properties( ${PROJECT_NAME} PROPERTIES FOLDER "exes" )
 elseif( UNIX )
 
@@ -569,29 +687,39 @@ elseif( UNIX )
 
 	add_definitions( -DUSE_SDL )
 	add_definitions( -DUSE_SOUND_PULSE )
-	add_definitions( -DUSE_EXCEPTIONS )
 
-	list(APPEND TEKUUM_INCLUDES
+	if( USE_VULKAN )
+		list( APPEND RBDOOM3_INCLUDES ${RENDERER_VULKAN_INCLUDES} )
+		list( APPEND RBDOOM3_SOURCES ${RENDERER_VULKAN_SOURCES} )
+	else()
+		find_package( OpenGL REQUIRED )
+		include_directories( ${OPENGL_INCLUDE_DIRS} )
+
+		list( APPEND RBDOOM3_INCLUDES ${RENDERER_OPENGL_INCLUDES} )
+		list( APPEND RBDOOM3_SOURCES ${RENDERER_OPENGL_SOURCES} )
+	endif()
+
+	list(APPEND KROOM3_INCLUDES
 		${SYS_INCLUDES}
 		${POSIX_INCLUDES}
 		${SDL_INCLUDES}
 		${LINUX_INCLUDES})
 
-	list(APPEND TEKUUM_SOURCES
+	list(APPEND KROOM3_SOURCES
 		${SYS_SOURCES}
 		${POSIX_SOURCES}
 		${SDL_SOURCES}
 		${LINUX_SOURCES})
 
-	list(REMOVE_DUPLICATES TEKUUM_SOURCES)
+	list(REMOVE_DUPLICATES KROOM3_SOURCES)
 
 	if( USE_PRECOMPILED_HEADERS )
-		set( TEKUUM_PRECOMPILED_SOURCES ${TEKUUM_SOURCES})
-		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTDecoder.cpp )
-		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder.cpp )
-		list( REMOVE_ITEM TEKUUM_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder_SSE2.cpp )
+		set( KROOM3_PRECOMPILED_SOURCES ${KROOM3_SOURCES})
+		list( REMOVE_ITEM KROOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTDecoder.cpp )
+		list( REMOVE_ITEM KROOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder.cpp )
+		list( REMOVE_ITEM KROOM3_PRECOMPILED_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/renderer/DXT/DXTEncoder_SSE2.cpp )
 
-		foreach( src_file ${TEKUUM_PRECOMPILED_SOURCES} )
+		foreach( src_file ${KROOM3_PRECOMPILED_SOURCES} )
 			#message(STATUS "-include precompiled.h for ${src_file}")
 			set_source_files_properties(
 				${src_file}
@@ -613,23 +741,23 @@ elseif( UNIX )
 	SEPARATE_ARGUMENTS( _compiler_FLAGS )
 
 	if( USE_PRECOMPILED_HEADERS )
-		# we need to recreate the precompiled header for Tekuum
+		# we need to recreate the precompiled header for Kroom3
 		# (i.e. can't use the one created for idlib before)
 		# because some definitions (e.g. -D__IDLIB__ -D__DOOM_DLL__) differ
-		add_custom_target( precomp_header_tekuum ALL
+		add_custom_target( precomp_header_kroom3 ALL
 				COMMAND ${CMAKE_CXX_COMPILER} ${_compiler_FLAGS} -x c++-header idlib/precompiled.h -o idlib/precompiled.h.gch
 				WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-				COMMENT "Creating idlib/precompiled.h.gch for Tekuum" )
+				COMMENT "Creating idlib/precompiled.h.gch for Kroom3" )
 
 		# make sure this is run after creating idlib
-		add_dependencies( precomp_header_tekuum idlib )
+		add_dependencies( precomp_header_kroom3 idlib )
 	endif()
 
-	add_executable( ${PROJECT_NAME} ${TEKUUM_INCLUDES} ${TEKUUM_SOURCES} )
+	add_executable( ${PROJECT_NAME} ${KROOM3_INCLUDES} ${KROOM3_SOURCES} )
 
 	if ( USE_PRECOMPILED_HEADERS )
 		# make sure precompiled header is created before executable is compiled
-		add_dependencies( ${PROJECT_NAME} precomp_header_tekuum )
+		add_dependencies( ${PROJECT_NAME} precomp_header_kroom3 )
 
 		if( WIN32 )
 			set( remove_command "del" )
@@ -658,11 +786,7 @@ elseif( UNIX )
 	target_link_libraries(${PROJECT_NAME}
 		idlib
 		external
-		GLEW::GLEW
-		${OPENAL_LIBRARY}
-		${FREETYPE_LIBRARY}
-		${FFMPEG_LIBRARIES}
-		${MIKKTSPACE_LIBRARY}
+		${sys_thirdparty_libs}
 		GL
 		pthread
 		dl
@@ -673,12 +797,11 @@ elseif( UNIX )
 endif()
 
 if( USE_CMDLINE_TOOLS )
-	target_link_libraries(${PROJECT_NAME}
-		cmdtools)
+	target_link_libraries( ${PROJECT_NAME} cmdtools )
 endif()
+
 if( USE_MFC_TOOLS )
-	target_link_libraries(${PROJECT_NAME}
-		tools)
+	target_link_libraries( ${PROJECT_NAME} tools )
 endif()
 
 set_target_properties( ${PROJECT_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<1:>${CMAKE_SOURCE_DIR}/.. LIBRARY_OUTPUT_DIRECTORY $<1:>${CMAKE_SOURCE_DIR}/.. )

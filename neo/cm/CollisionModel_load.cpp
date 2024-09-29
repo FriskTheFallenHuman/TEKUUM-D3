@@ -3539,11 +3539,15 @@ cm_model_t* idCollisionModelManagerLocal::LoadBinaryModelFromFile( idFile* file,
 	}
 
 	file->ReadBig( model->polygonMemory );
+	// SRS - Boost polygonMemory to handle in-memory (ptr) vs. on-disk (int) size for cm_polygon_t.material, otherwise AllocPolygon() leaks
+	model->polygonMemory += ( sizeof( idMaterial* ) - sizeof( int ) ) * model->numPolygons;
 	model->polygonBlock = ( cm_polygonBlock_t* ) Mem_ClearedAlloc( sizeof( cm_polygonBlock_t ) + model->polygonMemory );
 	model->polygonBlock->bytesRemaining = model->polygonMemory;
 	model->polygonBlock->next = ( ( byte* ) model->polygonBlock ) + sizeof( cm_polygonBlock_t );
 
 	file->ReadBig( model->brushMemory );
+	// SRS - Boost brushMemory to handle in-memory (ptr) vs. on-disk (int) size for cm_brush_t.material, otherwise AllocBrush() leaks
+	model->brushMemory += ( sizeof( idMaterial* ) - sizeof( int ) ) * model->numBrushes;
 	model->brushBlock = ( cm_brushBlock_t* ) Mem_ClearedAlloc( sizeof( cm_brushBlock_t ) + model->brushMemory );
 	model->brushBlock->bytesRemaining = model->brushMemory;
 	model->brushBlock->next = ( ( byte* ) model->brushBlock ) + sizeof( cm_brushBlock_t );
@@ -4247,7 +4251,6 @@ void idCollisionModelManagerLocal::BuildModels( const idMapFile* mapFile )
 
 	if( !LoadCollisionModelFile( mapFile->GetName(), mapFile->GetGeometryCRC() ) )
 	{
-
 		if( !mapFile->GetNumEntities() )
 		{
 			return;
@@ -4487,7 +4490,7 @@ bool idCollisionModelManagerLocal::GetModelPolygon( cmHandle_t model, int polygo
 idCollisionModelManagerLocal::LoadModel
 ==================
 */
-cmHandle_t idCollisionModelManagerLocal::LoadModel( const char* modelName )
+cmHandle_t idCollisionModelManagerLocal::LoadModel( const char* modelName, const bool precache )
 {
 	int handle;
 
@@ -4545,6 +4548,12 @@ cmHandle_t idCollisionModelManagerLocal::LoadModel( const char* modelName )
 		{
 			common->Warning( "idCollisionModelManagerLocal::LoadModel: collision file for '%s' contains different model", modelName );
 		}
+	}
+
+	// if only precaching .cm files do not waste memory converting render models
+	if( precache )
+	{
+		return 0;
 	}
 
 	// try to load a .ASE or .LWO model and convert it to a collision model
@@ -4726,7 +4735,7 @@ bool idCollisionModelManagerLocal::TrmFromModel( const char* modelName, idTraceM
 {
 	cmHandle_t handle;
 
-	handle = LoadModel( modelName );
+	handle = LoadModel( modelName, false );
 	if( !handle )
 	{
 		common->Printf( "idCollisionModelManagerLocal::TrmFromModel: model %s not found.\n", modelName );

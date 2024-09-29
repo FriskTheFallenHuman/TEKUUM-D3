@@ -467,7 +467,7 @@ bool idRenderSystemLocal::RegisterFont( const char* fontName, fontInfoEx_t& font
 	}
 
 #ifndef BUILD_FREETYPE
-	common->Warning( "RegisterFont: couldn't load FreeType code %s", name.c_str() );
+	common->Warning( "RegisterFont: FreeType not implemented! %s", name );
 	return false;
 #else
 

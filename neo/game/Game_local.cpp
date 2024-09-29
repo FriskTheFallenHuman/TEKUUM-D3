@@ -107,7 +107,7 @@ TestGameAPI
 */
 void TestGameAPI()
 {
-	gameImport_t testImport;
+	gameImport_t testImport = {};
 	gameExport_t testExport;
 
 	testImport.sys						= ::sys;
@@ -309,6 +309,7 @@ void idGameLocal::Init()
 	Printf( "...%d aas types\n", aasList.Num() );
 	Printf( "game initialized.\n" );
 	Printf( "--------------------------------------\n" );
+
 }
 
 /*
@@ -374,11 +375,13 @@ void idGameLocal::Shutdown()
 	Printf( "--------------------------------------\n" );
 
 #ifdef GAME_DLL
+
 	// remove auto-completion function pointers pointing into this DLL
 	cvarSystem->RemoveFlaggedAutoCompletion( CVAR_GAME );
 
 	// shutdown idLib
 	idLib::ShutDown();
+
 #endif
 }
 
@@ -1004,7 +1007,7 @@ void idGameLocal::LoadMap( const char* mapName, int randseed )
 idGameLocal::LocalMapRestart
 ===================
 */
-void idGameLocal::LocalMapRestart( )
+void idGameLocal::LocalMapRestart()
 {
 	int i, latchSpawnCount;
 
@@ -1024,6 +1027,8 @@ void idGameLocal::LocalMapRestart( )
 	savedEventQueue.Shutdown();
 
 	MapClear( false );
+
+
 
 	// clear the smoke particle free list
 	smokeParticles->Init();
@@ -1070,7 +1075,7 @@ void idGameLocal::LocalMapRestart( )
 idGameLocal::MapRestart
 ===================
 */
-void idGameLocal::MapRestart( )
+void idGameLocal::MapRestart()
 {
 	idBitMsg	outMsg;
 	byte		msgBuf[MAX_GAME_MESSAGE_SIZE];
@@ -1402,7 +1407,6 @@ bool idGameLocal::InitFromSaveGame( const char* mapName, idRenderWorld* renderWo
 		// with the player persistent data.
 		savegame.DeleteObjects();
 		program.Restart();
-
 		return false;
 	}
 
@@ -3606,7 +3610,6 @@ idGameLocal::InhibitEntitySpawn
 */
 bool idGameLocal::InhibitEntitySpawn( idDict& spawnArgs )
 {
-
 	bool result = false;
 
 	if( isMultiplayer )
@@ -3631,6 +3634,7 @@ bool idGameLocal::InhibitEntitySpawn( idDict& spawnArgs )
 		const char* name = spawnArgs.GetString( "classname" );
 		if( idStr::Icmp( name, "item_medkit" ) == 0 || idStr::Icmp( name, "item_medkit_small" ) == 0 )
 		{
+
 			result = true;
 		}
 	}

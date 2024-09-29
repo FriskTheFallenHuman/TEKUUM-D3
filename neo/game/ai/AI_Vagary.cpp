@@ -26,6 +26,7 @@ Vagary specific AI code
 #include "precompiled.h"
 #pragma hdrstop
 
+
 #include "../Game_local.h"
 
 class idAI_Vagary : public idAI

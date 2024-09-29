@@ -3240,7 +3240,6 @@ void idFuncRadioChatter::Event_Activate( idEntity* activator )
 	// we still put the hud up because this is used with no sound on
 	// certain frame commands when the chatter is triggered
 	PostEventSec( &EV_ResetRadioHud, time, player );
-
 }
 
 /*
@@ -3281,8 +3280,8 @@ idPhantomObjects::idPhantomObjects()
 {
 	target			= NULL;
 	end_time		= 0;
-	throw_time		= 0.0f;
-	shake_time		= 0.0f;
+	throw_time 		= 0.0f;
+	shake_time 		= 0.0f;
 	shake_ang.Zero();
 	speed			= 0.0f;
 	min_wait		= 0;

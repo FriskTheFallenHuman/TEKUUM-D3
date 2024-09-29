@@ -331,16 +331,16 @@ void idAsyncNetwork::SpawnServer_f( const idCmdArgs& args )
 	{
 		case 0:
 		case 2:
-			if( !renderSystem->IsOpenGLRunning() )
+			if( !renderSystem->IsBackendRunning() )
 			{
 				common->Warning( "OpenGL is not running, net_serverDedicated == %d", cvarSystem->GetCVarInteger( "net_serverDedicated" ) );
 			}
 			break;
 		case 1:
-			if( renderSystem->IsOpenGLRunning() )
+			if( renderSystem->IsBackendRunning() )
 			{
 				Sys_ShowConsole( 1, false );
-				renderSystem->ShutdownOpenGL();
+				renderSystem->ShutdownBackend();
 			}
 			soundSystem->SetMute( true );
 			soundSystem->ShutdownHW();

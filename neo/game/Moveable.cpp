@@ -381,6 +381,11 @@ idMoveable::EnableDamage
 */
 void idMoveable::EnableDamage( bool enable, float duration )
 {
+	if( canDamage == enable )
+	{
+		return;
+	}
+
 	canDamage = enable;
 	if( duration )
 	{
@@ -1126,7 +1131,7 @@ void idExplodingBarrel::Killed( idEntity* inflictor, idEntity* attacker, int dam
 		gameLocal.RadiusDamage( GetPhysics()->GetOrigin(), this, attacker, this, this, splash );
 	}
 
-	ExplodingEffects( );
+	ExplodingEffects();
 
 	//FIXME: need to precache all the debris stuff here and in the projectiles
 	const idKeyValue* kv = spawnArgs.MatchPrefix( "def_debris" );

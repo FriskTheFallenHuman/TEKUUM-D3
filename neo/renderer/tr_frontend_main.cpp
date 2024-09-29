@@ -274,17 +274,17 @@ static void R_SortDrawSurfs( drawSurf_t** drawSurfs, const int numDrawSurfs )
 	int64_t hi[MAX_LEVELS];
 
 	// Keep the top of the stack in registers to avoid load-hit-stores.
-	register int64_t st_lo = 0;
-	register int64_t st_hi = numDrawSurfs - 1;
-	register int64_t level = 0;
+	int64_t st_lo = 0;
+	int64_t st_hi = numDrawSurfs - 1;
+	int64_t level = 0;
 
 	for( ; ; )
 	{
-		register int64_t i = st_lo;
-		register int64_t j = st_hi;
+		int64_t i = st_lo;
+		int64_t j = st_hi;
 		if( j - i >= 4 && level < MAX_LEVELS - 1 )
 		{
-			register uint64_t pivot = indices[( i + j ) / 2];
+			uint64_t pivot = indices[( i + j ) / 2];
 			do
 			{
 				while( indices[i] > pivot )
@@ -319,7 +319,7 @@ static void R_SortDrawSurfs( drawSurf_t** drawSurfs, const int numDrawSurfs )
 		{
 			for( ; i < j; j-- )
 			{
-				register int64_t m = i;
+				int64_t m = i;
 				for( int64_t k = i + 1; k <= j; k++ )
 				{
 					if( indices[k] < indices[m] )
@@ -521,7 +521,7 @@ static void R_FindClosestEnvironmentProbes()
 	RenderEnvprobeLocal* nearest = viewEnvprobes[0];
 	tr.viewDef->globalProbeBounds = nearest->globalProbeBounds;
 
-	if( !nearest->irradianceImage->IsDefaulted() )
+	if( nearest->irradianceImage->IsLoaded() && !nearest->irradianceImage->IsDefaulted() )
 	{
 		tr.viewDef->irradianceImage = nearest->irradianceImage;
 	}

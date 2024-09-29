@@ -12,7 +12,15 @@
 		},
 		"glew",
 		"ffmpeg",
-		"tinyexr",
-		"mikktspace"
+		"mikktspace",
+		"vulkan",
+		{
+			"name": "opengl",
+			"platform": "!windows"
+		},
+		{
+			"name": "sdl2",
+			"platform": "!windows"
+		}
 	]
 }

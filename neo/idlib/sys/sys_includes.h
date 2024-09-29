@@ -65,6 +65,26 @@ Extra attributions can be found on the CREDITS.txt file
 
 			#define DIRECTINPUT_VERSION  0x0800			// was 0x0700 with the old mssdk
 
+			#ifndef _MSC_VER
+				// RB: was missing in MinGW/include/winuser.h
+				#ifndef MAPVK_VSC_TO_VK_EX
+					#define MAPVK_VSC_TO_VK_EX 3
+				#endif
+
+				// RB begin
+				#if defined(__MINGW32__)
+					//#include <sal.h> 	// RB: missing __analysis_assume
+					// including <sal.h> breaks some STL crap ...
+
+					#ifndef __analysis_assume
+						#define __analysis_assume( x )
+					#endif
+
+				#endif
+				// RB end
+
+			#endif
+
 			#include <dinput.h>
 
 		#endif /* !GAME_DLL */

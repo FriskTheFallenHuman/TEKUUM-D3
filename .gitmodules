@@ -1,3 +1,6 @@
 [submodule "vcpkg"]
 	path = vcpkg
 	url = https://github.com/Microsoft/vcpkg.git
+[submodule "neo/libs/glslang"]
+	path = neo/libs/glslang
+	url = https://github.com/KhronosGroup/glslang.git

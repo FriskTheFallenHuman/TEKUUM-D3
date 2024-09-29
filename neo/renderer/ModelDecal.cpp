@@ -48,6 +48,8 @@ idRenderModelDecal::idRenderModelDecal() :
 	demoSerialWrite( 0 ),
 	demoSerialCurrent( 0 )
 {
+	// SRS - initialize decals so members are defined for logical tests in CreateDecalFromWinding()
+	memset( decals, 0, sizeof( decals ) );
 }
 
 /*

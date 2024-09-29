@@ -16,14 +16,14 @@ Extra attributions can be found on the CREDITS.txt file
 ===========================================================================
 */
 
-#pragma hdrstop
 #include "precompiled.h"
+#pragma hdrstop
 
 #include "../RenderCommon.h"
 #include "../RenderProgs.h"
 
 
-void RpPrintState( uint64 stateBits );
+void RpPrintState( uint64_t stateBits );
 
 struct vertexLayout_t
 {
@@ -61,8 +61,8 @@ void CreateVertexDescriptions()
 		vertexLayout_t& layout = vertexLayouts[ LAYOUT_DRAW_VERT ];
 		layout.inputState = createInfo;
 
-		uint32 locationNo = 0;
-		uint32 offset = 0;
+		uint32_t locationNo = 0;
+		uint32_t offset = 0;
 
 		binding.stride = sizeof( idDrawVert );
 		binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
@@ -114,8 +114,8 @@ void CreateVertexDescriptions()
 		vertexLayout_t& layout = vertexLayouts[ LAYOUT_DRAW_SHADOW_VERT_SKINNED ];
 		layout.inputState = createInfo;
 
-		uint32 locationNo = 0;
-		uint32 offset = 0;
+		uint32_t locationNo = 0;
+		uint32_t offset = 0;
 
 		binding.stride = sizeof( idShadowVertSkinned );
 		binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
@@ -220,7 +220,7 @@ void idRenderProgManager::CreateDescriptorSetLayout( const shader_t& vertexShade
 		VkDescriptorSetLayoutBinding binding = {};
 		binding.descriptorCount = 1;
 
-		uint32 bindingId = 0;
+		uint32_t bindingId = 0;
 
 		binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 		for( int i = 0; i < vertexShader.bindings.Num(); ++i )
@@ -330,7 +330,7 @@ CompileGLSLtoSPIRV
 
 #include <shaderc/shaderc.hpp>
 
-static int CompileGLSLtoSPIRV( const char* filename, const idStr& dataGLSL, const rpStage_t stage, uint32** spirvBuffer )
+static int CompileGLSLtoSPIRV( const char* filename, const idStr& dataGLSL, const rpStage_t stage, uint32_t** spirvBuffer )
 {
 	shaderc::Compiler compiler;
 	shaderc::CompileOptions options;
@@ -383,18 +383,13 @@ static int CompileGLSLtoSPIRV( const char* filename, const idStr& dataGLSL, cons
 }
 #else
 
-//#include <glslang/Public/ShaderLang.h>
-//#include <glslang/Include/ResourceLimits.h>
-//#include <SPIRV/GlslangToSpv.h>
-//#include <glslang/StandAlone/DirStackFileIncluder.h>
-
-#include "../../extern/glslang/glslang/Public/ShaderLang.h"
-#include "../../extern/glslang/glslang/Include/ResourceLimits.h"
-#include "../../extern/glslang/SPIRV/GlslangToSpv.h"
+#include "../../libs/glslang/glslang/Public/ShaderLang.h"
+#include "../../libs/glslang/glslang/Include/ResourceLimits.h"
+#include "../../libs/glslang/SPIRV/GlslangToSpv.h"
 
 static bool glslangInitialized = false;
 
-static int CompileGLSLtoSPIRV( const char* filename, const idStr& dataGLSL, const rpStage_t stage, uint32** spirvBuffer )
+static int CompileGLSLtoSPIRV( const char* filename, const idStr& dataGLSL, const rpStage_t stage, uint32_t** spirvBuffer )
 {
 	if( !glslangInitialized )
 	{
@@ -565,12 +560,12 @@ static int CompileGLSLtoSPIRV( const char* filename, const idStr& dataGLSL, cons
 
 	glslang::GlslangToSpv( *program->getIntermediate( shaderType ), spirV, &logger, &spvOptions );
 
-	int32 spirvLen = spirV.size() * sizeof( unsigned int );
+	int32_t spirvLen = spirV.size() * sizeof( unsigned int );
 
-	void* buffer = Mem_Alloc( spirvLen, TAG_RENDERPROG );
+	void* buffer = Mem_Alloc( spirvLen );
 	memcpy( buffer, spirV.data(), spirvLen );
 
-	*spirvBuffer = ( uint32* ) buffer;
+	*spirvBuffer = ( uint32_t* ) buffer;
 	delete program;
 	delete shader;
 	return spirvLen;
@@ -774,13 +769,13 @@ void idRenderProgManager::LoadShader( shader_t& shader )
 	}
 
 	// TODO GLSL to SPIR-V compilation
-	uint32* spirvBuffer = NULL;
+	uint32_t* spirvBuffer = NULL;
 	int spirvLen = CompileGLSLtoSPIRV( outFileGLSL.c_str(), programGLSL, shader.stage, &spirvBuffer );
 
 	VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
 	shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 	shaderModuleCreateInfo.codeSize = spirvLen;
-	shaderModuleCreateInfo.pCode = ( uint32* )spirvBuffer;
+	shaderModuleCreateInfo.pCode = ( uint32_t* )spirvBuffer;
 
 	ID_VK_CHECK( vkCreateShaderModule( vkcontext.device, &shaderModuleCreateInfo, NULL, &shader.module ) );
 
@@ -914,7 +909,7 @@ void idRenderProgManager::AllocParmBlockBuffer( const idList<int>& parmIndices, 
 GetStencilOpState
 ========================
 */
-static VkStencilOpState GetStencilOpState( uint64 stencilBits )
+static VkStencilOpState GetStencilOpState( uint64_t stencilBits )
 {
 	VkStencilOpState state = {};
 
@@ -1013,7 +1008,7 @@ static VkPipeline CreateGraphicsPipeline(
 	VkShaderModule vertexShader,
 	VkShaderModule fragmentShader,
 	VkPipelineLayout pipelineLayout,
-	uint64 stateBits )
+	uint64_t stateBits )
 {
 
 	// Pipeline
@@ -1229,8 +1224,8 @@ static VkPipeline CreateGraphicsPipeline(
 		depthStencilState.maxDepthBounds = 1.0f;
 		depthStencilState.stencilTestEnable = ( stateBits & ( GLS_STENCIL_FUNC_BITS | GLS_STENCIL_OP_BITS | GLS_SEPARATE_STENCIL ) ) != 0;
 
-		uint32 ref = uint32( ( stateBits & GLS_STENCIL_FUNC_REF_BITS ) >> GLS_STENCIL_FUNC_REF_SHIFT );
-		uint32 mask = uint32( ( stateBits & GLS_STENCIL_FUNC_MASK_BITS ) >> GLS_STENCIL_FUNC_MASK_SHIFT );
+		uint32_t ref = uint32_t( ( stateBits & GLS_STENCIL_FUNC_REF_BITS ) >> GLS_STENCIL_FUNC_REF_SHIFT );
+		uint32_t mask = uint32_t( ( stateBits & GLS_STENCIL_FUNC_MASK_BITS ) >> GLS_STENCIL_FUNC_MASK_SHIFT );
 
 		if( stateBits & GLS_SEPARATE_STENCIL )
 		{
@@ -1340,7 +1335,7 @@ static VkPipeline CreateGraphicsPipeline(
 renderProg_t::GetPipeline
 ========================
 */
-VkPipeline idRenderProgManager::renderProg_t::GetPipeline( uint64 stateBits, VkShaderModule vertexShader, VkShaderModule fragmentShader )
+VkPipeline idRenderProgManager::renderProg_t::GetPipeline( uint64_t stateBits, VkShaderModule vertexShader, VkShaderModule fragmentShader )
 {
 	for( int i = 0; i < pipelines.Num(); ++i )
 	{
@@ -1365,7 +1360,7 @@ VkPipeline idRenderProgManager::renderProg_t::GetPipeline( uint64 stateBits, VkS
 idRenderProgManager::CommitUnforms
 ================================================================================================
 */
-void idRenderProgManager::CommitUniforms( uint64 stateBits )
+void idRenderProgManager::CommitUniforms( uint64_t stateBits )
 {
 #if 0
 	const int progID = current;
@@ -1544,7 +1539,7 @@ void idRenderProgManager::CommitUniforms( uint64 stateBits )
 		pipeline );
 }
 
-void idRenderProgManager::CachePipeline( uint64 stateBits )
+void idRenderProgManager::CachePipeline( uint64_t stateBits )
 {
 	renderProg_t& prog = renderProgs[ current ];
 

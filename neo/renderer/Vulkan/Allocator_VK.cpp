@@ -15,8 +15,8 @@ Extra attributions can be found on the CREDITS.txt file
 
 ===========================================================================
 */
-#pragma hdrstop
 #include "precompiled.h"
+#pragma hdrstop
 
 #include "../RenderCommon.h"
 #include "../RenderBackend.h"
@@ -48,7 +48,7 @@ static const char* allocationTypeStrings[ VULKAN_ALLOCATION_TYPES ] =
 FindMemoryTypeIndex
 =============
 */
-uint32 FindMemoryTypeIndex( const uint32 memoryTypeBits, const vulkanMemoryUsage_t usage )
+uint32_t FindMemoryTypeIndex( const uint32_t memoryTypeBits, const vulkanMemoryUsage_t usage )
 {
 	VkPhysicalDeviceMemoryProperties& physicalMemoryProperties = vkcontext.gpu->memProps;
 
@@ -82,7 +82,7 @@ uint32 FindMemoryTypeIndex( const uint32 memoryTypeBits, const vulkanMemoryUsage
 			idLib::FatalError( "idVulkanAllocator::AllocateFromPools: Unknown memory usage." );
 	}
 
-	for( uint32 i = 0; i < physicalMemoryProperties.memoryTypeCount; ++i )
+	for( uint32_t i = 0; i < physicalMemoryProperties.memoryTypeCount; ++i )
 	{
 		if( ( ( memoryTypeBits >> i ) & 1 ) == 0 )
 		{
@@ -109,7 +109,7 @@ uint32 FindMemoryTypeIndex( const uint32 memoryTypeBits, const vulkanMemoryUsage
 		return i;
 	}
 
-	for( uint32 i = 0; i < physicalMemoryProperties.memoryTypeCount; ++i )
+	for( uint32_t i = 0; i < physicalMemoryProperties.memoryTypeCount; ++i )
 	{
 		if( ( ( memoryTypeBits >> i ) & 1 ) == 0 )
 		{
@@ -147,7 +147,7 @@ idVulkanAllocator
 idVulkanBlock::idVulkanBlock
 =============
 */
-idVulkanBlock::idVulkanBlock( const uint32 _memoryTypeIndex, const VkDeviceSize _size, vulkanMemoryUsage_t _usage ) :
+idVulkanBlock::idVulkanBlock( const uint32_t _memoryTypeIndex, const VkDeviceSize _size, vulkanMemoryUsage_t _usage ) :
 	nextBlockId( 0 ),
 	size( _size ),
 	allocated( 0 ),
@@ -310,8 +310,8 @@ idVulkanBlock::Allocate
 =============
 */
 bool idVulkanBlock::Allocate(
-	const uint32 _size,
-	const uint32 align,
+	const uint32_t _size,
+	const uint32_t align,
 	const VkDeviceSize granularity,
 	const vulkanAllocationType_t allocType,
 	vulkanAllocation_t& allocation )
@@ -495,6 +495,7 @@ idVulkanBlock::Print
 */
 void idVulkanBlock::Print()
 {
+	/*
 	int count = 0;
 	for( chunk_t* current = head; current != NULL; current = current->next )
 	{
@@ -505,9 +506,9 @@ void idVulkanBlock::Print()
 	idLib::Printf( "Usage:      %s\n", memoryUsageStrings[ usage ] );
 	idLib::Printf( "Count:      %d\n", count );
 
-	// SRS - Changed %lu to %PRIu64 pre-defined macro to handle platform differences
-	idLib::Printf( "Size:       %" PRIu64"\n", size );
-	idLib::Printf( "Allocated:  %" PRIu64"\n", allocated );
+	// SRS - Changed %lu to %PRIuPTR pre-defined macro to handle platform differences
+	idLib::Printf( "Size:       %" PRIuPTR "\n", size );
+	idLib::Printf( "Allocated:  %" PRIuPTR "\n", allocated );
 	idLib::Printf( "Next Block: %u\n", nextBlockId );
 	idLib::Printf( "------------------------\n" );
 
@@ -516,15 +517,16 @@ void idVulkanBlock::Print()
 		idLib::Printf( "{\n" );
 
 		idLib::Printf( "\tId:     %u\n", current->id );
-		// SRS - Changed %lu to %PRIu64 pre-defined macro to handle platform differences
-		idLib::Printf( "\tSize:   %" PRIu64"\n", current->size );
-		idLib::Printf( "\tOffset: %" PRIu64"\n", current->offset );
+		// SRS - Changed %lu to %PRIuPTR pre-defined macro to handle platform differences
+		idLib::Printf( "\tSize:   %" PRIuPTR "\n", current->size );
+		idLib::Printf( "\tOffset: %" PRIuPTR "\n", current->offset );
 		idLib::Printf( "\tType:   %s\n", allocationTypeStrings[ current->type ] );
 
 		idLib::Printf( "}\n" );
 	}
 
 	idLib::Printf( "\n" );
+	*/
 }
 
 /*
@@ -594,16 +596,16 @@ idVulkanAllocator::Allocate
 =============
 */
 vulkanAllocation_t idVulkanAllocator::Allocate(
-	const uint32 _size,
-	const uint32 align,
-	const uint32 memoryTypeBits,
+	const uint32_t _size,
+	const uint32_t align,
+	const uint32_t memoryTypeBits,
 	const vulkanMemoryUsage_t usage,
 	const vulkanAllocationType_t allocType )
 {
 
 	vulkanAllocation_t allocation;
 
-	uint32 memoryTypeIndex = FindMemoryTypeIndex( memoryTypeBits, usage );
+	uint32_t memoryTypeIndex = FindMemoryTypeIndex( memoryTypeBits, usage );
 	if( memoryTypeIndex == UINT32_MAX )
 	{
 		idLib::FatalError( "idVulkanAllocator::Allocate: Unable to find a memoryTypeIndex for allocation request." );
@@ -693,10 +695,11 @@ idVulkanAllocator::Print
 */
 void idVulkanAllocator::Print()
 {
+	/*
 	idLib::Printf( "Device Local MB: %d\n", int( deviceLocalMemoryBytes / 1024 * 1024 ) );
 	idLib::Printf( "Host Visible MB: %d\n", int( hostVisibleMemoryBytes / 1024 * 1024 ) );
-	// SRS - Changed %lu to %PRIu64 pre-defined macro to handle platform differences
-	idLib::Printf( "Buffer Granularity: %" PRIu64"\n", bufferImageGranularity );
+	// SRS - Changed %lu to %PRIuPTR pre-defined macro to handle platform differences
+	idLib::Printf( "Buffer Granularity: %" PRIuPTR "\n", bufferImageGranularity );
 	idLib::Printf( "\n" );
 
 	for( int i = 0; i < VK_MAX_MEMORY_TYPES; ++i )
@@ -709,19 +712,21 @@ void idVulkanAllocator::Print()
 			blocksByType[ j ]->Print();
 		}
 	}
+	*/
 }
 
+/*
 CONSOLE_COMMAND( Vulkan_PrintHeapInfo, "Print out the heap information for this hardware.", 0 )
 {
 	VkPhysicalDeviceMemoryProperties& props = vkcontext.gpu->memProps;
 
 	idLib::Printf( "Heaps %u\n------------------------\n", props.memoryHeapCount );
-	for( uint32 i = 0; i < props.memoryHeapCount; ++i )
+	for( uint32_t i = 0; i < props.memoryHeapCount; ++i )
 	{
 		VkMemoryHeap heap = props.memoryHeaps[ i ];
 
-		// SRS - Changed %lu to %PRIu64 pre-defined macro to handle platform differences
-		idLib::Printf( "id=%d, size=%" PRIu64", flags=", i, heap.size );
+		// SRS - Changed %lu to %PRIuPTR pre-defined macro to handle platform differences
+		idLib::Printf( "id=%d, size=%" PRIuPTR ", flags=", i, heap.size );
 		if( heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT )
 		{
 			idLib::Printf( "DEVICE_LOCAL" );
@@ -736,7 +741,7 @@ CONSOLE_COMMAND( Vulkan_PrintHeapInfo, "Print out the heap information for this 
 		}
 		idLib::Printf( "\n" );
 
-		for( uint32 j = 0; j < props.memoryTypeCount; ++j )
+		for( uint32_t j = 0; j < props.memoryTypeCount; ++j )
 		{
 			VkMemoryType type = props.memoryTypes[ j ];
 			if( type.heapIndex != i )
@@ -776,6 +781,7 @@ CONSOLE_COMMAND( Vulkan_PrintHeapInfo, "Print out the heap information for this 
 		idLib::Printf( "\n" );
 	}
 }
+¨*/
 
 CONSOLE_COMMAND( Vulkan_PrintAllocations, "Print out all the current allocations.", 0 )
 {

@@ -439,7 +439,7 @@ bool Net_GetUDPPacket( int netSocket, netadr_t& net_from, char* data, int& size,
 			return false;
 		}
 		char	buf[1024];
-		sprintf( buf, "Net_GetUDPPacket: %s\n", NET_ErrorString() );
+		idStr::snPrintf( buf, sizeof( buf ), "Net_GetUDPPacket: %s\n", NET_ErrorString() );
 		OutputDebugString( buf );
 		return false;
 	}
@@ -454,7 +454,7 @@ bool Net_GetUDPPacket( int netSocket, netadr_t& net_from, char* data, int& size,
 	if( ret == maxSize )
 	{
 		char	buf[1024];
-		sprintf( buf, "Net_GetUDPPacket: oversize packet from %s\n", Sys_NetAdrToString( net_from ) );
+		idStr::snPrintf( buf, sizeof( buf ), "Net_GetUDPPacket: oversize packet from %s\n", Sys_NetAdrToString( net_from ) );
 		OutputDebugString( buf );
 		return false;
 	}
@@ -498,7 +498,7 @@ void Net_SendUDPPacket( int netSocket, int length, const void* data, const netad
 		}
 
 		char	buf[1024];
-		sprintf( buf, "Net_SendUDPPacket: %s\n", NET_ErrorString() );
+		idStr::snPrintf( buf, sizeof( buf ), "Net_SendUDPPacket: %s\n", NET_ErrorString() );
 		OutputDebugString( buf );
 	}
 }

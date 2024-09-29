@@ -830,7 +830,14 @@ void idFileSystemLocal::CreateOSPath( const char* OSPath )
 		return;
 	}
 
-	idStr path( OSPath );
+	idStrStatic< MAX_OSPATH > path( OSPath );
+
+	// RB begin
+#if defined(_WIN32)
+	path.SlashesToBackSlashes();
+#endif
+	// RB end
+
 	for( ofs = &path[ 1 ]; *ofs ; ofs++ )
 	{
 		if( *ofs == PATHSEPARATOR_CHAR )
@@ -1288,11 +1295,13 @@ int idFileSystemLocal::ReadFile( const char* relativePath, void** buffer, ID_TIM
 	if( !searchPaths )
 	{
 		common->FatalError( "Filesystem call made without initialization\n" );
+		return 0;
 	}
 
-	if( !relativePath || !relativePath[0] )
+	if( relativePath == NULL || !relativePath[0] )
 	{
 		common->FatalError( "idFileSystemLocal::ReadFile with empty name\n" );
+		return 0;
 	}
 
 	if( timestamp )
@@ -1354,6 +1363,7 @@ int idFileSystemLocal::ReadFile( const char* relativePath, void** buffer, ID_TIM
 		{
 			*buffer = NULL;
 		}
+
 		return -1;
 	}
 	len = f->Length();
@@ -2521,7 +2531,6 @@ void idFileSystemLocal::TouchFileList_f( const idCmdArgs& args )
 			while( src.ReadToken( &token ) )
 			{
 				common->Printf( "%s\n", token.c_str() );
-
 				const bool captureToImage = false;
 				session->UpdateScreen( captureToImage );
 
@@ -2535,7 +2544,6 @@ void idFileSystemLocal::TouchFileList_f( const idCmdArgs& args )
 	}
 
 }
-
 
 /*
 ================
@@ -3470,7 +3478,7 @@ void idFileSystemLocal::Restart()
 	// free anything we currently have loaded
 	Shutdown( true );
 
-	Startup( );
+	Startup();
 
 	// if we can't find default.cfg, assume that the paths are
 	// busted and error out now, rather than getting an unreadable
@@ -3759,11 +3767,13 @@ idFile* idFileSystemLocal::OpenFileReadFlags( const char* relativePath, int sear
 	if( !searchPaths )
 	{
 		common->FatalError( "Filesystem call made without initialization\n" );
+		return NULL;
 	}
 
-	if( !relativePath )
+	if( relativePath == NULL )
 	{
 		common->FatalError( "idFileSystemLocal::OpenFileRead: NULL 'relativePath' parameter passed\n" );
+		return NULL;
 	}
 
 	if( foundInPak )
@@ -4064,7 +4074,7 @@ idFile* idFileSystemLocal::OpenFileReadFlags( const char* relativePath, int sear
 		}
 	}
 
-	if( fs_debug.GetInteger( ) )
+	if( fs_debug.GetInteger() )
 	{
 		common->Printf( "Can't find %s\n", relativePath );
 	}
@@ -4099,6 +4109,7 @@ idFileSystemLocal::OpenFileWrite
 */
 idFile* idFileSystemLocal::OpenFileWrite( const char* relativePath, const char* basePath )
 {
+
 	const char* path;
 	idStr OSpath;
 	idFile_Permanent* f;
@@ -4226,6 +4237,7 @@ idFileSystemLocal::OpenFileAppend
 */
 idFile* idFileSystemLocal::OpenFileAppend( const char* relativePath, bool sync, const char* basePath )
 {
+
 	const char* path;
 	idStr OSpath;
 	idFile_Permanent* f;

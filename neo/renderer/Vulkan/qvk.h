@@ -19,18 +19,14 @@ Extra attributions can be found on the CREDITS.txt file
 #ifndef __QVK_H__
 #define __QVK_H__
 
-#if defined( USE_VULKAN )
-
 #if defined(VK_USE_PLATFORM_WIN32_KHR)  //_WIN32
 	#include <Windows.h>
 #endif
 
-#define USE_AMD_ALLOCATOR
-
 #include <vulkan/vulkan.h>
 
 #if defined( USE_AMD_ALLOCATOR )
-	#include "vma.h"
+	#include "vk_mem_alloc.h"
 #endif
 
 #define ID_VK_CHECK( x ) { \
@@ -68,6 +64,5 @@ extern PFN_vkCmdBeginDebugUtilsLabelEXT		qvkCmdBeginDebugUtilsLabelEXT;
 extern PFN_vkCmdEndDebugUtilsLabelEXT		qvkCmdEndDebugUtilsLabelEXT;
 extern PFN_vkCmdInsertDebugUtilsLabelEXT	qvkCmdInsertDebugUtilsLabelEXT;
 
-#endif
 
 #endif

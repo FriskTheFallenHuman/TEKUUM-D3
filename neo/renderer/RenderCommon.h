@@ -828,9 +828,9 @@ public:
 		return bInitialized;
 	}
 	virtual void			ResetGuiModels();
-	virtual void			InitOpenGL();
-	virtual void			ShutdownOpenGL();
-	virtual bool			IsOpenGLRunning() const;
+	virtual void			InitBackend();
+	virtual void			ShutdownBackend();
+	virtual bool			IsBackendRunning() const;
 	virtual bool			IsFullScreen() const;
 	virtual stereo3DMode_t	GetStereo3DMode() const;
 	virtual bool			HasQuadBufferSupport() const;
@@ -910,7 +910,7 @@ public:
 
 public:
 	// renderer globals
-	bool					registered;		// cleared at shutdown, set at InitOpenGL
+	bool					registered;		// cleared at shutdown, set at InitBackend
 
 	bool					takingScreenshot;
 	bool					takingEnvprobe;
@@ -1029,7 +1029,6 @@ extern idCVar r_lodBias;					// lod bias
 
 extern idCVar r_useLightPortalFlow;			// 1 = do a more precise area reference determination
 extern idCVar r_useShadowSurfaceScissor;	// 1 = scissor shadows by the scissor rect of the interaction surfaces
-extern idCVar r_useConstantMaterials;		// 1 = use pre-calculated material registers if possible
 extern idCVar r_useNodeCommonChildren;		// stop pushing reference bounds early when possible
 extern idCVar r_useSilRemap;				// 1 = consider verts with the same XYZ, but different ST the same for shadows
 extern idCVar r_useLightPortalCulling;		// 0 = none, 1 = box, 2 = exact clip of polyhedron faces, 3 MVP to plane culling
@@ -1269,7 +1268,7 @@ struct glimpParms_t
 
 // Eric: If on Linux using Vulkan use the sdl_vkimp.cpp methods
 // SRS - Generalized Vulkan SDL platform
-#if defined(VULKAN_USE_PLATFORM_SDL)
+#if defined( VULKAN_USE_PLATFORM_SDL )
 #include <vector>
 
 #define CLAMP(x, lo, hi)    ((x) < (lo) ? (lo) : (x) > (hi) ? (hi) : (x))

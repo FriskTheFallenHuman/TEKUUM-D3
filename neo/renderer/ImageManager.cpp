@@ -223,7 +223,7 @@ void R_ListImages_f( const idCmdArgs& args )
 		}
 		else
 		{
-			idLib::Printf( "%4i:",	i );
+			common->Printf( "%4i:",	i );
 			image->Print();
 		}
 		totalSize += image->StorageSize();
@@ -243,13 +243,13 @@ void R_ListImages_f( const idCmdArgs& args )
 		partialSize = 0;
 		for( i = 0 ; i < count ; i++ )
 		{
-			idLib::Printf( "%4i:",	sortedArray[i].index );
+			common->Printf( "%4i:",	sortedArray[i].index );
 			sortedArray[i].image->Print();
 			partialSize += sortedArray[i].image->StorageSize();
 			if( ( ( i + 1 ) % 10 ) == 0 )
 			{
-				idLib::Printf( "-------- %5.1f of %5.1f megs --------\n",
-							   partialSize / ( 1024 * 1024.0 ), totalSize / ( 1024 * 1024.0 ) );
+				common->Printf( "-------- %5.1f of %5.1f megs --------\n",
+								partialSize / ( 1024 * 1024.0 ), totalSize / ( 1024 * 1024.0 ) );
 			}
 		}
 	}
@@ -271,7 +271,7 @@ idImage* idImageManager::AllocImage( const char* name )
 {
 	if( strlen( name ) >= MAX_IMAGE_NAME )
 	{
-		idLib::Error( "idImageManager::AllocImage: \"%s\" is too long\n", name );
+		common->Error( "idImageManager::AllocImage: \"%s\" is too long\n", name );
 	}
 
 	int hash = idStr( name ).FileNameHash();
@@ -314,7 +314,6 @@ system to be completely regenerated if needed.
 */
 idImage* idImageManager::ImageFromFunction( const char* _name, void ( *generatorFunction )( idImage* image ) )
 {
-
 	// strip any .tga file extensions from anywhere in the _name
 	idStr name = _name;
 	name.Replace( ".tga", "" );
@@ -395,7 +394,7 @@ idImage*	idImageManager::ImageFromFile( const char* _name, textureFilter_t filte
 			}
 			if( image->cubeFiles != cubeMap )
 			{
-				idLib::Error( "Image '%s' has been referenced with conflicting cube map states", _name );
+				common->Error( "Image '%s' has been referenced with conflicting cube map states", _name );
 			}
 
 			if( image->filter != filter || image->repeat != repeat )
@@ -426,7 +425,7 @@ idImage*	idImageManager::ImageFromFile( const char* _name, textureFilter_t filte
 	//
 	// create a new image
 	//
-	idImage*	 image = AllocImage( name );
+	idImage* image = AllocImage( name );
 	image->cubeFiles = cubeMap;
 	image->usage = usage;
 	image->filter = filter;
@@ -623,9 +622,9 @@ void R_CombineCubeImages_f( const idCmdArgs& args )
 {
 	if( args.Argc() != 2 )
 	{
-		idLib::Printf( "usage: combineCubeImages <baseName>\n" );
-		idLib::Printf( " combines basename[1-6][0001-9999].tga to basenameCM[0001-9999].tga\n" );
-		idLib::Printf( " 1: forward 2:right 3:back 4:left 5:up 6:down\n" );
+		common->Printf( "usage: combineCubeImages <baseName>\n" );
+		common->Printf( " combines basename[1-6][0001-9999].tga to basenameCM[0001-9999].tga\n" );
+		common->Printf( " 1: forward 2:right 3:back 4:left 5:up 6:down\n" );
 		return;
 	}
 
@@ -641,14 +640,14 @@ void R_CombineCubeImages_f( const idCmdArgs& args )
 		int		orderRemap[6] = { 1, 3, 4, 2, 5, 6 };
 		for( side = 0 ; side < 6 ; side++ )
 		{
-			sprintf( filename, "%s%i%04i.tga", baseName.c_str(), orderRemap[side], frameNum );
+			idStr::snPrintf( filename, sizeof( filename ), "%s%i%04i.tga", baseName.c_str(), orderRemap[side], frameNum );
 
-			idLib::Printf( "reading %s\n", filename );
+			common->Printf( "reading %s\n", filename );
 			R_LoadImage( filename, &pics[side], &width, &height, NULL, true, NULL );
 
 			if( !pics[side] )
 			{
-				idLib::Printf( "not found.\n" );
+				common->Printf( "not found.\n" );
 				break;
 			}
 
@@ -694,9 +693,9 @@ void R_CombineCubeImages_f( const idCmdArgs& args )
 			memcpy( combined + width * height * 4 * side, pics[side], width * height * 4 );
 			Mem_Free( pics[side] );
 		}
-		sprintf( filename, "%sCM%04i.tga", baseName.c_str(), frameNum );
+		idStr::snPrintf( filename, sizeof( filename ), "%sCM%04i.tga", baseName.c_str(), frameNum );
 
-		idLib::Printf( "writing %s\n", filename );
+		common->Printf( "writing %s\n", filename );
 		R_WriteTGA( filename, combined, width, height * 6 );
 	}
 	common->SetRefreshOnPrint( false );
@@ -803,12 +802,27 @@ void idImageManager::Preload( const idPreloadManifest& manifest, const bool& map
 	if( preLoad_Images.GetBool() && manifest.NumResources() > 0 )
 	{
 		// preload this levels images
-		idLib::Printf( "Preloading images...\n" );
+		common->Printf( "Preloading images...\n" );
 		preloadingMapImages = mapPreload;
 		int	start = Sys_Milliseconds();
 		int numLoaded = 0;
 
 		//fileSystem->StartPreload( preloadImageFiles );
+
+		// count
+		int numPreload = 0;
+		for( int i = 0; i < manifest.NumResources(); i++ )
+		{
+			const preloadEntry_s& p = manifest.GetPreloadByIndex( i );
+			if( p.resType == PRELOAD_IMAGE && !ExcludePreloadImage( p.resourceName ) )
+			{
+				numPreload++;
+			}
+		}
+
+		common->LoadPacifierInfo( "Preloading images" );
+		common->LoadPacifierProgressTotal( numPreload );
+
 		for( int i = 0; i < manifest.NumResources(); i++ )
 		{
 			const preloadEntry_s& p = manifest.GetPreloadByIndex( i );
@@ -816,12 +830,14 @@ void idImageManager::Preload( const idPreloadManifest& manifest, const bool& map
 			{
 				globalImages->ImageFromFile( p.resourceName, ( textureFilter_t )p.imgData.filter, ( textureRepeat_t )p.imgData.repeat, ( textureUsage_t )p.imgData.usage, ( cubeFiles_t )p.imgData.cubeMap );
 				numLoaded++;
+
+				common->LoadPacifierProgressIncrement( 1 );
 			}
 		}
 		//fileSystem->StopPreload();
 		int	end = Sys_Milliseconds();
-		idLib::Printf( "%05d images preloaded ( or were already loaded ) in %5.1f seconds\n", numLoaded, ( end - start ) * 0.001 );
-		idLib::Printf( "----------------------------------------\n" );
+		common->Printf( "%05d images preloaded ( or were already loaded ) in %5.1f seconds\n", numLoaded, ( end - start ) * 0.001 );
+		common->Printf( "----------------------------------------\n" );
 		preloadingMapImages = false;
 	}
 }
@@ -867,13 +883,13 @@ void idImageManager::EndLevelLoad()
 {
 	insideLevelLoad = false;
 
-	idLib::Printf( "----- idImageManager::EndLevelLoad -----\n" );
+	common->Printf( "----- idImageManager::EndLevelLoad -----\n" );
 	int start = Sys_Milliseconds();
 	int	loadCount = LoadLevelImages( true );
 
 	int	end = Sys_Milliseconds();
-	idLib::Printf( "%5i images loaded in %5.1f seconds\n", loadCount, ( end - start ) * 0.001 );
-	idLib::Printf( "----------------------------------------\n" );
+	common->Printf( "%5i images loaded in %5.1f seconds\n", loadCount, ( end - start ) * 0.001 );
+	common->Printf( "----------------------------------------\n" );
 	//R_ListImages_f( idCmdArgs( "sorted sorted", false ) );
 }
 

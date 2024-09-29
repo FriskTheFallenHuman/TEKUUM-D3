@@ -2426,7 +2426,7 @@ void CMainFrame::OnMiscSelectentitycolor()
 	if( DoColor( COLOR_ENTITY ) )
 	{
 		char	buffer[100];
-		sprintf( buffer, "%f %f %f", g_qeglobals.d_savedinfo.colors[COLOR_ENTITY][0], g_qeglobals.d_savedinfo.colors[COLOR_ENTITY][1], g_qeglobals.d_savedinfo.colors[COLOR_ENTITY][2] );
+		idStr::snPrintf( buffer, sizeof( buffer ), "%f %f %f", g_qeglobals.d_savedinfo.colors[COLOR_ENTITY][0], g_qeglobals.d_savedinfo.colors[COLOR_ENTITY][1], g_qeglobals.d_savedinfo.colors[COLOR_ENTITY][2] );
 		Select_SetKeyVal( "_color", buffer );
 		if( ent )
 		{

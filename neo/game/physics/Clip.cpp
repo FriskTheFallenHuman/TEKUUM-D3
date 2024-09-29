@@ -19,6 +19,7 @@ Extra attributions can be found on the CREDITS.txt file
 #include "precompiled.h"
 #pragma hdrstop
 
+
 #include "../Game_local.h"
 
 #define	MAX_SECTOR_DEPTH				12
@@ -64,7 +65,13 @@ idBlockAlloc<clipLink_t, 1024>	clipLinkAllocator;
 */
 
 static idList<trmCache_s*>		traceModelCache;
+static idList<trmCache_s*>		traceModelCache_Unsaved;
 static idHashIndex				traceModelHash;
+static idHashIndex				traceModelHash_Unsaved;
+const static int				TRACE_MODEL_SAVED = BIT( 16 );
+
+// SRS - statically define the default trace model used for the default clip model
+const static idTraceModel		defaultTraceModel = idBounds( idVec3( 0, 0, 0 ) ).Expand( 8 );
 
 /*
 ===============
@@ -74,7 +81,9 @@ idClipModel::ClearTraceModelCache
 void idClipModel::ClearTraceModelCache()
 {
 	traceModelCache.DeleteContents( true );
+	traceModelCache_Unsaved.DeleteContents( true );
 	traceModelHash.Free();
+	traceModelHash_Unsaved.Free();
 }
 
 /*
@@ -92,28 +101,65 @@ int idClipModel::TraceModelCacheSize()
 idClipModel::AllocTraceModel
 ===============
 */
-int idClipModel::AllocTraceModel( const idTraceModel& trm )
+int idClipModel::AllocTraceModel( const idTraceModel& trm, bool persistantThroughSaves )
 {
 	int i, hashKey, traceModelIndex;
 	trmCache_t* entry;
 
 	hashKey = GetTraceModelHashKey( trm );
-	for( i = traceModelHash.First( hashKey ); i >= 0; i = traceModelHash.Next( i ) )
+
+	if( persistantThroughSaves )
 	{
-		if( traceModelCache[i]->trm == trm )
+		// Look Inside the saved list.
+		for( i = traceModelHash.First( hashKey ); i >= 0; i = traceModelHash.Next( i ) )
 		{
-			traceModelCache[i]->refCount++;
-			return i;
+			if( traceModelCache[i]->trm == trm )
+			{
+				traceModelCache[i]->refCount++;
+				int flagged_index = i | TRACE_MODEL_SAVED;
+				return flagged_index;
+			}
 		}
 	}
+	else
+	{
+
+		// Look inside the unsaved list.
+		for( i = traceModelHash_Unsaved.First( hashKey ); i >= 0; i = traceModelHash_Unsaved.Next( i ) )
+		{
+			if( traceModelCache_Unsaved[i]->trm == trm )
+			{
+				traceModelCache_Unsaved[i]->refCount++;
+				return i;
+			}
+		}
+	}
+
 
 	entry = new trmCache_t;
 	entry->trm = trm;
 	entry->trm.GetMassProperties( 1.0f, entry->volume, entry->centerOfMass, entry->inertiaTensor );
 	entry->refCount = 1;
 
-	traceModelIndex = traceModelCache.Append( entry );
-	traceModelHash.Add( hashKey, traceModelIndex );
+	if( persistantThroughSaves )
+	{
+		traceModelIndex = traceModelCache.Append( entry );
+		traceModelHash.Add( hashKey, traceModelIndex );
+
+		// Set the saved bit.
+		traceModelIndex |= TRACE_MODEL_SAVED;
+
+	}
+	else
+	{
+		traceModelIndex = traceModelCache_Unsaved.Append( entry );
+		traceModelHash_Unsaved.Add( hashKey, traceModelIndex );
+
+		// remove the saved bit
+		traceModelIndex &= ~TRACE_MODEL_SAVED;
+
+	}
+
 	return traceModelIndex;
 }
 
@@ -124,12 +170,32 @@ idClipModel::FreeTraceModel
 */
 void idClipModel::FreeTraceModel( int traceModelIndex )
 {
-	if( traceModelIndex < 0 || traceModelIndex >= traceModelCache.Num() || traceModelCache[traceModelIndex]->refCount <= 0 )
+
+	int realTraceModelIndex = traceModelIndex & ~TRACE_MODEL_SAVED;
+
+	// Check which cache we are using.
+	if( traceModelIndex & TRACE_MODEL_SAVED )
 	{
-		gameLocal.Warning( "idClipModel::FreeTraceModel: tried to free uncached trace model" );
-		return;
+
+		if( realTraceModelIndex < 0 || realTraceModelIndex >= traceModelCache.Num() || traceModelCache[realTraceModelIndex]->refCount <= 0 )
+		{
+			gameLocal.Warning( "idClipModel::FreeTraceModel: tried to free uncached trace model" );
+			return;
+		}
+		traceModelCache[realTraceModelIndex]->refCount--;
+
 	}
-	traceModelCache[traceModelIndex]->refCount--;
+	else
+	{
+
+		if( realTraceModelIndex < 0 || realTraceModelIndex >= traceModelCache_Unsaved.Num() || traceModelCache_Unsaved[realTraceModelIndex]->refCount <= 0 )
+		{
+			gameLocal.Warning( "idClipModel::FreeTraceModel: tried to free uncached trace model" );
+			return;
+		}
+		traceModelCache_Unsaved[realTraceModelIndex]->refCount--;
+
+	}
 }
 
 /*
@@ -139,7 +205,36 @@ idClipModel::GetCachedTraceModel
 */
 idTraceModel* idClipModel::GetCachedTraceModel( int traceModelIndex )
 {
-	return &traceModelCache[traceModelIndex]->trm;
+	int realTraceModelIndex = traceModelIndex & ~TRACE_MODEL_SAVED;
+
+	if( traceModelIndex & TRACE_MODEL_SAVED )
+	{
+		return &traceModelCache[realTraceModelIndex]->trm;
+	}
+	else
+	{
+		return &traceModelCache_Unsaved[realTraceModelIndex]->trm;
+	}
+}
+
+/*
+===============
+idClipModel::GetCachedTraceModel
+===============
+*/
+trmCache_t* idClipModel::GetTraceModelEntry( int traceModelIndex )
+{
+
+	int realTraceModelIndex = traceModelIndex & ~TRACE_MODEL_SAVED;
+
+	if( traceModelIndex & TRACE_MODEL_SAVED )
+	{
+		return traceModelCache[realTraceModelIndex];
+	}
+	else
+	{
+		return traceModelCache_Unsaved[realTraceModelIndex];
+	}
 }
 
 /*
@@ -202,6 +297,9 @@ void idClipModel::RestoreTraceModels( idRestoreGame* savefile )
 		traceModelCache[i] = entry;
 		traceModelHash.Add( GetTraceModelHashKey( entry->trm ), i );
 	}
+
+	// SRS - find or allocate default trace model here since it's not referenced by objects
+	gameLocal.clip.DefaultClipModel()->traceModelIndex = AllocTraceModel( defaultTraceModel );
 }
 
 
@@ -245,7 +343,7 @@ bool idClipModel::LoadModel( const char* name )
 idClipModel::LoadModel
 ================
 */
-void idClipModel::LoadModel( const idTraceModel& trm )
+void idClipModel::LoadModel( const idTraceModel& trm, bool persistantThroughSave )
 {
 	collisionModelHandle = 0;
 	renderModelHandle = -1;
@@ -253,7 +351,7 @@ void idClipModel::LoadModel( const idTraceModel& trm )
 	{
 		FreeTraceModel( traceModelIndex );
 	}
-	traceModelIndex = AllocTraceModel( trm );
+	traceModelIndex = AllocTraceModel( trm, persistantThroughSave );
 	bounds = trm.bounds;
 }
 
@@ -334,7 +432,18 @@ idClipModel::idClipModel
 idClipModel::idClipModel( const idTraceModel& trm )
 {
 	Init();
-	LoadModel( trm );
+	LoadModel( trm, true );
+}
+
+/*
+================
+idClipModel::idClipModel
+================
+*/
+idClipModel::idClipModel( const idTraceModel& trm, bool persistantThroughSave )
+{
+	Init();
+	LoadModel( trm, persistantThroughSave );
 }
 
 /*
@@ -455,7 +564,8 @@ void idClipModel::Restore( idRestoreGame* savefile )
 	savefile->ReadInt( traceModelIndex );
 	if( traceModelIndex >= 0 )
 	{
-		traceModelCache[traceModelIndex]->refCount++;
+		int realIndex = traceModelIndex & ~TRACE_MODEL_SAVED;
+		traceModelCache[realIndex]->refCount++;
 	}
 	savefile->ReadInt( renderModelHandle );
 	savefile->ReadBool( linked );
@@ -523,7 +633,7 @@ void idClipModel::GetMassProperties( const float density, float& mass, idVec3& c
 		gameLocal.Error( "idClipModel::GetMassProperties: clip model %d on '%s' is not a trace model\n", id, entity->name.c_str() );
 	}
 
-	trmCache_t* entry = traceModelCache[traceModelIndex];
+	trmCache_t* entry = GetTraceModelEntry( traceModelIndex ); //traceModelCache[traceModelIndex];
 	mass = entry->volume * density;
 	centerOfMass = entry->centerOfMass;
 	inertiaTensor = density * entry->inertiaTensor;
@@ -772,9 +882,11 @@ void idClip::Init()
 	memset( clipSectors, 0, MAX_SECTORS * sizeof( clipSector_t ) );
 	numClipSectors = 0;
 	touchCount = -1;
+
 	// get world map bounds
 	h = collisionModelManager->LoadModel( "worldMap", false );
 	collisionModelManager->GetModelBounds( h, worldBounds );
+
 	// create world sectors
 	CreateClipSectors_r( 0, worldBounds, maxSector );
 
@@ -783,7 +895,7 @@ void idClip::Init()
 	gameLocal.Printf( "max clip sector is (%1.1f, %1.1f, %1.1f)\n", maxSector[0], maxSector[1], maxSector[2] );
 
 	// initialize a default clip model
-	defaultClipModel.LoadModel( idTraceModel( idBounds( idVec3( 0, 0, 0 ) ).Expand( 8 ) ) );
+	defaultClipModel.LoadModel( defaultTraceModel );
 
 	// set counters to zero
 	numRotations = numTranslations = numMotions = numRenderModelTraces = numContents = numContacts = 0;

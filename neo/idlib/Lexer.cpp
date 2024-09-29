@@ -237,7 +237,7 @@ void idLexer::Error( const char* str, ... )
 	}
 
 	va_start( ap, str );
-	vsprintf( text, str, ap );
+	idStr::vsnPrintf( text, sizeof( text ), str, ap );
 	va_end( ap );
 
 	if( idLexer::flags & LEXFL_NOFATALERRORS )
@@ -266,7 +266,7 @@ void idLexer::Warning( const char* str, ... )
 	}
 
 	va_start( ap, str );
-	vsprintf( text, str, ap );
+	idStr::vsnPrintf( text, sizeof( text ), str, ap );
 	va_end( ap );
 	idLib::common->Warning( "file %s, line %d: %s", idLexer::filename.c_str(), idLexer::line, text );
 }
@@ -757,7 +757,7 @@ int idLexer::ReadName( idToken* token )
 			( c >= 'A' && c <= 'Z' ) ||
 			( c >= '0' && c <= '9' ) ||
 			c == '_' ||
-			// if treating all tokens as strings, don't parse '-' as a seperate token
+			// if treating all tokens as strings, don't parse '-' as a separate token
 			( ( idLexer::flags & LEXFL_ONLYSTRINGS ) && ( c == '-' ) ) ||
 			// if special path name characters are allowed
 			( ( idLexer::flags & LEXFL_ALLOWPATHNAMES ) && ( c == '/' || c == '\\' || c == ':' || c == '.' ) ) );
@@ -1840,7 +1840,7 @@ const char* idLexer::ParseBracedSectionExact( idStr& out, int tabs )
 
 	if( !idLexer::ExpectTokenString( "{" ) )
 	{
-		return out.c_str( );
+		return out.c_str();
 	}
 
 	out = "{";

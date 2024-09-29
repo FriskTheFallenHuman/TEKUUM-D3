@@ -771,14 +771,12 @@ void idRenderBackend::PrepareStageTexturing( const shaderStage_t* pStage,  const
 	}
 	else if( pStage->texture.texgen == TG_DIFFUSE_CUBE )
 	{
-
 		// As far as I can tell, this is never used
 		idLib::Warning( "Using Diffuse Cube! Please contact Brian!" );
 
 	}
 	else if( pStage->texture.texgen == TG_GLASSWARP )
 	{
-
 		// As far as I can tell, this is never used
 		idLib::Warning( "Using GlassWarp! Please contact Brian!" );
 	}
@@ -1179,6 +1177,7 @@ GENERAL INTERACTION RENDERING
 const int INTERACTION_TEXUNIT_BUMP			= 0;
 const int INTERACTION_TEXUNIT_SPECULARMIX	= 1;
 const int INTERACTION_TEXUNIT_BASECOLOR		= 2;
+
 const int INTERACTION_TEXUNIT_FALLOFF		= 3;	// RB: also _brdfLut
 const int INTERACTION_TEXUNIT_PROJECTION	= 4;	// RB: also SSAO render target
 const int INTERACTION_TEXUNIT_SHADOWMAPS	= 5;
@@ -1492,6 +1491,8 @@ void idRenderBackend::DrawSingleInteraction( drawInteraction_t* din, bool useFas
 	}
 	else if( setInteractionShader )
 	{
+		// TODO extra paths for foliage, terrain and skin
+
 		if( specUsage == TD_SPECULAR_PBR_RMAO || specUsage == TD_SPECULAR_PBR_RMAOD )
 		{
 			// PBR path with roughness, metal and AO

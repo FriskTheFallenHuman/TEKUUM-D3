@@ -78,7 +78,6 @@ idCVar r_useViewBypass( "r_useViewBypass", "1", CVAR_RENDERER | CVAR_INTEGER, "b
 idCVar r_useLightPortalFlow( "r_useLightPortalFlow", "1", CVAR_RENDERER | CVAR_BOOL, "use a more precise area reference determination" );
 idCVar r_singleTriangle( "r_singleTriangle", "0", CVAR_RENDERER | CVAR_BOOL, "only draw a single triangle per primitive" );
 idCVar r_checkBounds( "r_checkBounds", "0", CVAR_RENDERER | CVAR_BOOL, "compare all surface bounds with precalculated ones" );
-idCVar r_useConstantMaterials( "r_useConstantMaterials", "1", CVAR_RENDERER | CVAR_BOOL, "use pre-calculated material registers if possible" );
 idCVar r_useSilRemap( "r_useSilRemap", "1", CVAR_RENDERER | CVAR_BOOL, "consider verts with the same XYZ, but different ST the same for shadows" );
 idCVar r_useNodeCommonChildren( "r_useNodeCommonChildren", "1", CVAR_RENDERER | CVAR_BOOL, "stop pushing reference bounds early when possible" );
 idCVar r_useShadowSurfaceScissor( "r_useShadowSurfaceScissor", "1", CVAR_RENDERER | CVAR_BOOL, "scissor shadows by the scissor rect of the interaction surfaces" );
@@ -360,14 +359,14 @@ void R_SetNewMode( const bool fullInit )
 			idList<vidMode_t> modeList;
 			if( !R_GetModeListForDisplay( r_fullscreen.GetInteger() - 1, modeList ) )
 			{
-				idLib::Printf( "r_fullscreen reset from %i to 1 because mode list failed.", r_fullscreen.GetInteger() );
+				idLib::Printf( "r_fullscreen reset from %i to 1 because mode list failed.\n", r_fullscreen.GetInteger() );
 				r_fullscreen.SetInteger( 1 );
 				R_GetModeListForDisplay( r_fullscreen.GetInteger() - 1, modeList );
 			}
 
 			if( modeList.Num() < 1 )
 			{
-				idLib::Printf( "Going to safe mode because mode list failed." );
+				idLib::Printf( "Going to safe mode because mode list failed.\n" );
 				goto safeMode;
 			}
 
@@ -593,26 +592,15 @@ void R_TestVideo_f( const idCmdArgs& args )
 
 	tr.testImage = globalImages->ImageFromFile( "_scratch", TF_DEFAULT, TR_REPEAT, TD_DEFAULT );
 	tr.testVideo = idCinematic::Alloc();
-	tr.testVideo->InitFromFile( args.Argv( 1 ), true );
-
-	cinData_t	cin;
-	cin = tr.testVideo->ImageForTime( 0 );
-	// SRS - Also handle ffmpeg and original RoQ decoders for test videos (using cin.image)
-	if( cin.imageY == NULL && cin.image == NULL )
+	// SRS - make sure we have a valid bink, ffmpeg, or RoQ video file, otherwise delete testVideo and return
+	// SRS - no need to call ImageForTime() here, playback is handled within idRenderBackend::DBG_TestImage()
+	if( !tr.testVideo->InitFromFile( args.Argv( 1 ), true ) )
 	{
 		delete tr.testVideo;
 		tr.testVideo = NULL;
 		tr.testImage = NULL;
 		return;
 	}
-
-	common->Printf( "%i x %i images\n", cin.imageWidth, cin.imageHeight );
-
-	int	len = tr.testVideo->AnimationLength();
-	common->Printf( "%5.1f seconds of video\n", len * 0.001 );
-
-	// SRS - Not needed or used since InitFromFile() sets the correct start time automatically
-	//tr.testVideoStartTime = tr.primaryRenderView.time[1];
 
 	// try to play the matching wav file
 	idStr	wavString = args.Argv( ( args.Argc() == 2 ) ? 1 : 2 );
@@ -896,7 +884,7 @@ If ref == NULL, common->UpdateScreen will be used
 // RB: changed .tga to .png
 void idRenderSystemLocal::TakeScreenshot( int width, int height, const char* fileName, int blends, renderView_t* ref, int exten )
 {
-	byte*		buffer;
+	byte*		buffer = nullptr;
 	int			i, j, c, temp;
 	idStr finalFileName;
 
@@ -1135,12 +1123,14 @@ void R_ScreenShot_f( const idCmdArgs& args )
 			blends = 1;
 			R_ScreenshotFilename( lastNumber, "screenshots/", checkname );
 			break;
+
 		case 2:
 			width = renderSystem->GetWidth();
 			height = renderSystem->GetHeight();
 			blends = 1;
 			checkname = args.Argv( 1 );
 			break;
+
 		case 3:
 			width = atoi( args.Argv( 1 ) );
 			height = atoi( args.Argv( 2 ) );
@@ -1431,7 +1421,7 @@ void R_SetColorMappings()
 		tr.gammaTable[i] = idMath::ClampInt( 0, 0xFFFF, inf );
 	}
 // SRS - Generalized Vulkan SDL platform
-#if defined(VULKAN_USE_PLATFORM_SDL)
+#if defined( VULKAN_USE_PLATFORM_SDL )
 	VKimp_SetGamma( tr.gammaTable, tr.gammaTable, tr.gammaTable );
 #else
 	GLimp_SetGamma( tr.gammaTable, tr.gammaTable, tr.gammaTable );
@@ -1455,10 +1445,7 @@ void GfxInfo_f( const idCmdArgs& args )
 	common->Printf( "GL_RENDERER: %s\n", glConfig.renderer_string );
 	common->Printf( "GL_VERSION: %s\n", glConfig.version_string );
 	common->Printf( "GL_EXTENSIONS: %s\n", glConfig.extensions_string );
-	if( glConfig.wgl_extensions_string )
-	{
-		common->Printf( "WGL_EXTENSIONS: %s\n", glConfig.wgl_extensions_string );
-	}
+
 	common->Printf( "GL_MAX_TEXTURE_SIZE: %d\n", glConfig.maxTextureSize );
 	common->Printf( "GL_MAX_TEXTURE_COORDS_ARB: %d\n", glConfig.maxTextureCoords );
 	common->Printf( "GL_MAX_TEXTURE_IMAGE_UNITS_ARB: %d\n", glConfig.maxTextureImageUnits );
@@ -1732,24 +1719,32 @@ void idRenderSystemLocal::Clear()
 
 	if( unitSquareTriangles != NULL )
 	{
+		Mem_Free( unitSquareTriangles->verts );
+		Mem_Free( unitSquareTriangles->indexes );
 		Mem_Free( unitSquareTriangles );
 		unitSquareTriangles = NULL;
 	}
 
 	if( zeroOneCubeTriangles != NULL )
 	{
+		Mem_Free( zeroOneCubeTriangles->verts );
+		Mem_Free( zeroOneCubeTriangles->indexes );
 		Mem_Free( zeroOneCubeTriangles );
 		zeroOneCubeTriangles = NULL;
 	}
 
 	if( zeroOneSphereTriangles != NULL )
 	{
+		Mem_Free( zeroOneSphereTriangles->verts );
+		Mem_Free( zeroOneSphereTriangles->indexes );
 		Mem_Free( zeroOneSphereTriangles );
 		zeroOneSphereTriangles = NULL;
 	}
 
 	if( testImageTriangles != NULL )
 	{
+		Mem_Free( testImageTriangles->verts );
+		Mem_Free( testImageTriangles->indexes );
 		Mem_Free( testImageTriangles );
 		testImageTriangles = NULL;
 	}
@@ -2165,6 +2160,13 @@ void idRenderSystemLocal::Shutdown()
 
 	renderModelManager->Shutdown();
 
+	// SRS - if testVideo is currently playing, make sure cinematic is deleted before ShutdownCinematic()
+	if( tr.testVideo )
+	{
+		delete tr.testVideo;
+		tr.testVideo = NULL;
+	}
+
 	idCinematic::ShutdownCinematic();
 
 	globalImages->Shutdown();
@@ -2188,11 +2190,12 @@ void idRenderSystemLocal::Shutdown()
 
 	delete guiModel;
 
+	parallelJobManager->FreeJobList( envprobeJobList );
 	parallelJobManager->FreeJobList( frontEndJobList );
 
 	Clear();
 
-	ShutdownOpenGL();
+	ShutdownBackend();
 
 	bInitialized = false;
 }
@@ -2290,10 +2293,10 @@ bool idRenderSystemLocal::AreAutomaticBackgroundSwapsRunning( autoRenderIconType
 
 /*
 ========================
-idRenderSystemLocal::InitOpenGL
+idRenderSystemLocal::InitBackend
 ========================
 */
-void idRenderSystemLocal::InitOpenGL()
+void idRenderSystemLocal::InitBackend()
 {
 	// if OpenGL isn't started, start it now
 	if( !IsInitialized() )
@@ -2315,10 +2318,10 @@ void idRenderSystemLocal::InitOpenGL()
 
 /*
 ========================
-idRenderSystemLocal::ShutdownOpenGL
+idRenderSystemLocal::ShutdownBackend
 ========================
 */
-void idRenderSystemLocal::ShutdownOpenGL()
+void idRenderSystemLocal::ShutdownBackend()
 {
 	// free the context and close the window
 	R_ShutdownFrameData();
@@ -2328,10 +2331,10 @@ void idRenderSystemLocal::ShutdownOpenGL()
 
 /*
 ========================
-idRenderSystemLocal::IsOpenGLRunning
+idRenderSystemLocal::IsBackendRunning
 ========================
 */
-bool idRenderSystemLocal::IsOpenGLRunning() const
+bool idRenderSystemLocal::IsBackendRunning() const
 {
 	return IsInitialized();
 }

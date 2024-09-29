@@ -206,7 +206,7 @@ void idRenderModelManagerLocal::WritePrecacheCommands( idFile* f )
 		}
 
 		char	str[1024];
-		sprintf( str, "touchModel %s\n", model->Name() );
+		idStr::snPrintf( str, sizeof( str ), "touchModel %s\n", model->Name() );
 		common->Printf( "%s", str );
 		f->Printf( "%s", str );
 	}
@@ -391,7 +391,6 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 	// Not one of the known formats
 	if( model == NULL )
 	{
-
 		if( extension.Length() )
 		{
 			common->Warning( "unknown model type '%s'", canonical.c_str() );
@@ -580,7 +579,7 @@ void idRenderModelManagerLocal::ReloadModels( bool forceAll )
 			}
 		}
 
-		common->DPrintf( "reloading %s.\n", model->Name() );
+		common->DPrintf( "^1Reloading %s.\n", model->Name() );
 
 		model->LoadModel();
 	}
@@ -742,7 +741,6 @@ void idRenderModelManagerLocal::EndLevelLoad()
 
 		if( !model->IsLevelLoadReferenced() && model->IsLoaded() && model->IsReloadable() )
 		{
-
 //			common->Printf( "purging %s\n", model->Name() );
 
 			purgeCount++;

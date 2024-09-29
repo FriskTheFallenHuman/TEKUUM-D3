@@ -107,6 +107,7 @@ struct idRegEntry
 	int index;
 };
 
+
 class rvGEWindowWrapper;
 class idWindow;
 

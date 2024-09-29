@@ -15,8 +15,9 @@ Extra attributions can be found on the CREDITS.txt file
 
 ===========================================================================
 */
-#pragma hdrstop
+
 #include "precompiled.h"
+#pragma hdrstop
 
 //#include "../../libs/mesa/format_r11g11b10f.h"
 
@@ -548,7 +549,7 @@ void idImage::AllocImage()
 	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 #if defined( USE_AMD_ALLOCATOR )
-	VmaMemoryRequirements vmaReq = {};
+	VmaAllocationCreateInfo vmaReq = {};
 	vmaReq.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
 	ID_VK_CHECK( vmaCreateImage( vmaAllocator, &imageCreateInfo, &vmaReq, &image, &allocation, NULL ) );
@@ -673,7 +674,7 @@ void idImage::SubImageUpload( int mipLevel, int x, int y, int z, int width, int 
 			// unpack RGBA8 to 3 floats
 			union
 			{
-				uint32	i;
+				uint32_t	i;
 				byte	b[4];
 			} tmp;
 

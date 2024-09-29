@@ -19,6 +19,7 @@ Extra attributions can be found on the CREDITS.txt file
 #include "precompiled.h"
 #pragma hdrstop
 
+
 #include "../Game_local.h"
 
 #include "TypeInfo.h"
@@ -149,8 +150,29 @@ void Cmd_ReloadScript_f( const idCmdArgs& args )
 	// recompile the scripts
 	gameLocal.program.Startup( SCRIPT_DEFAULT );
 
+	if( fileSystem->ReadFile( "doom_main.script", NULL ) > 0 )
+	{
+		gameLocal.program.CompileFile( "doom_main.script" );
+		gameLocal.program.FinishCompilation();
+	}
+
 	// error out so that the user can rerun the scripts
 	gameLocal.Error( "Exiting map to reload scripts" );
+}
+
+CONSOLE_COMMAND( reloadScript2, "Doesn't thow an error...  Use this when switching game modes", 0 )
+{
+	// shutdown the map because entities may point to script objects
+	gameLocal.MapShutdown();
+
+	// recompile the scripts
+	gameLocal.program.Startup( SCRIPT_DEFAULT );
+
+	if( fileSystem->ReadFile( "doom_main.script", NULL ) > 0 )
+	{
+		gameLocal.program.CompileFile( "doom_main.script" );
+		gameLocal.program.FinishCompilation();
+	}
 }
 
 /*
@@ -444,7 +466,7 @@ argv(0) god
 */
 void Cmd_God_f( const idCmdArgs& args )
 {
-	const char*	msg;
+	const char*		msg;
 	idPlayer*	player;
 
 	player = gameLocal.GetLocalPlayer();
@@ -478,7 +500,7 @@ argv(0) notarget
 */
 void Cmd_Notarget_f( const idCmdArgs& args )
 {
-	const char*	msg;
+	const char*		msg;
 	idPlayer*	player;
 
 	player = gameLocal.GetLocalPlayer();
@@ -510,7 +532,7 @@ argv(0) noclip
 */
 void Cmd_Noclip_f( const idCmdArgs& args )
 {
-	const char*	msg;
+	const char*		msg;
 	idPlayer*	player;
 
 	player = gameLocal.GetLocalPlayer();
@@ -613,8 +635,6 @@ Cmd_Say
 */
 static void Cmd_Say( bool team, const idCmdArgs& args )
 {
-	const char* name;
-	idStr text;
 	const char* cmd = team ? "sayTeam" : "say" ;
 
 	if( !gameLocal.isMultiplayer )
@@ -629,7 +649,7 @@ static void Cmd_Say( bool team, const idCmdArgs& args )
 		return;
 	}
 
-	text = args.Args();
+	idStr text = args.Args();
 	if( text.Length() == 0 )
 	{
 		return;
@@ -639,15 +659,13 @@ static void Cmd_Say( bool team, const idCmdArgs& args )
 	{
 		text[ text.Length() - 1 ] = '\0';
 	}
-	name = "player";
-
-	idPlayer* 	player;
+	const char* name = "player";
 
 	// here we need to special case a listen server to use the real client name instead of "server"
 	// "server" will only appear on a dedicated server
 	if( gameLocal.isClient || cvarSystem->GetCVarInteger( "net_serverDedicated" ) == 0 )
 	{
-		player = gameLocal.localClientNum >= 0 ? static_cast<idPlayer*>( gameLocal.entities[ gameLocal.localClientNum ] ) : NULL;
+		idPlayer* 	player = gameLocal.localClientNum >= 0 ? static_cast<idPlayer*>( gameLocal.entities[ gameLocal.localClientNum ] ) : NULL;
 		if( player )
 		{
 			name = player->GetUserInfo()->GetString( "ui_name", "player" );
@@ -1401,7 +1419,7 @@ static void PrintFloat( float f )
 	char buf[128];
 	int i;
 
-	for( i = sprintf( buf, "%3.2f", f ); i < 7; i++ )
+	for( i = idStr::snPrintf( buf, sizeof( buf ), "%3.2f", f ); i < 7; i++ )
 	{
 		buf[i] = ' ';
 	}
@@ -2557,10 +2575,6 @@ void Cmd_NextGUI_f( const idCmdArgs& args )
 	player->Teleport( origin, angles, NULL );
 }
 
-static void ArgCompletion_DefFile( const idCmdArgs& args, void( *callback )( const char* s ) )
-{
-	cmdSystem->ArgCompletion_FolderExtension( args, callback, "def/", true, ".def", NULL );
-}
 
 /*
 ===============
@@ -2658,7 +2672,7 @@ void idGameLocal::InitConsoleCommands()
 	cmdSystem->AddCommand( "script",				Cmd_Script_f,				CMD_FL_GAME | CMD_FL_CHEAT,	"executes a line of script" );
 	cmdSystem->AddCommand( "listCollisionModels",	Cmd_ListCollisionModels_f,	CMD_FL_GAME,				"lists collision models" );
 	cmdSystem->AddCommand( "collisionModelInfo",	Cmd_CollisionModelInfo_f,	CMD_FL_GAME,				"shows collision model info" );
-	cmdSystem->AddCommand( "reexportmodels",		Cmd_ReexportModels_f,		CMD_FL_GAME | CMD_FL_CHEAT,	"reexports models", ArgCompletion_DefFile );
+	cmdSystem->AddCommand( "reexportmodels",		Cmd_ReexportModels_f,		CMD_FL_GAME | CMD_FL_CHEAT,	"reexports models", idCmdSystem::ArgCompletion_DefFile );
 	cmdSystem->AddCommand( "reloadanims",			Cmd_ReloadAnims_f,			CMD_FL_GAME | CMD_FL_CHEAT,	"reloads animations" );
 	cmdSystem->AddCommand( "listAnims",				Cmd_ListAnims_f,			CMD_FL_GAME,				"lists all animations" );
 	cmdSystem->AddCommand( "aasStats",				Cmd_AASStats_f,				CMD_FL_GAME,				"shows AAS stats" );
@@ -2676,7 +2690,7 @@ void idGameLocal::InitConsoleCommands()
 	cmdSystem->AddCommand( "gameError",				Cmd_GameError_f,			CMD_FL_GAME | CMD_FL_CHEAT,	"causes a game error" );
 
 	cmdSystem->AddCommand( "disasmScript",			Cmd_DisasmScript_f,			CMD_FL_GAME | CMD_FL_CHEAT,	"disassembles script" );
-	cmdSystem->AddCommand( "exportmodels",			Cmd_ExportModels_f,			CMD_FL_GAME | CMD_FL_CHEAT,	"exports models", ArgCompletion_DefFile );
+	cmdSystem->AddCommand( "exportmodels",			Cmd_ExportModels_f,			CMD_FL_GAME | CMD_FL_CHEAT,	"exports models", idCmdSystem::ArgCompletion_DefFile );
 
 	// RB begin
 	cmdSystem->AddCommand( "saveEnvprobes",			Cmd_SaveEnvprobes_f,		CMD_FL_GAME | CMD_FL_CHEAT,	"saves all autogenerated env_probes to a .extras_env_probes.map file" );

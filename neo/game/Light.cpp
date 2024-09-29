@@ -183,6 +183,11 @@ void idLight::UpdateChangeableSpawnArgs( const idDict* source )
 
 	gameEdit->ParseSpawnArgsToRenderLight( source ? source : &spawnArgs, &renderLight );
 
+	// RB: allow the ingame light editor to move the light
+	GetPhysics()->SetOrigin( renderLight.origin );
+	GetPhysics()->SetAxis( renderLight.axis );
+	// RB end
+
 	UpdateVisuals();
 }
 
@@ -605,6 +610,7 @@ idLight::On
 void idLight::On()
 {
 	currentLevel = levels;
+
 	// offset the start time of the shader to sync it to the game time
 	renderLight.shaderParms[ SHADERPARM_TIMEOFFSET ] = -MS2SEC( gameLocal.time );
 	if( ( soundWasPlaying || refSound.waitfortrigger ) && refSound.shader )
@@ -624,6 +630,7 @@ idLight::Off
 void idLight::Off()
 {
 	currentLevel = 0;
+
 	// kill any sound it was making
 	if( refSound.referenceSound && refSound.referenceSound->CurrentlyPlaying() )
 	{
@@ -721,7 +728,6 @@ void idLight::BecomeBroken( idEntity* activator )
 			idVec3 origin = renderEntity.origin + renderEntity.bounds.GetCenter() * renderEntity.axis;
 			gameLocal.RadiusDamage( origin, activator, activator, this, this, damageDefName );
 		}
-
 	}
 
 	ActivateTargets( activator );
@@ -876,6 +882,12 @@ bool idLight::GetPhysicsToSoundTransform( idVec3& origin, idMat3& axis )
 	origin = localLightOrigin + renderLight.lightCenter;
 	axis = localLightAxis * GetPhysics()->GetAxis();
 	return true;
+}
+
+// RB
+idVec3 idLight::GetEditOrigin() const
+{
+	return ( GetPhysics()->GetOrigin() + GetPhysics()->GetAxis() * localLightOrigin );
 }
 
 /*
@@ -1264,7 +1276,6 @@ idLight::ClientReceiveEvent
 */
 bool idLight::ClientReceiveEvent( int event, int time, const idBitMsg& msg )
 {
-
 	switch( event )
 	{
 		case EVENT_BECOMEBROKEN:

@@ -22,6 +22,7 @@ Extra attributions can be found on the CREDITS.txt file
 	#include "Vulkan/Allocator_VK.h"
 #endif
 
+
 enum bufferMapType_t
 {
 	BM_READ,			// map for reading

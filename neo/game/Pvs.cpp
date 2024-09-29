@@ -1215,12 +1215,13 @@ pvsHandle_t idPVS::MergeCurrentPVS( pvsHandle_t pvs1, pvsHandle_t pvs2 ) const
 {
 	int i;
 	int* pvs1Ptr, *pvs2Ptr, *ptr;
-	pvsHandle_t handle;
+	pvsHandle_t handle = { 0 };
 
 	if( pvs1.i < 0 || pvs1.i >= MAX_CURRENT_PVS || pvs1.h != currentPVS[pvs1.i].handle.h ||
 			pvs2.i < 0 || pvs2.i >= MAX_CURRENT_PVS || pvs2.h != currentPVS[pvs2.i].handle.h )
 	{
 		gameLocal.Error( "idPVS::MergeCurrentPVS: invalid handle" );
+		return handle;
 	}
 
 	handle = AllocCurrentPVS( pvs1.h ^ pvs2.h );

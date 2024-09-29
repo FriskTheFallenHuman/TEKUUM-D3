@@ -332,9 +332,12 @@ void idImage::ActuallyLoadImage( bool fromBackEnd )
 	// RB: PBR HACK - RMAO maps should end with _rmao insted of _s
 	if( usage == TD_SPECULAR_PBR_RMAO )
 	{
-		if( imgName.StripTrailingOnce( "_s" ) )
+		idStr baseName = imgName;
+		baseName.StripFileExtension();
+
+		if( baseName.StripTrailingOnce( "_s" ) )
 		{
-			imgName += "_rmao";
+			imgName = baseName + "_rmao";
 		}
 	}
 	// RB end
@@ -559,7 +562,6 @@ StorageSize
 */
 int idImage::StorageSize() const
 {
-
 	if( !IsLoaded() )
 	{
 		return 0;
@@ -570,6 +572,7 @@ int idImage::StorageSize() const
 		baseSize *= 4;
 		baseSize /= 3;
 	}
+
 	baseSize *= BitsForFormat( opts.format );
 	baseSize /= 8;
 	return baseSize;

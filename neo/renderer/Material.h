@@ -249,6 +249,7 @@ struct stencilStage_t
 };
 // SP End
 
+
 static const int	MAX_FRAGMENT_IMAGES = 8;
 static const int	MAX_VERTEX_PARMS = 4;
 

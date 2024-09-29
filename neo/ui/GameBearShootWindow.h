@@ -15,7 +15,6 @@ Extra attributions can be found on the CREDITS.txt file
 
 ===========================================================================
 */
-
 #ifndef __GAME_BEARSHOOT_WINDOW_H__
 #define __GAME_BEARSHOOT_WINDOW_H__
 

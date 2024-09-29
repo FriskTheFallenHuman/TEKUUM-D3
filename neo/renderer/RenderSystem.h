@@ -166,7 +166,6 @@ struct glconfig_t
 	const char* 		vendor_string;
 	const char* 		version_string;
 	const char* 		extensions_string;
-	const char* 		wgl_extensions_string;
 	const char* 		shading_language_string;
 
 	float				glVersion;				// atof( version_string )
@@ -324,11 +323,11 @@ public:
 
 	virtual void			ResetGuiModels() = 0;
 
-	virtual void			InitOpenGL() = 0;
+	virtual void			InitBackend() = 0;
 
-	virtual void			ShutdownOpenGL() = 0;
+	virtual void			ShutdownBackend() = 0;
 
-	virtual bool			IsOpenGLRunning() const = 0;
+	virtual bool			IsBackendRunning() const = 0;
 
 	virtual bool			IsFullScreen() const = 0;
 	virtual int				GetWidth() const = 0;

@@ -529,7 +529,7 @@ void idWindow::Activate( bool activate,	idStr& act )
 	int n = ( activate ) ? ON_ACTIVATE : ON_DEACTIVATE;
 
 	//  make sure win vars are updated before activation
-	UpdateWinVars( );
+	UpdateWinVars();
 
 	RunScript( n );
 	int c = children.Num();
@@ -705,7 +705,7 @@ void idWindow::RunNamedEvent( const char* eventName )
 	int c;
 
 	// Find and run the event
-	c = namedEvents.Num( );
+	c = namedEvents.Num();
 	for( i = 0; i < c; i ++ )
 	{
 		if( namedEvents[i]->mName.Icmp( eventName ) )
@@ -1150,16 +1150,16 @@ void idWindow::DebugDraw( int time, float x, float y )
 
 			if( str.Length() )
 			{
-				sprintf( buff, "%s\n", str.c_str() );
+				idStr::snPrintf( buff, sizeof( buff ), "%s\n", str.c_str() );
 			}
 
-			sprintf( out, "Rect: %0.1f, %0.1f, %0.1f, %0.1f\n", rect.x(), rect.y(), rect.w(), rect.h() );
+			idStr::snPrintf( out, sizeof( out ), "Rect: %0.1f, %0.1f, %0.1f, %0.1f\n", rect.x(), rect.y(), rect.w(), rect.h() );
 			strcat( buff, out );
-			sprintf( out, "Draw Rect: %0.1f, %0.1f, %0.1f, %0.1f\n", drawRect.x, drawRect.y, drawRect.w, drawRect.h );
+			idStr::snPrintf( out, sizeof( out ), "Draw Rect: %0.1f, %0.1f, %0.1f, %0.1f\n", drawRect.x, drawRect.y, drawRect.w, drawRect.h );
 			strcat( buff, out );
-			sprintf( out, "Client Rect: %0.1f, %0.1f, %0.1f, %0.1f\n", clientRect.x, clientRect.y, clientRect.w, clientRect.h );
+			idStr::snPrintf( out, sizeof( out ), "Client Rect: %0.1f, %0.1f, %0.1f, %0.1f\n", clientRect.x, clientRect.y, clientRect.w, clientRect.h );
 			strcat( buff, out );
-			sprintf( out, "Cursor: %0.1f : %0.1f\n", gui->CursorX(), gui->CursorY() );
+			idStr::snPrintf( out, sizeof( out ), "Cursor: %0.1f : %0.1f\n", gui->CursorX(), gui->CursorY() );
 			strcat( buff, out );
 
 
@@ -1275,6 +1275,7 @@ void idWindow::Time()
 			}
 		}
 	}
+
 	if( gui->Active() )
 	{
 		if( gui->GetPendingCmd().Length() > 0 )
@@ -5766,7 +5767,7 @@ Returns the number of children
 */
 int idWindow::GetChildCount()
 {
-	return drawWindows.Num( );
+	return drawWindows.Num();
 }
 
 /*
@@ -5950,12 +5951,12 @@ bool idWindow::UpdateFromDictionary( idDict& dict )
 	const idKeyValue*	kv;
 	int					i;
 
-	SetDefaults( );
+	SetDefaults();
 
 	// Clear all registers since they will get recreated
-	regList.Reset( );
-	expressionRegisters.Clear( );
-	ops.Clear( );
+	regList.Reset();
+	expressionRegisters.Clear();
+	ops.Clear();
 
 	for( i = 0; i < dict.GetNumKeyVals(); i ++ )
 	{

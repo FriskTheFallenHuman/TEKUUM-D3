@@ -313,7 +313,7 @@ void RadiantInit()
 {
 
 	// make sure the renderer is initialized
-	if( !renderSystem->IsOpenGLRunning() )
+	if( !renderSystem->IsBackendRunning() )
 	{
 		common->Printf( "no OpenGL running\n" );
 		return;

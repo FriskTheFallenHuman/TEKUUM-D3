@@ -15,8 +15,9 @@ Extra attributions can be found on the CREDITS.txt file
 
 ===========================================================================
 */
-#pragma hdrstop
+
 #include "precompiled.h"
+#pragma hdrstop
 
 #include "../RenderCommon.h"
 #include "../RenderBackend.h"

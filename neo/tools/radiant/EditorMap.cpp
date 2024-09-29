@@ -1708,42 +1708,42 @@ void MemFile_fprintf( CMemFile* pMemFile, const char* string, ... )
 					case 'g':
 					case 'G':
 						f = va_arg( argPtr, double );
-						sprintf( buf, "%1.10f", f );
+						idStr::snPrintf( buff, sizeof( buff ), "%1.10f", f );
 						buf.StripTrailing( '0' );
 						buf.StripTrailing( '.' );
-						sprintf( buff, "%s", buf.c_str() );
+						idStr::snPrintf( buff, sizeof( buff ), "%s", buf.c_str() );
 						break;
 					case 'd':
 					case 'i':
 						i = va_arg( argPtr, long );
-						sprintf( buff, "%d", i );
+						idStr::snPrintf( buff, sizeof( buff ), "%d", i );
 						break;
 					case 'u':
 						u = va_arg( argPtr, unsigned long );
-						sprintf( buff, "%u", u );
+						idStr::snPrintf( buff, sizeof( buff ), "%u", u );
 						break;
 					case 'o':
 						u = va_arg( argPtr, unsigned long );
-						sprintf( buff, "%o", u );
+						idStr::snPrintf( buff, sizeof( buff ), "%o", u );
 						break;
 					case 'x':
 						u = va_arg( argPtr, unsigned long );
-						sprintf( buff, "%x", u );
+						idStr::snPrintf( buff, sizeof( buff ), "%x", u );
 						break;
 					case 'X':
 						u = va_arg( argPtr, unsigned long );
-						sprintf( buff, "%X", u );
+						idStr::snPrintf( buff, sizeof( buff ), "%X", u );
 						break;
 					case 'c':
 						i = va_arg( argPtr, long );
-						sprintf( buff, "%c", ( char ) i );
+						idStr::snPrintf( buff, sizeof( buff ), "%c", ( char ) i );
 						break;
 					case 's':
 						str = va_arg( argPtr, char* );
-						sprintf( buff, "%s", str );
+						idStr::snPrintf( buff, sizeof( buff ), "%s", str );
 						break;
 					case '%':
-						sprintf( buff, "%%" );
+						idStr::snPrintf( buff, sizeof( buff ), "%%" );
 						break;
 					default:
 						common->Error( "MemFile_fprintf: invalid %%%c", *string );
@@ -1756,10 +1756,10 @@ void MemFile_fprintf( CMemFile* pMemFile, const char* string, ... )
 				switch( *string )
 				{
 					case 't':
-						sprintf( buff, "\t" );
+						idStr::snPrintf( buff, sizeof( buff ), "\t" );
 						break;
 					case 'n':
-						sprintf( buff, "\n" );
+						idStr::snPrintf( buff, sizeof( buff ), "\n" );
 					default:
 						common->Error( "MemFile_fprintf: unknown escape character \'%c\'", *string );
 						break;
@@ -1767,7 +1767,7 @@ void MemFile_fprintf( CMemFile* pMemFile, const char* string, ... )
 				string++;
 				break;
 			default:
-				sprintf( buff, "%c", *string );
+				idStr::snPrintf( buff, sizeof( buff ), "%c", *string );
 				string++;
 				break;
 		}

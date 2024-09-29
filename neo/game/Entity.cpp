@@ -2035,7 +2035,7 @@ void idEntity::Bind( idEntity* master, bool orientated )
 
 	FinishBind();
 
-	PostBind( );
+	PostBind();
 }
 
 /*
@@ -2988,7 +2988,7 @@ bool idEntity::RunPhysics()
 	for( i = 0; i < gameLocal.push.GetNumPushedEntities(); i++ )
 	{
 		idEntity* ent = gameLocal.push.GetPushedEntity( i );
-		ent->physics->SetPushed( endTime - startTime );
+		ent->physics->SetPushed( GetPhysicsTimeStep() );
 	}
 
 	// Propogate skipMotionBlur to all team members
@@ -3275,9 +3275,9 @@ explosions and melee attacks.
 */
 bool idEntity::CanDamage( const idVec3& origin, idVec3& damagePoint ) const
 {
-	idVec3	dest;
+	idVec3 	dest;
 	trace_t	tr;
-	idVec3	midpoint;
+	idVec3 	midpoint;
 
 	// use the midpoint of the bounds instead of the origin, because
 	// bmodels may have their origin at 0,0,0
@@ -3533,7 +3533,7 @@ Can be overridden by subclasses when a thread doesn't need to be allocated.
 */
 idThread* idEntity::ConstructScriptObject()
 {
-	idThread* thread;
+	idThread*		thread;
 	const function_t* constructor;
 
 	// init the script object's data
@@ -4232,6 +4232,11 @@ idEntity::ShowEditingDialog
 */
 void idEntity::ShowEditingDialog()
 {
+}
+
+idVec3 idEntity::GetEditOrigin() const
+{
+	return GetPhysics()->GetOrigin();
 }
 
 /***********************************************************************
@@ -5403,7 +5408,7 @@ void idEntity::ReadGUIFromSnapshot( const idBitMsgDelta& msg )
 {
 	int state;
 	idUserInterface* gui;
-	state = msg.ReadByte( );
+	state = msg.ReadByte();
 	gui = renderEntity.gui[ 0 ];
 	if( gui && state != mpGUIState )
 	{
