@@ -24,7 +24,9 @@ Extra attributions can be found on the CREDITS.txt file
 #include "Model_local.h"
 #include "Model_ase.h"
 #include "Model_lwo.h"
-#include "Model_ma.h"
+#ifdef ID_MAYA_IMPORT_TOOL
+	#include "Model_ma.h"
+#endif
 #include "Model_obj.h"
 
 idCVar idRenderModelStatic::r_mergeModelSurfaces( "r_mergeModelSurfaces", "1", CVAR_BOOL | CVAR_RENDERER, "combine model surfaces with the same material" );
@@ -318,11 +320,13 @@ void idRenderModelStatic::InitFromFile( const char* fileName )
 		loaded		= LoadLWO( name, &sourceTimeStamp );
 		reloadable	= true;
 	}
+#ifdef ID_MAYA_IMPORT_TOOL
 	else if( extension.Icmp( "ma" ) == 0 )
 	{
 		loaded		= LoadMA( name, &sourceTimeStamp );
 		reloadable	= true;
 	}
+#endif
 	else
 	{
 		common->Warning( "idRenderModelStatic::InitFromFile: unknown type for model: \'%s\'", name.c_str() );
@@ -2532,6 +2536,7 @@ struct aseModel_s* idRenderModelStatic::ConvertLWOToASE( const struct st_lwObjec
 	return ase;
 }
 
+#ifdef ID_MAYA_IMPORT_TOOL
 /*
 =================
 idRenderModelStatic::ConvertMAToModelSurfaces
@@ -2920,6 +2925,7 @@ bool idRenderModelStatic::ConvertMAToModelSurfaces( const struct maModel_s* ma )
 
 	return true;
 }
+#endif
 
 /*
 =================
@@ -2973,6 +2979,7 @@ bool idRenderModelStatic::LoadLWO( const char* fileName, ID_TIME_T* sourceTimeSt
 	return true;
 }
 
+#ifdef ID_MAYA_IMPORT_TOOL
 /*
 =================
 idRenderModelStatic::LoadMA
@@ -2997,6 +3004,7 @@ bool idRenderModelStatic::LoadMA( const char* fileName, ID_TIME_T* sourceTimeSta
 
 	return true;
 }
+#endif
 
 /*
 =================

@@ -109,6 +109,9 @@ const uint32_t NUM_FRAME_DATA = 2;
 #include "../aas/AASFile.h"
 #include "../aas/AASFileManager.h"
 
+// MayaImport
+#include "../MayaImport/maya_main.h"
+
 // game
 #include "../framework/Game.h"
 

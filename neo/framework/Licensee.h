@@ -45,7 +45,7 @@ Extra attributions can be found on the CREDITS.txt file
 
 // filenames
 #ifndef CONFIG_FILE
-	#define CONFIG_FILE						"DoomConfig.cfg"
+	#define CONFIG_FILE						"Kroom3Config.cfg"
 #endif
 
 // base folder where the source code lives

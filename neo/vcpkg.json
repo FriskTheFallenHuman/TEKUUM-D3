@@ -2,8 +2,10 @@
 	"name": "kroom3",
 	"version": "0.5.0",
 	"dependencies": [
+		"curl",
 		"stb",
 		"openal-soft",
+		"opengl",
 		"freetype",
 		{
 		  "name": "freetype",

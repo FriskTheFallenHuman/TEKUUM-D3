@@ -6,6 +6,9 @@ file( GLOB GAME_AI_INCLUDES ai/*.h )
 file( GLOB GAME_AI_SOURCES ai/*.cpp )
 file( GLOB GAME_ANIM_INCLUDES anim/*.h )
 file( GLOB GAME_ANIM_SOURCES anim/*.cpp)
+if ( NOT MAYA_IMPORT )
+	list( REMOVE_ITEM GAME_ANIM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/anim/Anim_Import.cpp )
+endif()
 file( GLOB GAME_GAMESYS_INCLUDES gamesys/*.h )
 set( GAME_GAMESYS_SOURCES
 	gamesys/Class.cpp

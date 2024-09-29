@@ -330,10 +330,16 @@ idRenderModel* idRenderModelManagerLocal::GetModel( const char* _modelName, bool
 	idRenderModel* model = NULL;
 
 	// RB: Wavefront OBJ
-	if( ( extension.Icmp( "obj" ) == 0 ) || ( extension.Icmp( "ase" ) == 0 ) || ( extension.Icmp( "lwo" ) == 0 ) || ( extension.Icmp( "flt" ) == 0 ) || ( extension.Icmp( "ma" ) == 0 ) )
+	if( ( extension.Icmp( "obj" ) == 0 ) || ( extension.Icmp( "ase" ) == 0 ) || ( extension.Icmp( "lwo" ) == 0 ) )
 	{
 		model = new idRenderModelStatic;
 	}
+#ifdef ID_MAYA_IMPORT_TOOL
+	else if( extension.Icmp( "ma" ) == 0 )
+	{
+		model = new idRenderModelStatic;
+	}
+#endif
 	else if( extension.Icmp( MD5_MESH_EXT ) == 0 )
 	{
 		model = new idRenderModelMD5;

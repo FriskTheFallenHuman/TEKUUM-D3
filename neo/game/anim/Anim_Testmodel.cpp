@@ -872,14 +872,14 @@ void idTestModel::TestModel_f( const idCmdArgs& args )
 			{
 				name.DefaultFileExtension( ".ase" );
 			}
-
+#ifdef ID_MAYA_IMPORT_TOOL
 			if( strstr( name, ".ma" ) || strstr( name, ".mb" ) )
 			{
 				idModelExport exporter;
 				exporter.ExportModel( name );
 				name.SetFileExtension( MD5_MESH_EXT );
 			}
-
+#endif
 			if( !renderModelManager->CheckModel( name ) )
 			{
 				gameLocal.Printf( "Can't register model\n" );

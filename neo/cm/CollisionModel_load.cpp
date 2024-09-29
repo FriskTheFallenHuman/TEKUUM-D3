@@ -3849,7 +3849,11 @@ cm_model_t* idCollisionModelManagerLocal::LoadRenderModel( const char* fileName 
 	idStr( fileName ).ExtractFileExtension( extension );
 
 	// RB: OBJ support
-	if( ( extension.Icmp( "ase" ) != 0 ) && ( extension.Icmp( "lwo" ) != 0 ) && ( extension.Icmp( "ma" ) != 0 ) && ( extension.Icmp( "md3" ) != 0 ) && ( extension.Icmp( "obj" ) != 0 ) )
+#ifdef ID_MAYA_IMPORT_TOOL
+	if( ( extension.Icmp( "ase" ) != 0 ) && ( extension.Icmp( "lwo" ) != 0 ) && ( extension.Icmp( "md3" ) != 0 ) && ( extension.Icmp( "obj" ) != 0 ) && ( extension.Icmp( "ma" ) != 0 ) )
+#else
+	if( ( extension.Icmp( "ase" ) != 0 ) && ( extension.Icmp( "lwo" ) != 0 ) && ( extension.Icmp( "md3" ) != 0 )  && ( extension.Icmp( "obj" ) != 0 ) )
+#endif
 	{
 		return NULL;
 	}

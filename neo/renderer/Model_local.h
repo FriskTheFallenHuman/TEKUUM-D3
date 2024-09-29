@@ -104,13 +104,17 @@ public:
 
 	bool						LoadASE( const char* fileName, ID_TIME_T* sourceTimeStamp );
 	bool						LoadLWO( const char* fileName, ID_TIME_T* sourceTimeStamp );
+#ifdef ID_MAYA_IMPORT_TOOL
 	bool						LoadMA( const char* filename, ID_TIME_T* sourceTimeStamp );
+#endif
 	bool						LoadOBJ( const char* fileName, ID_TIME_T* sourceTimeStamp ); // RB
 
 	bool						ConvertOBJToModelSurfaces( const objModel_t* obj ); // RB
 	bool						ConvertASEToModelSurfaces( const struct aseModel_s* ase );
 	bool						ConvertLWOToModelSurfaces( const struct st_lwObject* lwo );
+#ifdef ID_MAYA_IMPORT_TOOL
 	bool						ConvertMAToModelSurfaces( const struct maModel_s* ma );
+#endif
 
 	struct aseModel_s* 			ConvertLWOToASE( const struct st_lwObject* obj, const char* fileName );
 

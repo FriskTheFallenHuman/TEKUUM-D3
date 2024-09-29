@@ -898,6 +898,7 @@ bool idDict::ReadFromIniFile( idFile* f )
 	return success;
 }
 
+/*
 CONSOLE_COMMAND( TestDictIniFile, "Tests the writing/reading of various items in a dict to/from an ini file", 0 )
 {
 	// Write to the file
@@ -949,6 +950,7 @@ CONSOLE_COMMAND( TestDictIniFile, "Tests the writing/reading of various items in
 		idLib::Printf( "%s=%s\n", kv->GetKey().c_str(), kv->GetValue().c_str() );
 	}
 }
+*/
 
 /*
 ================

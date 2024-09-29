@@ -20,7 +20,6 @@ Extra attributions can be found on the CREDITS.txt file
 #pragma hdrstop
 
 #include "../Game_local.h"
-#include "../../MayaImport/maya_main.h"
 
 /***********************************************************************
 
@@ -68,53 +67,6 @@ void idModelExport::Shutdown()
 	Maya_ConvertModel = NULL;
 	Maya_Error.Clear();
 	initialized = false;
-}
-
-/*
-=====================
-idModelExport::CheckMayaInstall
-
-Determines if Maya is installed on the user's machine
-=====================
-*/
-bool idModelExport::CheckMayaInstall()
-{
-#ifndef _WIN32
-	return false;
-#elif 0
-	HKEY	hKey;
-	long	lres, lType;
-
-	lres = RegOpenKey( HKEY_LOCAL_MACHINE, "SOFTWARE\\Alias|Wavefront\\Maya\\4.5\\Setup\\InstallPath", &hKey );
-
-	if( lres != ERROR_SUCCESS )
-	{
-		return false;
-	}
-
-	lres = RegQueryValueEx( hKey, "MAYA_INSTALL_LOCATION", NULL, ( unsigned long* )&lType, ( unsigned char* )NULL, ( unsigned long* )NULL );
-
-	RegCloseKey( hKey );
-
-	if( lres != ERROR_SUCCESS )
-	{
-		return false;
-	}
-	return true;
-#else
-	HKEY	hKey;
-	long	lres;
-
-	// only check the non-version specific key so that we only have to update the maya dll when new versions are released
-	lres = RegOpenKey( HKEY_LOCAL_MACHINE, "SOFTWARE\\Alias|Wavefront\\Maya", &hKey );
-	RegCloseKey( hKey );
-
-	if( lres != ERROR_SUCCESS )
-	{
-		return false;
-	}
-	return true;
-#endif
 }
 
 /*
@@ -177,8 +129,7 @@ version number has changed.
 */
 bool idModelExport::ConvertMayaToMD5()
 {
-	ID_TIME_T
-	sourceTime;
+	ID_TIME_T		sourceTime;
 	ID_TIME_T		destTime;
 	int			version;
 	idToken		cmdLine;
@@ -235,12 +186,6 @@ bool idModelExport::ConvertMayaToMD5()
 	if( !initialized )
 	{
 		initialized = true;
-
-		if( !CheckMayaInstall() )
-		{
-			Maya_Error = "Maya not installed in registry.";
-			return false;
-		}
 
 		LoadMayaDll();
 
@@ -616,12 +561,6 @@ int idModelExport::ExportModels( const char* pathname, const char* extension )
 
 	idFileList* files;
 	int			i;
-
-	if( !CheckMayaInstall() )
-	{
-		// if Maya isn't installed, don't bother checking if we have anims to export
-		return 0;
-	}
 
 	gameLocal.Printf( "--------- Exporting models --------\n" );
 	if( !g_exportMask.GetString()[ 0 ] )

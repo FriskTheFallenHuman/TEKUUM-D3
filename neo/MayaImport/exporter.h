@@ -15,6 +15,10 @@ Extra attributions can be found on the CREDITS.txt file
 
 ===========================================================================
 */
+
+#ifndef __EXPORTER_H__
+#define __EXPORTER_H__
+
 #define MAYA_DEFAULT_CAMERA		"camera1"
 
 #define	ANIM_TX			BIT( 0 )
@@ -507,3 +511,5 @@ public:
 	void					ConvertModel();
 	void					ConvertToMD3();
 };
+
+#endif /* !__EXPORTER_H__ */

@@ -19,6 +19,10 @@ Extra attributions can be found on the CREDITS.txt file
 #ifndef __MAYA_MAIN_H__
 #define __MAYA_MAIN_H__
 
+#ifndef ID_MAYA_IMPORT_API
+	#define ID_MAYA_IMPORT_API
+#endif
+
 /*
 ==============================================================
 
@@ -27,9 +31,8 @@ Extra attributions can be found on the CREDITS.txt file
 ==============================================================
 */
 
-
-typedef bool ( *exporterDLLEntry_t )( int version, idCommon* common, idSys* sys );
-typedef const char* ( *exporterInterface_t )( const char* ospath, const char* commandline );
-typedef void ( *exporterShutdown_t )();
+typedef ID_MAYA_IMPORT_API bool ( *exporterDLLEntry_t )( int version, idCommon* common, idSys* sys );
+typedef ID_MAYA_IMPORT_API const char* ( *exporterInterface_t )( const char* ospath, const char* commandline );
+typedef ID_MAYA_IMPORT_API void ( *exporterShutdown_t )( void );
 
 #endif /* !__MAYA_MAIN_H__ */

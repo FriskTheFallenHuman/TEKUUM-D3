@@ -16,9 +16,10 @@ Extra attributions can be found on the CREDITS.txt file
 ===========================================================================
 */
 
-#include "sys/platform.h"
+#include "precompiled.h"
+#pragma hdrstop
 
-#include "sound/snd_local.h"
+#include "../sound/snd_local.h"
 
 extern "C" {
 
@@ -156,5 +157,7 @@ extern "C" {
 
 	AL_API void AL_APIENTRY alSourcePlay( ALuint sid ) { }
 	AL_API void AL_APIENTRY alSourcePause( ALuint source ) {}
+
+	AL_API void AL_APIENTRY alSourceRewind( ALuint source ) {}
 
 } // extern "C"

@@ -23,3 +23,7 @@ Extra attributions can be found on the CREDITS.txt file
 
 ===============================================================================
 */
+
+#ifdef ID_DEDICATED
+#undef ID_ALLOW_TOOLS
+#endif
